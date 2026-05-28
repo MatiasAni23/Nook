@@ -1,28 +1,22 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Search, Star, MapPin, Bell } from "lucide-react";
+import { Search, Star, Bell } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { NotificationsPanel } from "../shared/NotificationsPanel";
 import { workPlaces, currentWorker, notifications } from "../../data/mockData";
-import { getCurrentUserProfile, getFirstName, getInitials } from "../../services/currentUserService";
+import { useCurrentUser } from "../../context/CurrentUserContext";
+import { getFirstName, getInitials } from "../../services/currentUserService";
 
 export function WorkerDiscoverView() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('coworking');
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
-  const [displayName, setDisplayName] = useState(currentWorker.name);
-
-  useEffect(() => {
-    getCurrentUserProfile().then((user) => {
-      if (user?.name) {
-        setDisplayName(user.name);
-      }
-    });
-  }, []);
+  const { currentUser: cachedUser } = useCurrentUser();
+  const displayName = cachedUser?.name ?? currentWorker.name;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

@@ -8,6 +8,7 @@ import { AdminStats } from "./features/admin/AdminStats";
 import { LoginView } from "./features/auth/LoginView";
 import { ProfileSetupView } from "./features/auth/ProfileSetupView";
 import { ChatView } from "./features/chat/ChatView";
+import { clearStoredCurrentUser, useCurrentUser } from "./context/CurrentUserContext";
 import { DelegateHome } from "./features/delegado/DelegateHome";
 import { DelegateLayout } from "./features/delegado/DelegateLayout";
 import { DelegateMyPlaces } from "./features/delegado/DelegateMyPlaces";
@@ -21,6 +22,7 @@ import { PlaceDetails } from "./features/mapa/PlaceDetails";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
 import { Layout } from "./features/shared/Layout";
 import { isSupabaseConfigured } from "./lib/supabase";
+import { getCurrentUserProfile } from "./services/currentUserService";
 import {
   ensureAppUserRecord,
   getAppUserRecord,
@@ -51,10 +53,12 @@ const logoutAndRedirect = async () => {
     await signOut();
   }
 
+  clearStoredCurrentUser();
   window.location.replace("/");
 };
 
 function AuthWrapper() {
+  const { clearCurrentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("student");
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
@@ -70,6 +74,11 @@ function AuthWrapper() {
     setGlobalUserRole(role);
     setUserName(appUser?.name ?? fallbackName);
     setNeedsProfileSetup(!appUser?.profile_completed && role !== "admin" && role !== "delegate");
+
+    const profile = await getCurrentUserProfile();
+    if (profile) {
+      setCurrentUser(profile);
+    }
   };
 
   useEffect(() => {
@@ -155,6 +164,7 @@ function AuthWrapper() {
     setIsAuthenticated(true);
     setUserName(name);
     setNeedsProfileSetup(true);
+    await refreshCurrentUser();
   };
 
   const handleProfileSetup = async (role: "student" | "worker", profileData: any) => {
@@ -165,6 +175,7 @@ function AuthWrapper() {
     setUserRole(role);
     setGlobalUserRole(role);
     setNeedsProfileSetup(false);
+    await refreshCurrentUser();
   };
 
   const handleLogout = async () => {
@@ -176,6 +187,7 @@ function AuthWrapper() {
     setUserRole("student");
     setGlobalUserRole("student");
     setNeedsProfileSetup(false);
+    clearCurrentUser();
   };
 
   if (isInitializing) {

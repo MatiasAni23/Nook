@@ -9,37 +9,47 @@ import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { currentWorker, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
-import { getCurrentUserProfile, getInitials, updateCurrentUserProfile } from "../../services/currentUserService";
+import { useCurrentUser } from "../../context/CurrentUserContext";
+import {
+  type CurrentUserProfile,
+  getInitials,
+  updateCurrentUserProfile,
+} from "../../services/currentUserService";
+
+function buildWorkerProfile(user: CurrentUserProfile | null) {
+  if (!user) return currentWorker;
+
+  return {
+    ...currentWorker,
+    id: user.id,
+    name: user.name,
+    avatar: user.profile?.profile_image_url ?? currentWorker.avatar,
+    company: user.profile?.company ?? "",
+    position: user.profile?.position ?? user.profile?.industry ?? "",
+    bio: user.profile?.bio ?? "",
+    online: true,
+  };
+}
 
 export function WorkerProfileView() {
   const navigate = useNavigate();
+  const {
+    clearCurrentUser,
+    currentUser: cachedUser,
+    isLoadingCurrentUser,
+    refreshCurrentUser,
+  } = useCurrentUser();
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState(currentWorker);
+  const [profile, setProfile] = useState(() => buildWorkerProfile(cachedUser));
   const [favoritePlaces] = useState([workPlaces[0], workPlaces[2], workPlaces[3]]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(isSupabaseConfigured);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-
-    getCurrentUserProfile()
-      .then((user) => {
-        if (!user) return;
-
-        setProfile((currentProfile) => ({
-          ...currentProfile,
-          id: user.id,
-          name: user.name,
-          avatar: user.profile?.profile_image_url ?? currentProfile.avatar,
-          company: user.profile?.company ?? "",
-          position: user.profile?.position ?? user.profile?.industry ?? "",
-          bio: user.profile?.bio ?? "",
-          online: true,
-        }));
-      })
-      .finally(() => setIsLoadingProfile(false));
-  }, []);
+    if (!isEditing) {
+      setProfile(buildWorkerProfile(cachedUser));
+    }
+  }, [cachedUser, isEditing]);
 
   const handleSave = async () => {
     setIsSavingProfile(true);
@@ -57,6 +67,7 @@ export function WorkerProfileView() {
         });
       }
 
+      await refreshCurrentUser();
       setIsEditing(false);
     } finally {
       setIsSavingProfile(false);
@@ -71,6 +82,7 @@ export function WorkerProfileView() {
         await signOut();
       }
     } finally {
+      clearCurrentUser();
       window.location.replace("/");
     }
   };
@@ -111,7 +123,7 @@ export function WorkerProfileView() {
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
-        {isLoadingProfile && (
+        {isLoadingCurrentUser && !cachedUser && (
           <div className="px-4 py-3 text-sm text-gray-500">Cargando perfil...</div>
         )}
 

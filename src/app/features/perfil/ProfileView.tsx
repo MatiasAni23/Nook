@@ -9,39 +9,49 @@ import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { currentUser, studyPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
-import { getCurrentUserProfile, getInitials, updateCurrentUserProfile } from "../../services/currentUserService";
+import { useCurrentUser } from "../../context/CurrentUserContext";
+import {
+  type CurrentUserProfile,
+  getInitials,
+  updateCurrentUserProfile,
+} from "../../services/currentUserService";
+
+function buildStudentProfile(user: CurrentUserProfile | null) {
+  if (!user) return currentUser;
+
+  return {
+    ...currentUser,
+    id: user.id,
+    name: user.name,
+    avatar: user.profile?.profile_image_url ?? currentUser.avatar,
+    career: user.profile?.career ?? "",
+    university: user.profile?.university ?? "",
+    subjects: user.profile?.subjects ?? [],
+    bio: user.profile?.bio ?? "",
+    online: true,
+  };
+}
 
 export function ProfileView() {
   const navigate = useNavigate();
+  const {
+    clearCurrentUser,
+    currentUser: cachedUser,
+    isLoadingCurrentUser,
+    refreshCurrentUser,
+  } = useCurrentUser();
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState(currentUser);
+  const [profile, setProfile] = useState(() => buildStudentProfile(cachedUser));
   const [newSubject, setNewSubject] = useState("");
   const [favoritePlaces] = useState([studyPlaces[0], studyPlaces[2], studyPlaces[4]]);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(isSupabaseConfigured);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-
-    getCurrentUserProfile()
-      .then((user) => {
-        if (!user) return;
-
-        setProfile((currentProfile) => ({
-          ...currentProfile,
-          id: user.id,
-          name: user.name,
-          avatar: user.profile?.profile_image_url ?? currentProfile.avatar,
-          career: user.profile?.career ?? "",
-          university: user.profile?.university ?? "",
-          subjects: user.profile?.subjects ?? [],
-          bio: user.profile?.bio ?? "",
-          online: true,
-        }));
-      })
-      .finally(() => setIsLoadingProfile(false));
-  }, []);
+    if (!isEditing) {
+      setProfile(buildStudentProfile(cachedUser));
+    }
+  }, [cachedUser, isEditing]);
 
   const handleSave = async () => {
     setIsSavingProfile(true);
@@ -60,6 +70,7 @@ export function ProfileView() {
         });
       }
 
+      await refreshCurrentUser();
       setIsEditing(false);
     } finally {
       setIsSavingProfile(false);
@@ -91,6 +102,7 @@ export function ProfileView() {
         await signOut();
       }
     } finally {
+      clearCurrentUser();
       window.location.replace("/");
     }
   };
@@ -123,7 +135,7 @@ export function ProfileView() {
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
-        {isLoadingProfile && (
+        {isLoadingCurrentUser && !cachedUser && (
           <div className="px-4 py-3 text-sm text-gray-500">Cargando perfil...</div>
         )}
 
