@@ -1,0 +1,289 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
+import { User, BookOpen, GraduationCap, Edit, LogOut, Star, Heart } from "lucide-react";
+import { Card, CardContent } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
+import { Badge } from "../../components/ui/badge";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { currentUser, studyPlaces } from "../../data/mockData";
+
+export function ProfileView() {
+  const navigate = useNavigate();
+  const [isEditing, setIsEditing] = useState(false);
+  const [profile, setProfile] = useState(currentUser);
+  const [newSubject, setNewSubject] = useState("");
+  const [favoritePlaces] = useState([studyPlaces[0], studyPlaces[2], studyPlaces[4]]);
+
+  const handleSave = () => {
+    setIsEditing(false);
+    alert("Perfil actualizado correctamente");
+  };
+
+  const addSubject = () => {
+    if (newSubject.trim() && !profile.subjects.includes(newSubject.trim())) {
+      setProfile({
+        ...profile,
+        subjects: [...profile.subjects, newSubject.trim()],
+      });
+      setNewSubject("");
+    }
+  };
+
+  const removeSubject = (subject: string) => {
+    setProfile({
+      ...profile,
+      subjects: profile.subjects.filter(s => s !== subject),
+    });
+  };
+
+  const getPlaceImage = (id: string) => {
+    const gradients = [
+      'from-gray-400 to-gray-600',
+      'from-blue-400 to-blue-600',
+      'from-green-400 to-green-600',
+      'from-orange-400 to-orange-600',
+      'from-indigo-400 to-indigo-600',
+      'from-pink-400 to-pink-600',
+      'from-cyan-400 to-cyan-600',
+      'from-red-400 to-red-600',
+    ];
+    const index = parseInt(id) % gradients.length;
+    return gradients[index];
+  };
+
+  const getPlaceIcon = (type: string) => {
+    switch (type) {
+      case 'library': return '📚';
+      case 'cafe': return '☕';
+      case 'coworking': return '💼';
+      case 'park': return '🌳';
+      default: return '📍';
+    }
+  };
+
+  return (
+    <div className="size-full flex flex-col bg-gray-50">
+      <div className="flex-1 overflow-auto pb-20">
+        {/* Header */}
+        <div className="px-4 pt-8 pb-6 bg-white">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-2xl" style={{ fontWeight: 700 }}>Mi Perfil</h1>
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="px-4 py-2 rounded-full bg-[#4F46E5] text-white text-sm font-medium hover:bg-[#4338CA] transition-all"
+              >
+                <Edit className="size-4 inline mr-1" />
+                Editar
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 rounded-full bg-gray-200 text-gray-700 text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 rounded-full bg-[#4F46E5] text-white text-sm font-medium"
+                >
+                  Guardar
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Avatar and name */}
+          <div className="flex items-center gap-4 mb-6">
+            <Avatar className="size-24 border-4 border-white shadow-lg">
+              <AvatarFallback className="bg-[#4F46E5] text-white text-3xl">
+                {profile.name.split(' ').map(n => n[0]).join('')}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+              {isEditing ? (
+                <Input
+                  value={profile.name}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  placeholder="Tu nombre"
+                  className="h-10 text-lg font-semibold"
+                />
+              ) : (
+                <h2 className="text-xl mb-1" style={{ fontWeight: 700 }}>{profile.name}</h2>
+              )}
+              <div className="flex items-center gap-2">
+                <div className={`size-2 rounded-full ${profile.online ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className="text-sm text-gray-600">
+                  {profile.online ? 'En línea' : 'Desconectado'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bio */}
+          {isEditing ? (
+            <Textarea
+              value={profile.bio}
+              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              placeholder="Cuéntanos sobre ti"
+              className="mb-4 bg-gray-50 border-0"
+              rows={3}
+            />
+          ) : (
+            <p className="text-sm text-gray-600 mb-4">{profile.bio}</p>
+          )}
+
+          {/* Info */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <GraduationCap className="size-5 text-[#4F46E5]" />
+              {isEditing ? (
+                <Input
+                  value={profile.career}
+                  onChange={(e) => setProfile({ ...profile, career: e.target.value })}
+                  placeholder="Tu carrera"
+                  className="h-9 bg-gray-50 border-0"
+                />
+              ) : (
+                <span className="text-sm font-medium">{profile.career}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-5 text-[#4F46E5]" />
+              {isEditing ? (
+                <Input
+                  value={profile.university}
+                  onChange={(e) => setProfile({ ...profile, university: e.target.value })}
+                  placeholder="Tu universidad"
+                  className="h-9 bg-gray-50 border-0"
+                />
+              ) : (
+                <span className="text-sm font-medium">{profile.university}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="px-4 py-4">
+          <div className="grid grid-cols-3 gap-3">
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="pt-4 pb-3 text-center">
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>12</p>
+                <p className="text-xs text-gray-600">Lugares visitados</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="pt-4 pb-3 text-center">
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>8</p>
+                <p className="text-xs text-gray-600">Compañeros</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white border-0 shadow-sm">
+              <CardContent className="pt-4 pb-3 text-center">
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>45</p>
+                <p className="text-xs text-gray-600">Horas estudiadas</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Materias */}
+        <div className="px-4 pb-4">
+          <h3 className="text-lg mb-3" style={{ fontWeight: 700 }}>Mis materias</h3>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {profile.subjects.map((subject) => (
+              <Badge key={subject} className="bg-[#4F46E5] text-white text-sm px-3 py-1">
+                {subject}
+                {isEditing && (
+                  <button
+                    className="ml-2 hover:text-red-200"
+                    onClick={() => removeSubject(subject)}
+                  >
+                    ×
+                  </button>
+                )}
+              </Badge>
+            ))}
+            {profile.subjects.length === 0 && (
+              <p className="text-sm text-gray-500">No hay materias agregadas</p>
+            )}
+          </div>
+          {isEditing && (
+            <div className="flex gap-2">
+              <Input
+                value={newSubject}
+                onChange={(e) => setNewSubject(e.target.value)}
+                placeholder="Nueva materia"
+                onKeyDown={(e) => e.key === 'Enter' && addSubject()}
+                className="h-10 bg-white"
+              />
+              <button
+                onClick={addSubject}
+                className="px-5 py-2 rounded-full bg-[#4F46E5] text-white text-sm font-medium whitespace-nowrap"
+              >
+                Agregar
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Lugares favoritos */}
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg" style={{ fontWeight: 700 }}>Lugares favoritos</h3>
+            <Heart className="size-5 text-red-500 fill-red-500" />
+          </div>
+          <div className="space-y-3">
+            {favoritePlaces.map((place) => (
+              <Card
+                key={place.id}
+                className="cursor-pointer hover:shadow-lg transition-all overflow-hidden bg-white"
+                onClick={() => navigate(`/app/place/${place.id}`)}
+              >
+                <CardContent className="p-0">
+                  <div className="flex gap-3 p-3">
+                    <div className={`relative w-20 h-20 rounded-xl bg-gradient-to-br ${getPlaceImage(place.id)} flex items-center justify-center shrink-0`}>
+                      <span className="text-3xl">{getPlaceIcon(place.type)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h4 className="font-semibold text-sm line-clamp-1">{place.name}</h4>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Star className="size-3 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm font-semibold">{place.rating}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-1">Las Condes, Santiago</p>
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="text-xs px-2 py-0 border-gray-300">
+                          WiFi
+                        </Badge>
+                        <Badge variant="outline" className="text-xs px-2 py-0 border-gray-300">
+                          Café
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Logout */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={() => window.location.href = "/"}
+            className="w-full py-3 rounded-lg border-2 border-red-200 text-red-600 hover:bg-red-50 transition-all font-medium"
+          >
+            <LogOut className="size-4 inline mr-2" />
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
