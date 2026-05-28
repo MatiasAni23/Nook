@@ -11,33 +11,35 @@ interface LoginViewProps {
   onRegister?: (name: string, email: string, phone: string, password: string) => Promise<void> | void;
 }
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailPattern = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 
 function isValidEmail(email: string) {
   return emailPattern.test(email.trim());
 }
 
-function getPhoneDigits(phone: string) {
-  return phone.replace(/\D/g, "");
+function getEmailValidationMessage(email: string) {
+  const trimmedEmail = email.trim();
+
+  if (!trimmedEmail) return "Ingresa tu correo.";
+  if (!trimmedEmail.includes("@")) return "El correo debe contener @.";
+
+  const [, domain = ""] = trimmedEmail.split("@");
+  if (!domain.includes(".")) return "El dominio del correo debe contener un punto.";
+  if (!isValidEmail(trimmedEmail)) return "Ingresa un correo valido.";
+
+  return "";
 }
 
-function isValidChilePhone(phone: string) {
-  const digits = getPhoneDigits(phone);
-  return /^569\d{8}$/.test(digits) || /^9\d{8}$/.test(digits);
+function getPhoneInputDigits(value: string) {
+  return value.replace(/\D/g, "").slice(0, 8);
 }
 
-function normalizeChilePhone(phone: string) {
-  const digits = getPhoneDigits(phone);
+function isValidChileMobileDigits(digits: string) {
+  return /^\d{8}$/.test(digits);
+}
 
-  if (/^9\d{8}$/.test(digits)) {
-    return `+56${digits}`;
-  }
-
-  if (/^569\d{8}$/.test(digits)) {
-    return `+${digits}`;
-  }
-
-  return phone.trim();
+function normalizeChilePhone(digits: string) {
+  return `+569${digits}`;
 }
 
 function getPasswordScore(password: string) {
@@ -125,14 +127,43 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   const passwordsMismatch =
     registerPasswordConfirm.length > 0 && registerPassword !== registerPasswordConfirm;
 
+  const clearLoginForm = () => {
+    setLoginEmail("");
+    setLoginPassword("");
+    setShowLoginPassword(false);
+  };
+
+  const clearRegisterForm = () => {
+    setRegisterName("");
+    setRegisterEmail("");
+    setRegisterPhone("");
+    setRegisterPassword("");
+    setRegisterPasswordConfirm("");
+    setShowRegisterPassword(false);
+    setShowRegisterPasswordConfirm(false);
+  };
+
+  const handleTabChange = (value: string) => {
+    setErrorMessage("");
+    setIsSubmitting(false);
+
+    if (value === "login") {
+      clearRegisterForm();
+      return;
+    }
+
+    clearLoginForm();
+  };
+
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       setErrorMessage("Ingresa tu correo y contrasena.");
       return;
     }
 
-    if (!isValidEmail(loginEmail)) {
-      setErrorMessage("Ingresa un correo valido.");
+    const loginEmailError = getEmailValidationMessage(loginEmail);
+    if (loginEmailError) {
+      setErrorMessage(loginEmailError);
       return;
     }
 
@@ -154,13 +185,14 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
       return;
     }
 
-    if (!isValidEmail(registerEmail)) {
-      setErrorMessage("Ingresa un correo valido.");
+    const registerEmailError = getEmailValidationMessage(registerEmail);
+    if (registerEmailError) {
+      setErrorMessage(registerEmailError);
       return;
     }
 
-    if (!isValidChilePhone(registerPhone)) {
-      setErrorMessage("Ingresa un telefono chileno valido. Ej: +56 9 1234 5678.");
+    if (!isValidChileMobileDigits(registerPhone)) {
+      setErrorMessage("Ingresa los 8 digitos restantes de tu telefono. Ej: +56 9 1234 5678.");
       return;
     }
 
@@ -207,7 +239,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
           <p className="text-sm text-gray-600">Plataforma de gestion de espacios de estudio</p>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" onValueChange={() => setErrorMessage("")}>
+          <Tabs defaultValue="login" onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Iniciar Sesion</TabsTrigger>
               <TabsTrigger value="register">Registrarse</TabsTrigger>
@@ -258,13 +290,6 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                 <LogIn className="size-4 mr-2" />
                 {isSubmitting ? "Ingresando..." : "Iniciar Sesion"}
               </Button>
-              <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-                <p className="font-semibold mb-2">Nota:</p>
-                <p>
-                  Las cuentas deben existir en Supabase Authentication. Las credenciales demo solo
-                  funcionan si las creaste ahi.
-                </p>
-              </div>
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4 mt-4">
@@ -289,14 +314,25 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="register-phone">Telefono</Label>
-                <Input
-                  id="register-phone"
-                  type="tel"
-                  placeholder="+56 9 1234 5678"
-                  value={registerPhone}
-                  onChange={(e) => setRegisterPhone(e.target.value)}
-                />
-                <p className="text-xs text-gray-500">Acepta +56 9 1234 5678 o 912345678.</p>
+                <div className="flex min-h-10 overflow-hidden rounded-md border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-purple-200">
+                  <div className="flex w-20 shrink-0 items-center justify-center whitespace-nowrap border-r border-gray-200 bg-gray-50 px-3 text-sm text-gray-600">
+                    +56 9
+                  </div>
+                  <Input
+                    id="register-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="1234 5678"
+                    value={registerPhone}
+                    maxLength={8}
+                    className="border-0 shadow-none focus-visible:ring-0"
+                    onChange={(e) => setRegisterPhone(getPhoneInputDigits(e.target.value))}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      setRegisterPhone(getPhoneInputDigits(e.clipboardData.getData("text")));
+                    }}
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="register-password">Contrasena</Label>

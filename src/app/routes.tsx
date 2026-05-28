@@ -46,6 +46,14 @@ const setGlobalUserRole = (role: UserRole) => {
   }
 };
 
+const logoutAndRedirect = async () => {
+  if (isSupabaseConfigured) {
+    await signOut();
+  }
+
+  window.location.replace("/");
+};
+
 function AuthWrapper() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("student");
@@ -214,7 +222,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    element: <AdminLayout onLogout={() => window.location.href = "/"} />,
+    element: <AdminLayout onLogout={logoutAndRedirect} />,
     children: [
       { index: true, Component: AdminHome },
       { path: "places", Component: AdminManagePlaces },
@@ -224,7 +232,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/delegate",
-    element: <DelegateLayout onLogout={() => window.location.href = "/"} />,
+    element: <DelegateLayout onLogout={logoutAndRedirect} />,
     children: [
       { index: true, Component: DelegateHome },
       { path: "places", Component: DelegateMyPlaces },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { User, BookOpen, GraduationCap, Edit, LogOut, Star, Heart } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -7,6 +7,9 @@ import { Textarea } from "../../components/ui/textarea";
 import { Badge } from "../../components/ui/badge";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { currentUser, studyPlaces } from "../../data/mockData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import { signOut } from "../../services/authService";
+import { getCurrentUserProfile, getInitials, updateCurrentUserProfile } from "../../services/currentUserService";
 
 export function ProfileView() {
   const navigate = useNavigate();
@@ -14,10 +17,53 @@ export function ProfileView() {
   const [profile, setProfile] = useState(currentUser);
   const [newSubject, setNewSubject] = useState("");
   const [favoritePlaces] = useState([studyPlaces[0], studyPlaces[2], studyPlaces[4]]);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(isSupabaseConfigured);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  const handleSave = () => {
-    setIsEditing(false);
-    alert("Perfil actualizado correctamente");
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    getCurrentUserProfile()
+      .then((user) => {
+        if (!user) return;
+
+        setProfile((currentProfile) => ({
+          ...currentProfile,
+          id: user.id,
+          name: user.name,
+          avatar: user.profile?.profile_image_url ?? currentProfile.avatar,
+          career: user.profile?.career ?? "",
+          university: user.profile?.university ?? "",
+          subjects: user.profile?.subjects ?? [],
+          bio: user.profile?.bio ?? "",
+          online: true,
+        }));
+      })
+      .finally(() => setIsLoadingProfile(false));
+  }, []);
+
+  const handleSave = async () => {
+    setIsSavingProfile(true);
+
+    try {
+      if (isSupabaseConfigured) {
+        await updateCurrentUserProfile({
+          name: profile.name,
+          role: "student",
+          profileData: {
+            career: profile.career,
+            university: profile.university,
+            subjects: profile.subjects,
+            bio: profile.bio,
+          },
+        });
+      }
+
+      setIsEditing(false);
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
   const addSubject = () => {
@@ -35,6 +81,18 @@ export function ProfileView() {
       ...profile,
       subjects: profile.subjects.filter(s => s !== subject),
     });
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      if (isSupabaseConfigured) {
+        await signOut();
+      }
+    } finally {
+      window.location.replace("/");
+    }
   };
 
   const getPlaceImage = (id: string) => {
@@ -65,6 +123,10 @@ export function ProfileView() {
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
+        {isLoadingProfile && (
+          <div className="px-4 py-3 text-sm text-gray-500">Cargando perfil...</div>
+        )}
+
         {/* Header */}
         <div className="px-4 pt-8 pb-6 bg-white">
           <div className="flex items-center justify-between mb-6">
@@ -87,9 +149,10 @@ export function ProfileView() {
                 </button>
                 <button
                   onClick={handleSave}
+                  disabled={isSavingProfile}
                   className="px-4 py-2 rounded-full bg-[#4F46E5] text-white text-sm font-medium"
                 >
-                  Guardar
+                  {isSavingProfile ? "Guardando..." : "Guardar"}
                 </button>
               </div>
             )}
@@ -99,7 +162,7 @@ export function ProfileView() {
           <div className="flex items-center gap-4 mb-6">
             <Avatar className="size-24 border-4 border-white shadow-lg">
               <AvatarFallback className="bg-[#4F46E5] text-white text-3xl">
-                {profile.name.split(' ').map(n => n[0]).join('')}
+                {getInitials(profile.name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
@@ -276,7 +339,8 @@ export function ProfileView() {
         {/* Logout */}
         <div className="px-4 pb-4">
           <button
-            onClick={() => window.location.href = "/"}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
             className="w-full py-3 rounded-lg border-2 border-red-200 text-red-600 hover:bg-red-50 transition-all font-medium"
           >
             <LogOut className="size-4 inline mr-2" />

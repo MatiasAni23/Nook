@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { APIProvider, AdvancedMarker, Map, Pin } from "@vis.gl/react-google-maps";
 import { Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
@@ -9,6 +10,8 @@ import { studyPlaces, workPlaces } from "../../data/mockData";
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
 };
+
+const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 export function MapView() {
   const navigate = useNavigate();
@@ -134,40 +137,87 @@ export function MapView() {
 
       {/* Map */}
       <div className="flex-1 relative bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="absolute inset-0">
-          {/* User location */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-            <div className="relative">
-              <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
-                <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
+        {googleMapsApiKey ? (
+          <APIProvider apiKey={googleMapsApiKey}>
+            <Map
+              defaultCenter={userLocation}
+              defaultZoom={13}
+              mapId="nook-map"
+              disableDefaultUI
+              gestureHandling="greedy"
+              className="absolute inset-0"
+            >
+              <AdvancedMarker position={userLocation} zIndex={30}>
+                <div className="relative">
+                  <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
+                    <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
+                  </div>
+                </div>
+              </AdvancedMarker>
+
+              {places.map((place) => {
+                const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
+
+                return (
+                  <AdvancedMarker
+                    key={place.id}
+                    position={{ lat: place.lat, lng: place.lng }}
+                    onClick={() => navigate(placeUrl)}
+                  >
+                    <button className="transition-transform hover:scale-110">
+                      <Pin
+                        background="#ffffff"
+                        borderColor="#4F46E5"
+                        glyphColor="#4F46E5"
+                        glyph={getPlaceIcon(place.type)}
+                        scale={1.15}
+                      />
+                    </button>
+                  </AdvancedMarker>
+                );
+              })}
+            </Map>
+          </APIProvider>
+        ) : (
+          <div className="absolute inset-0">
+            <div className="absolute left-4 right-4 top-4 z-30 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+              Agrega VITE_GOOGLE_MAPS_API_KEY en .env para activar Google Maps.
+            </div>
+
+            {/* User location */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+              <div className="relative">
+                <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
+                  <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
+                </div>
               </div>
             </div>
+
+            {/* Place markers with icons only */}
+            {places.map((place) => {
+              const offsetX = (place.lng - userLocation.lng) * 3000;
+              const offsetY = (userLocation.lat - place.lat) * 3000;
+              const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
+
+              return (
+                <button
+                  key={place.id}
+                  className="absolute z-0 transition-transform hover:scale-110"
+                  style={{
+                    left: `calc(50% + ${offsetX}px)`,
+                    top: `calc(50% + ${offsetY}px)`,
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                  onClick={() => navigate(placeUrl)}
+                >
+                  <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-white">
+                    <span className="text-2xl">{getPlaceIcon(place.type)}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
-
-          {/* Place markers with icons only */}
-          {places.map((place) => {
-            const offsetX = (place.lng - userLocation.lng) * 3000;
-            const offsetY = (userLocation.lat - place.lat) * 3000;
-            const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
-
-            return (
-              <button
-                key={place.id}
-                className="absolute z-0 transition-transform hover:scale-110"
-                style={{
-                  left: `calc(50% + ${offsetX}px)`,
-                  top: `calc(50% + ${offsetY}px)`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                onClick={() => navigate(placeUrl)}
-              >
-                <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-white">
-                  <span className="text-2xl">{getPlaceIcon(place.type)}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        )}
       </div>
 
       {/* Bottom section - Cerca de ti (collapsible) */}

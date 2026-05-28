@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Search, Star, MapPin, Bell, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -7,12 +7,22 @@ import { Input } from "../../components/ui/input";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { NotificationsPanel } from "../shared/NotificationsPanel";
 import { studyPlaces, currentUser, placeIssues, notifications } from "../../data/mockData";
+import { getCurrentUserProfile, getFirstName, getInitials } from "../../services/currentUserService";
 
 export function DiscoverView() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('cowork');
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [displayName, setDisplayName] = useState(currentUser.name);
+
+  useEffect(() => {
+    getCurrentUserProfile().then((user) => {
+      if (user?.name) {
+        setDisplayName(user.name);
+      }
+    });
+  }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -92,7 +102,7 @@ export function DiscoverView() {
               </button>
               <Avatar className="size-10">
                 <AvatarFallback className="bg-[#4F46E5] text-white">
-                  {currentUser.name.split(' ').map(n => n[0]).join('')}
+                  {getInitials(displayName)}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -100,7 +110,7 @@ export function DiscoverView() {
 
           <div className="mb-4">
             <h2 className="text-xl mb-1" style={{ fontWeight: 700 }}>
-              ¡Hola, {currentUser.name.split(' ')[0]}! 👋
+              ¡Hola, {getFirstName(displayName)}! 👋
             </h2>
             <p className="text-gray-600 text-sm">¿Dónde quieres estudiar hoy?</p>
           </div>
