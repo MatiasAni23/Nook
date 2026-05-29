@@ -82,6 +82,43 @@ export async function signUpWithEmail({ name, email, phone, password }: Register
   return data;
 }
 
+export async function sendPasswordRecoveryCode(email: string) {
+  const client = requireSupabase();
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/recover-password`,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function verifyPasswordRecoveryCode(email: string, code: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.auth.verifyOtp({
+    email,
+    token: code,
+    type: "recovery",
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateRecoveredPassword(password: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.auth.updateUser({ password });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
 export async function signOut() {
   const client = requireSupabase();
   const { error } = await client.auth.signOut();
@@ -153,6 +190,9 @@ export async function saveProfileSetup({ role, profileData }: ProfileSetupInput)
       {
         user_id: userData.user.id,
         university: profileData.university ?? null,
+        region_id: profileData.regionId ?? null,
+        institution_id: profileData.institutionId ?? null,
+        city_id: profileData.cityId ?? null,
         career: profileData.career ?? null,
         subjects: profileData.subjects ?? null,
         company: profileData.company ?? null,

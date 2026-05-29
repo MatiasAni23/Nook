@@ -7,6 +7,7 @@ import { AdminManagePlaces } from "./features/admin/AdminManagePlaces";
 import { AdminStats } from "./features/admin/AdminStats";
 import { LoginView } from "./features/auth/LoginView";
 import { ProfileSetupView } from "./features/auth/ProfileSetupView";
+import { RecoverPasswordView } from "./features/auth/RecoverPasswordView";
 import { ChatView } from "./features/chat/ChatView";
 import { clearStoredCurrentUser, useCurrentUser } from "./context/CurrentUserContext";
 import { DelegateHome } from "./features/delegado/DelegateHome";
@@ -217,6 +218,10 @@ export const router = createBrowserRouter([
   {
     path: "/",
     Component: AuthWrapper,
+  },
+  {
+    path: "/recover-password",
+    Component: RecoverPasswordView,
   },
   {
     path: "/app",

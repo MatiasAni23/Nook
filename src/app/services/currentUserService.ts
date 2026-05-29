@@ -8,6 +8,9 @@ export interface CurrentUserProfile {
   phone?: string | null;
   profile: {
     university?: string | null;
+    region_id?: string | null;
+    institution_id?: string | null;
+    city_id?: string | null;
     career?: string | null;
     subjects?: string[] | null;
     company?: string | null;
@@ -16,6 +19,16 @@ export interface CurrentUserProfile {
     industry?: string | null;
     bio?: string | null;
     profile_image_url?: string | null;
+    institutions?: {
+      name: string | null;
+      type: string | null;
+    } | null;
+    cities?: {
+      name: string | null;
+      regions?: {
+        name: string | null;
+      } | null;
+    } | null;
   } | null;
 }
 
@@ -36,7 +49,22 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
 
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("university, career, subjects, company, position, is_independent, industry, bio, profile_image_url")
+    .select(`
+      university,
+      region_id,
+      institution_id,
+      city_id,
+      career,
+      subjects,
+      company,
+      position,
+      is_independent,
+      industry,
+      bio,
+      profile_image_url,
+      institutions:institution_id(name, type),
+      cities:city_id(name, regions:region_id(name))
+    `)
     .eq("user_id", authData.user.id)
     .maybeSingle();
 
@@ -83,6 +111,9 @@ export async function updateCurrentUserProfile(input: {
       {
         user_id: authData.user.id,
         university: input.profileData.university ?? null,
+        region_id: input.profileData.regionId ?? null,
+        institution_id: input.profileData.institutionId ?? null,
+        city_id: input.profileData.cityId ?? null,
         career: input.profileData.career ?? null,
         subjects: input.profileData.subjects ?? null,
         company: input.profileData.company ?? null,

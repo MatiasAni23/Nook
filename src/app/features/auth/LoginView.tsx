@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -107,6 +108,7 @@ function PasswordVisibilityButton({
 }
 
 export function LoginView({ onLogin, onRegister }: LoginViewProps) {
+  const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
@@ -283,13 +285,20 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                 </div>
               </div>
               <Button
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
                 onClick={handleLogin}
                 disabled={isSubmitting}
               >
                 <LogIn className="size-4 mr-2" />
                 {isSubmitting ? "Ingresando..." : "Iniciar Sesion"}
               </Button>
+              <button
+                type="button"
+                onClick={() => navigate("/recover-password")}
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-[#4F46E5] transition-colors hover:bg-purple-50 hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Olvide mi contrasena
+              </button>
             </TabsContent>
 
             <TabsContent value="register" className="space-y-4 mt-4">
@@ -383,7 +392,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                 {passwordsMismatch && <p className="text-xs text-red-600">Las contrasenas no coinciden.</p>}
               </div>
               <Button
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
                 onClick={handleRegister}
                 disabled={isSubmitting}
               >

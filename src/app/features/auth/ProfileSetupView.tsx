@@ -1,83 +1,174 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Textarea } from "../../components/ui/textarea";
-import { Label } from "../../components/ui/label";
+import { useEffect, useMemo, useState } from "react";
+import { Briefcase, GraduationCap } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
-import { GraduationCap, Briefcase } from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
+import { Textarea } from "../../components/ui/textarea";
+import {
+  type CityOption,
+  getCitiesByRegion,
+  getInstitutions,
+  getRegions,
+  type InstitutionOption,
+  type RegionOption,
+} from "../../services/catalogService";
 
 interface ProfileSetupViewProps {
   userName: string;
-  onComplete: (role: 'student' | 'worker', profileData: any) => Promise<void> | void;
+  onComplete: (role: "student" | "worker", profileData: any) => Promise<void> | void;
 }
 
 export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps) {
-  const [step, setStep] = useState<'role' | 'details'>('role');
-  const [selectedRole, setSelectedRole] = useState<'student' | 'worker' | null>(null);
+  const [step, setStep] = useState<"role" | "details">("role");
+  const [selectedRole, setSelectedRole] = useState<"student" | "worker" | null>(null);
 
-  // Student fields
   const [career, setCareer] = useState("");
-  const [university, setUniversity] = useState("");
+  const [regionId, setRegionId] = useState("");
+  const [cityId, setCityId] = useState("");
+  const [institutionId, setInstitutionId] = useState("");
+  const [regions, setRegions] = useState<RegionOption[]>([]);
+  const [cities, setCities] = useState<CityOption[]>([]);
+  const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
+  const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
   const [newSubject, setNewSubject] = useState("");
 
-  // Worker fields
   const [isIndependent, setIsIndependent] = useState<boolean | null>(null);
   const [company, setCompany] = useState("");
   const [position, setPosition] = useState("");
   const [industry, setIndustry] = useState("");
 
-  // Common fields
   const [bio, setBio] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleRoleSelect = (role: 'student' | 'worker') => {
+  const selectedInstitution = useMemo(
+    () => institutions.find((institution) => institution.id === institutionId),
+    [institutionId, institutions],
+  );
+
+  useEffect(() => {
+    if (selectedRole !== "student") return;
+
+    setIsLoadingCatalogs(true);
+    setCatalogError("");
+
+    Promise.all([getRegions(), getInstitutions()])
+      .then(([regionOptions, institutionOptions]) => {
+        setRegions(regionOptions);
+        setInstitutions(institutionOptions);
+      })
+      .catch((error) => {
+        setCatalogError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar regiones e instituciones.",
+        );
+      })
+      .finally(() => setIsLoadingCatalogs(false));
+  }, [selectedRole]);
+
+  useEffect(() => {
+    if (!regionId) {
+      setCities([]);
+      setCityId("");
+      return;
+    }
+
+    setCatalogError("");
+    getCitiesByRegion(regionId)
+      .then((cityOptions) => {
+        setCities(cityOptions);
+        setCityId("");
+      })
+      .catch((error) => {
+        setCatalogError(
+          error instanceof Error ? error.message : "No se pudieron cargar las ciudades.",
+        );
+      });
+  }, [regionId]);
+
+  useEffect(() => {
+    setInstitutionId("");
+
+    getInstitutions(cityId || undefined)
+      .then(setInstitutions)
+      .catch((error) => {
+        setCatalogError(
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar las instituciones.",
+        );
+      });
+  }, [cityId]);
+
+  const handleRoleSelect = (role: "student" | "worker") => {
     setSelectedRole(role);
-    setStep('details');
+    setStep("details");
   };
 
   const addSubject = () => {
-    if (newSubject.trim() && !subjects.includes(newSubject.trim())) {
-      setSubjects([...subjects, newSubject.trim()]);
+    const subject = newSubject.trim();
+
+    if (subject && !subjects.includes(subject)) {
+      setSubjects([...subjects, subject]);
       setNewSubject("");
     }
   };
 
   const removeSubject = (subject: string) => {
-    setSubjects(subjects.filter(s => s !== subject));
+    setSubjects(subjects.filter((item) => item !== subject));
   };
 
   const handleComplete = async () => {
     if (!selectedRole) return;
 
-    const profileData = selectedRole === 'student'
-      ? { career, university, subjects, bio }
-      : isIndependent
-        ? { isIndependent: true, industry, bio }
-        : { isIndependent: false, company, position, bio };
+    if (selectedRole === "student") {
+      if (!career || !regionId || !institutionId) {
+        alert("Por favor completa carrera, region e institucion");
+        return;
+      }
 
-    // Validate required fields
-    if (selectedRole === 'student' && (!career || !university)) {
-      alert('Por favor completa todos los campos requeridos');
-      return;
+      if (cities.length > 0 && !cityId) {
+        alert("Por favor selecciona tu ciudad");
+        return;
+      }
     }
 
-    if (selectedRole === 'worker') {
+    if (selectedRole === "worker") {
       if (isIndependent === null) {
-        alert('Por favor indica si eres independiente');
+        alert("Por favor indica si eres independiente");
         return;
       }
+
       if (isIndependent && !industry) {
-        alert('Por favor indica tu rubro');
+        alert("Por favor indica tu rubro");
         return;
       }
+
       if (!isIndependent && (!company || !position)) {
-        alert('Por favor completa todos los campos requeridos');
+        alert("Por favor completa todos los campos requeridos");
         return;
       }
     }
+
+    const profileData =
+      selectedRole === "student"
+        ? {
+            career,
+            regionId,
+            cityId: cityId || null,
+            institutionId,
+            university: selectedInstitution?.name ?? "",
+            subjects,
+            bio,
+          }
+        : isIndependent
+          ? { isIndependent: true, industry, bio }
+          : { isIndependent: false, company, position, bio };
 
     setIsSubmitting(true);
     setErrorMessage("");
@@ -91,17 +182,17 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
     }
   };
 
-  if (step === 'role') {
+  if (step === "role") {
     return (
       <div className="size-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl mb-2">¡Bienvenido, {userName.split(' ')[0]}! 👋</CardTitle>
-            <p className="text-sm text-gray-600">¿Cómo quieres usar Nook?</p>
+            <CardTitle className="text-2xl mb-2">Bienvenido, {userName.split(" ")[0]}</CardTitle>
+            <p className="text-sm text-gray-600">Como quieres usar Nook?</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <button
-              onClick={() => handleRoleSelect('student')}
+              onClick={() => handleRoleSelect("student")}
               className="w-full p-6 rounded-xl border-2 border-gray-300 hover:border-[#4F46E5] hover:bg-purple-50 transition-all text-left"
             >
               <div className="flex items-start gap-4">
@@ -111,14 +202,14 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg mb-1">Soy estudiante</h3>
                   <p className="text-sm text-gray-600">
-                    Busco lugares para estudiar y conectar con compañeros de estudio
+                    Busco lugares para estudiar y conectar con companeros de estudio
                   </p>
                 </div>
               </div>
             </button>
 
             <button
-              onClick={() => handleRoleSelect('worker')}
+              onClick={() => handleRoleSelect("worker")}
               className="w-full p-6 rounded-xl border-2 border-gray-300 hover:border-[#4F46E5] hover:bg-purple-50 transition-all text-left"
             >
               <div className="flex items-start gap-4">
@@ -145,7 +236,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
         <CardHeader>
           <CardTitle className="text-2xl">Completa tu perfil</CardTitle>
           <p className="text-sm text-gray-600">
-            {selectedRole === 'student' ? 'Cuéntanos sobre tus estudios' : 'Cuéntanos sobre tu trabajo'}
+            {selectedRole === "student" ? "Cuentanos sobre tus estudios" : "Cuentanos sobre tu trabajo"}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -155,35 +246,85 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
             </div>
           )}
 
-          {selectedRole === 'student' ? (
+          {catalogError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {catalogError}
+            </div>
+          )}
+
+          {selectedRole === "student" ? (
             <>
               <div className="space-y-2">
                 <Label htmlFor="career">Carrera *</Label>
                 <Input
                   id="career"
-                  placeholder="Ej: Ingeniería Civil en Computación"
+                  placeholder="Ej: Ingenieria Civil en Computacion"
                   value={career}
-                  onChange={(e) => setCareer(e.target.value)}
+                  onChange={(event) => setCareer(event.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="university">Universidad *</Label>
+                <Label htmlFor="region">Region *</Label>
                 <select
-                  id="university"
-                  value={university}
-                  onChange={(e) => setUniversity(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  id="region"
+                  value={regionId}
+                  onChange={(event) => setRegionId(event.target.value)}
+                  disabled={isLoadingCatalogs}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
                 >
-                  <option value="">Selecciona tu universidad</option>
-                  <option value="Universidad de Chile">Universidad de Chile</option>
-                  <option value="Pontificia Universidad Católica de Chile">Pontificia Universidad Católica de Chile</option>
-                  <option value="Universidad Técnica Federico Santa María">Universidad Técnica Federico Santa María</option>
-                  <option value="Universidad de Santiago de Chile">Universidad de Santiago de Chile</option>
-                  <option value="Universidad Adolfo Ibáñez">Universidad Adolfo Ibáñez</option>
-                  <option value="Universidad Diego Portales">Universidad Diego Portales</option>
-                  <option value="Universidad de Concepción">Universidad de Concepción</option>
-                  <option value="Otra">Otra</option>
+                  <option value="">
+                    {isLoadingCatalogs ? "Cargando regiones..." : "Selecciona tu region"}
+                  </option>
+                  {regions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="city">Ciudad</Label>
+                <select
+                  id="city"
+                  value={cityId}
+                  onChange={(event) => setCityId(event.target.value)}
+                  disabled={!regionId || cities.length === 0}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
+                >
+                  <option value="">
+                    {!regionId
+                      ? "Selecciona primero una region"
+                      : cities.length === 0
+                        ? "Sin ciudades cargadas para esta region"
+                        : "Selecciona tu ciudad"}
+                  </option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="institution">Institucion *</Label>
+                <select
+                  id="institution"
+                  value={institutionId}
+                  onChange={(event) => setInstitutionId(event.target.value)}
+                  disabled={isLoadingCatalogs}
+                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
+                >
+                  <option value="">
+                    {isLoadingCatalogs ? "Cargando instituciones..." : "Selecciona tu institucion"}
+                  </option>
+                  {institutions.map((institution) => (
+                    <option key={institution.id} value={institution.id}>
+                      {institution.name} - {institution.type}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -196,46 +337,54 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                       <button
                         className="ml-2 hover:text-red-200"
                         onClick={() => removeSubject(subject)}
+                        type="button"
                       >
-                        ×
+                        x
                       </button>
                     </Badge>
                   ))}
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Ej: Algoritmos, Cálculo..."
+                    placeholder="Ej: Algoritmos, Calculo..."
                     value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSubject())}
+                    onChange={(event) => setNewSubject(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addSubject();
+                      }
+                    }}
                   />
-                  <Button onClick={addSubject} type="button">Agregar</Button>
+                  <Button onClick={addSubject} type="button">
+                    Agregar
+                  </Button>
                 </div>
               </div>
             </>
           ) : (
             <>
               <div className="space-y-3">
-                <Label>¿Eres independiente? *</Label>
+                <Label>Eres independiente? *</Label>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setIsIndependent(true)}
                     className={`flex-1 p-4 rounded-lg border-2 transition-all ${
                       isIndependent === true
-                        ? 'border-[#4F46E5] bg-purple-50'
-                        : 'border-gray-300 hover:border-[#4F46E5]'
+                        ? "border-[#4F46E5] bg-purple-50"
+                        : "border-gray-300 hover:border-[#4F46E5]"
                     }`}
                   >
-                    <span className="font-semibold">Sí</span>
+                    <span className="font-semibold">Si</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsIndependent(false)}
                     className={`flex-1 p-4 rounded-lg border-2 transition-all ${
                       isIndependent === false
-                        ? 'border-[#4F46E5] bg-purple-50'
-                        : 'border-gray-300 hover:border-[#4F46E5]'
+                        ? "border-[#4F46E5] bg-purple-50"
+                        : "border-gray-300 hover:border-[#4F46E5]"
                     }`}
                   >
                     <span className="font-semibold">No</span>
@@ -248,9 +397,9 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                   <Label htmlFor="industry">Rubro *</Label>
                   <Input
                     id="industry"
-                    placeholder="Ej: Diseño gráfico, Desarrollo de software..."
+                    placeholder="Ej: Diseno grafico, Desarrollo de software..."
                     value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
+                    onChange={(event) => setIndustry(event.target.value)}
                   />
                 </div>
               )}
@@ -263,7 +412,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                       id="company"
                       placeholder="Ej: Tech Solutions SpA"
                       value={company}
-                      onChange={(e) => setCompany(e.target.value)}
+                      onChange={(event) => setCompany(event.target.value)}
                     />
                   </div>
 
@@ -273,7 +422,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                       id="position"
                       placeholder="Ej: Desarrollador Senior"
                       value={position}
-                      onChange={(e) => setPosition(e.target.value)}
+                      onChange={(event) => setPosition(event.target.value)}
                     />
                   </div>
                 </>
@@ -282,22 +431,18 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Descripción</Label>
+            <Label htmlFor="bio">Descripcion</Label>
             <Textarea
               id="bio"
-              placeholder="Cuéntanos un poco sobre ti..."
+              placeholder="Cuentanos un poco sobre ti..."
               value={bio}
-              onChange={(e) => setBio(e.target.value)}
+              onChange={(event) => setBio(event.target.value)}
               rows={3}
             />
           </div>
 
           <div className="flex gap-2 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setStep('role')}
-              className="flex-1"
-            >
+            <Button variant="outline" onClick={() => setStep("role")} className="flex-1">
               Volver
             </Button>
             <Button

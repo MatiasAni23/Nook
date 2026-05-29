@@ -25,7 +25,7 @@ function buildStudentProfile(user: CurrentUserProfile | null) {
     name: user.name,
     avatar: user.profile?.profile_image_url ?? currentUser.avatar,
     career: user.profile?.career ?? "",
-    university: user.profile?.university ?? "",
+    university: user.profile?.institutions?.name ?? user.profile?.university ?? "",
     subjects: user.profile?.subjects ?? [],
     bio: user.profile?.bio ?? "",
     online: true,
