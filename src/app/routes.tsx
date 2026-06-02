@@ -8,6 +8,7 @@ import { AdminStats } from "./features/admin/AdminStats";
 import { LoginView } from "./features/auth/LoginView";
 import { ProfileSetupView } from "./features/auth/ProfileSetupView";
 import { RecoverPasswordView } from "./features/auth/RecoverPasswordView";
+import { VerifyAccountView } from "./features/auth/VerifyAccountView";
 import { ChatView } from "./features/chat/ChatView";
 import { clearStoredCurrentUser, useCurrentUser } from "./context/CurrentUserContext";
 import { DelegateHome } from "./features/delegado/DelegateHome";
@@ -28,6 +29,7 @@ import {
   ensureAppUserRecord,
   getAppUserRecord,
   getCurrentSession,
+  type RegisterResult,
   saveProfileSetup,
   signInWithEmail,
   signOut,
@@ -142,12 +144,17 @@ function AuthWrapper() {
     await applyAuthenticatedUser(user.id, user.user_metadata.full_name ?? "");
   };
 
-  const handleRegister = async (name: string, email: string, phone: string, password: string) => {
+  const handleRegister = async (
+    name: string,
+    email: string,
+    phone: string,
+    password: string,
+  ): Promise<RegisterResult> => {
     if (!isSupabaseConfigured) {
       setIsAuthenticated(true);
       setUserName(name);
       setNeedsProfileSetup(true);
-      return;
+      return { email, needsEmailVerification: false };
     }
 
     const { user, session } = await signUpWithEmail({ name, email, phone, password });
@@ -157,7 +164,7 @@ function AuthWrapper() {
     }
 
     if (!session) {
-      throw new Error("Cuenta creada. Revisa tu correo para confirmar el registro antes de iniciar sesion.");
+      return { email, needsEmailVerification: true };
     }
 
     await ensureAppUserRecord(user);
@@ -166,6 +173,7 @@ function AuthWrapper() {
     setUserName(name);
     setNeedsProfileSetup(true);
     await refreshCurrentUser();
+    return { email, needsEmailVerification: false };
   };
 
   const handleProfileSetup = async (role: "student" | "worker", profileData: any) => {
@@ -222,6 +230,10 @@ export const router = createBrowserRouter([
   {
     path: "/recover-password",
     Component: RecoverPasswordView,
+  },
+  {
+    path: "/verify-account",
+    Component: VerifyAccountView,
   },
   {
     path: "/app",

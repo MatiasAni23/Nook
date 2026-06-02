@@ -44,6 +44,9 @@ Información extendida específica según el rol del usuario.
 - `university` - Universidad
 - `career` - Carrera
 - `subjects` - Array de materias/intereses
+- `region_id` - Region del usuario
+- `city_id` - Ciudad/comuna del usuario
+- `institution_id` - Institucion educativa asociada
 
 **Campos para Trabajadores:**
 - `company` - Empresa
@@ -57,6 +60,9 @@ Información extendida específica según el rol del usuario.
 
 **Relaciones:**
 - ← `users` (1:1) - Usuario asociado
+- → `regions` (N:1) - Region seleccionada (opcional)
+- → `cities` (N:1) - Ciudad/comuna seleccionada (opcional)
+- → `institutions` (N:1) - Institucion seleccionada (opcional)
 
 ---
 

@@ -6,10 +6,16 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import type { RegisterResult } from "../../services/authService";
 
 interface LoginViewProps {
   onLogin: (email: string, password: string) => Promise<void> | void;
-  onRegister?: (name: string, email: string, phone: string, password: string) => Promise<void> | void;
+  onRegister?: (
+    name: string,
+    email: string,
+    phone: string,
+    password: string,
+  ) => Promise<RegisterResult> | RegisterResult;
 }
 
 const emailPattern = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
@@ -213,12 +219,17 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
 
     try {
       if (onRegister) {
-        await onRegister(
+        const result = await onRegister(
           registerName.trim(),
           registerEmail.trim(),
           normalizeChilePhone(registerPhone),
           registerPassword,
         );
+
+        if (result.needsEmailVerification) {
+          navigate(`/verify-account?email=${encodeURIComponent(result.email)}`);
+          return;
+        }
       }
 
       setRegisterName("");

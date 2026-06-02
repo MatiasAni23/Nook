@@ -21,6 +21,11 @@ export interface AppUserRecord {
   profile_completed: boolean;
 }
 
+export interface RegisterResult {
+  email: string;
+  needsEmailVerification: boolean;
+}
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error("Faltan VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en el archivo .env.");
@@ -91,6 +96,36 @@ export async function sendPasswordRecoveryCode(email: string) {
   if (error) {
     throw error;
   }
+}
+
+export async function resendSignupVerificationCode(email: string) {
+  const client = requireSupabase();
+  const { error } = await client.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/verify-account`,
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function verifySignupCode(email: string, code: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.auth.verifyOtp({
+    email,
+    token: code,
+    type: "signup",
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 export async function verifyPasswordRecoveryCode(email: string, code: string) {

@@ -19,6 +19,9 @@ DROP TABLE IF EXISTS place_amenities CASCADE;
 DROP TABLE IF EXISTS place_hours CASCADE;
 DROP TABLE IF EXISTS places CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
+DROP TABLE IF EXISTS institutions CASCADE;
+DROP TABLE IF EXISTS cities CASCADE;
+DROP TABLE IF EXISTS regions CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- =============================================
@@ -47,6 +50,53 @@ CREATE INDEX idx_users_role ON users(role);
 CREATE INDEX idx_users_status ON users(status);
 
 -- =============================================
+-- TABLA: regions
+-- Catalogo de regiones
+-- =============================================
+CREATE TABLE regions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    code VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_regions_name ON regions(name);
+
+-- =============================================
+-- TABLA: cities
+-- Catalogo de ciudades/comunas
+-- =============================================
+CREATE TABLE cities (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    region_id UUID NOT NULL REFERENCES regions(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cities_region_id ON cities(region_id);
+CREATE INDEX idx_cities_name ON cities(name);
+
+-- =============================================
+-- TABLA: institutions
+-- Catalogo de instituciones educativas
+-- =============================================
+CREATE TABLE institutions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    city_id UUID REFERENCES cities(id) ON DELETE SET NULL,
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(100) NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_institutions_city_id ON institutions(city_id);
+CREATE INDEX idx_institutions_name ON institutions(name);
+CREATE INDEX idx_institutions_active ON institutions(active);
+
+-- =============================================
 -- TABLA: user_profiles
 -- Perfiles extendidos según el rol del usuario
 -- =============================================
@@ -58,6 +108,9 @@ CREATE TABLE user_profiles (
     university VARCHAR(255),
     career VARCHAR(255),
     subjects TEXT[], -- Array de materias/intereses
+    region_id UUID REFERENCES regions(id) ON DELETE SET NULL,
+    city_id UUID REFERENCES cities(id) ON DELETE SET NULL,
+    institution_id UUID REFERENCES institutions(id) ON DELETE SET NULL,
 
     -- Campos para trabajadores
     company VARCHAR(255),
@@ -76,6 +129,9 @@ CREATE TABLE user_profiles (
 );
 
 CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
+CREATE INDEX idx_user_profiles_region_id ON user_profiles(region_id);
+CREATE INDEX idx_user_profiles_city_id ON user_profiles(city_id);
+CREATE INDEX idx_user_profiles_institution_id ON user_profiles(institution_id);
 
 -- =============================================
 -- TABLA: delegates
