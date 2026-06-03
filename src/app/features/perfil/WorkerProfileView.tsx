@@ -30,7 +30,13 @@ const EMPTY_STATS: ProfileStats = {
 };
 
 function buildWorkerProfile(user: CurrentUserProfile | null) {
-  if (!user) return currentWorker;
+  if (!user) {
+    return {
+      ...currentWorker,
+      industry: "",
+      isIndependent: false,
+    };
+  }
 
   return {
     ...currentWorker,
@@ -38,8 +44,10 @@ function buildWorkerProfile(user: CurrentUserProfile | null) {
     name: user.name,
     avatar: user.profile?.profile_image_url ?? currentWorker.avatar,
     company: user.profile?.company ?? "",
-    position: user.profile?.position ?? user.profile?.industry ?? "",
+    position: user.profile?.position ?? "",
+    industry: user.profile?.industry ?? "",
     bio: user.profile?.bio ?? "",
+    isIndependent: Boolean(user.profile?.is_independent),
     online: true,
   };
 }
@@ -111,8 +119,10 @@ export function WorkerProfileView() {
           name: profile.name,
           role: "worker",
           profileData: {
-            company: profile.company,
-            position: profile.position,
+            company: profile.isIndependent ? null : profile.company,
+            position: profile.isIndependent ? null : profile.position,
+            isIndependent: profile.isIndependent,
+            industry: profile.industry,
             bio: profile.bio,
             profileImageUrl: profile.avatar,
           },
@@ -321,32 +331,52 @@ export function WorkerProfileView() {
 
           {/* Info */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Briefcase className="size-5 text-[#4F46E5]" />
-              {isEditing ? (
-                <Input
-                  value={profile.position}
-                  onChange={(e) => setProfile({ ...profile, position: e.target.value })}
-                  placeholder="Tu cargo"
-                  className="h-9 bg-gray-50 border-0"
-                />
-              ) : (
-                <span className="text-sm font-medium">{profile.position}</span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Building2 className="size-5 text-[#4F46E5]" />
-              {isEditing ? (
-                <Input
-                  value={profile.company}
-                  onChange={(e) => setProfile({ ...profile, company: e.target.value })}
-                  placeholder="Tu empresa"
-                  className="h-9 bg-gray-50 border-0"
-                />
-              ) : (
-                <span className="text-sm font-medium">{profile.company}</span>
-              )}
-            </div>
+            {!profile.isIndependent && (
+              <div className="flex items-center gap-2">
+                <Briefcase className="size-5 text-[#4F46E5]" />
+                {isEditing ? (
+                  <Input
+                    value={profile.position}
+                    onChange={(e) => setProfile({ ...profile, position: e.target.value })}
+                    placeholder="Tu cargo"
+                    className="h-9 bg-gray-50 border-0"
+                  />
+                ) : (
+                  <span className="text-sm font-medium">{profile.position}</span>
+                )}
+              </div>
+            )}
+            {profile.isIndependent ? (
+              <div className="flex items-center gap-2">
+                <Briefcase className="size-5 text-[#4F46E5]" />
+                {isEditing ? (
+                  <Input
+                    value={profile.industry}
+                    onChange={(e) => setProfile({ ...profile, industry: e.target.value })}
+                    placeholder="Tu rubro"
+                    className="h-9 bg-gray-50 border-0"
+                  />
+                ) : (
+                  <span className="text-sm font-medium">
+                    Rubro: {profile.industry || "Sin definir"}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Building2 className="size-5 text-[#4F46E5]" />
+                {isEditing ? (
+                  <Input
+                    value={profile.company}
+                    onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                    placeholder="Tu empresa"
+                    className="h-9 bg-gray-50 border-0"
+                  />
+                ) : (
+                  <span className="text-sm font-medium">{profile.company}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

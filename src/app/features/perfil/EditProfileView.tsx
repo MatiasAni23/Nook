@@ -167,7 +167,7 @@ export function EditProfileView() {
         throw new Error("Completa nombre, carrera, region e institucion.");
       }
 
-      if (!isStudent && (!position.trim() || (!isIndependent && !company.trim()))) {
+      if (!isStudent && !isIndependent && (!position.trim() || !company.trim())) {
         throw new Error("Completa tu cargo y empresa.");
       }
 
@@ -187,7 +187,7 @@ export function EditProfileView() {
             }
           : {
               company: isIndependent ? null : company,
-              position,
+              position: isIndependent ? null : position,
               isIndependent,
               industry,
               bio,
@@ -413,16 +413,18 @@ export function EditProfileView() {
                 />
               </label>
 
-              <div className="space-y-2">
-                <Label htmlFor="position">Cargo</Label>
-                <Input
-                  id="position"
-                  value={position}
-                  onChange={(event) => setPosition(event.target.value)}
-                  placeholder="Ej: Product Manager"
-                  className="h-11 bg-gray-50"
-                />
-              </div>
+              {!isIndependent && (
+                <div className="space-y-2">
+                  <Label htmlFor="position">Cargo</Label>
+                  <Input
+                    id="position"
+                    value={position}
+                    onChange={(event) => setPosition(event.target.value)}
+                    placeholder="Ej: Product Manager"
+                    className="h-11 bg-gray-50"
+                  />
+                </div>
+              )}
 
               {!isIndependent && (
                 <div className="space-y-2">
