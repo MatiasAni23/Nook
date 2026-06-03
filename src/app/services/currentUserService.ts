@@ -63,6 +63,25 @@ export interface ProfileStats {
   reservedHours: number;
 }
 
+export interface ChatUserProfile {
+  career?: string | null;
+  subjects?: string[] | null;
+  university?: string | null;
+  company?: string | null;
+  position?: string | null;
+  industry?: string | null;
+  is_independent?: boolean | null;
+  bio?: string | null;
+  profile_image_url?: string | null;
+}
+
+export interface ChatUser {
+  id: string;
+  name: string;
+  role: "student" | "worker" | "admin" | "delegate" | "support";
+  profile: ChatUserProfile | null;
+}
+
 function toFavoritePlace(place: unknown): FavoritePlace | null {
   if (!place || typeof place !== "object") return null;
 
@@ -294,6 +313,63 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
     .map((favorite) => toFavoritePlace((favorite as { places?: unknown }).places))
     .filter((place): place is FavoritePlace => Boolean(place))
     .filter((place) => !category || place.category === category);
+}
+
+export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promise<ChatUser[]> {
+  if (!supabase) return [];
+
+  let query = supabase
+    .from("users")
+    .select(
+      `id,
+       name,
+       role,
+       user_profiles(
+         career,
+         subjects,
+         university,
+         company,
+         position,
+         industry,
+         is_independent,
+         bio,
+         profile_image_url
+       )`,
+    )
+    .order("name", { ascending: true });
+
+  if (options?.role) {
+    query = query.eq("role", options.role);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => {
+    const profileValue = Array.isArray(row.user_profiles)
+      ? row.user_profiles[0]
+      : row.user_profiles;
+
+    return {
+      id: String(row.id),
+      name: String(row.name ?? ""),
+      role: (row.role ?? "student") as ChatUser["role"],
+      profile: profileValue
+        ? {
+            career: profileValue.career ?? null,
+            subjects: profileValue.subjects ?? null,
+            university: profileValue.university ?? null,
+            company: profileValue.company ?? null,
+            position: profileValue.position ?? null,
+            industry: profileValue.industry ?? null,
+            is_independent: profileValue.is_independent ?? null,
+            bio: profileValue.bio ?? null,
+            profile_image_url: profileValue.profile_image_url ?? null,
+          }
+        : null,
+    };
+  });
 }
 
 export async function getIsCurrentUserFavoritePlace(placeId: string) {
