@@ -13,7 +13,7 @@ import {
   getCurrentUserProfile,
 } from "../services/currentUserService";
 
-const STORAGE_KEY = "nook_current_user";
+let currentUserMemoryCache: CurrentUserProfile | null = null;
 
 interface CurrentUserContextValue {
   currentUser: CurrentUserProfile | null;
@@ -26,25 +26,11 @@ interface CurrentUserContextValue {
 const CurrentUserContext = createContext<CurrentUserContextValue | null>(null);
 
 function readStoredCurrentUser() {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const storedValue = window.localStorage.getItem(STORAGE_KEY);
-    return storedValue ? (JSON.parse(storedValue) as CurrentUserProfile) : null;
-  } catch {
-    return null;
-  }
+  return currentUserMemoryCache;
 }
 
 function writeStoredCurrentUser(user: CurrentUserProfile | null) {
-  if (typeof window === "undefined") return;
-
-  if (!user) {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  currentUserMemoryCache = user;
 }
 
 export function clearStoredCurrentUser() {

@@ -10,6 +10,7 @@ import { currentWorker } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
+import { ProfileSkeleton } from "./ProfileSkeleton";
 import {
   type CurrentUserProfile,
   type FavoritePlace,
@@ -212,13 +213,13 @@ export function WorkerProfileView() {
     }).format(price);
   };
 
+  if (isLoadingCurrentUser && !cachedUser) {
+    return <ProfileSkeleton />;
+  }
+
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
-        {isLoadingCurrentUser && !cachedUser && (
-          <div className="px-4 py-3 text-sm text-gray-500">Cargando perfil...</div>
-        )}
-
         {/* Header */}
         <div className="px-4 pt-8 pb-6 bg-white">
           <div className="flex items-center justify-between mb-6">

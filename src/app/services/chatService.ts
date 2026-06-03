@@ -40,6 +40,8 @@ interface ChatMessageRow {
   created_at: string;
 }
 
+const chatUserCache = new Map<string, ChatUser>();
+
 function mapChatMessage(row: ChatMessageRow): ChatMessage {
   return {
     id: row.id,
@@ -54,11 +56,13 @@ function mapChatUser(row: {
   id: string;
   name: string | null;
   role: string | null;
+  avatar_url?: string | null;
   user_profiles?: ChatUserProfile[] | ChatUserProfile | null;
 }): ChatUser {
   const profileValue = Array.isArray(row.user_profiles)
     ? row.user_profiles[0]
     : row.user_profiles;
+  const profileImageUrl = profileValue?.profile_image_url ?? row.avatar_url ?? null;
 
   return {
     id: String(row.id),
@@ -74,9 +78,11 @@ function mapChatUser(row: {
           industry: profileValue.industry ?? null,
           is_independent: profileValue.is_independent ?? null,
           bio: profileValue.bio ?? null,
-          profile_image_url: profileValue.profile_image_url ?? null,
+          profile_image_url: profileImageUrl,
         }
-      : null,
+      : profileImageUrl
+        ? { profile_image_url: profileImageUrl }
+        : null,
   };
 }
 
@@ -84,12 +90,21 @@ export async function getChatUsersByIds(ids: string[]): Promise<ChatUser[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   if (ids.length === 0) return [];
 
+  const uniqueIds = Array.from(new Set(ids));
+  const cachedUsers = uniqueIds
+    .map((id) => chatUserCache.get(id))
+    .filter((user): user is ChatUser => Boolean(user));
+  const missingIds = uniqueIds.filter((id) => !chatUserCache.has(id));
+
+  if (missingIds.length === 0) return cachedUsers;
+
   const { data, error } = await supabase
     .from("users")
     .select(
       `id,
        name,
        role,
+       avatar_url,
        user_profiles(
          career,
          subjects,
@@ -102,12 +117,17 @@ export async function getChatUsersByIds(ids: string[]): Promise<ChatUser[]> {
          profile_image_url
        )`,
     )
-    .in("id", ids)
+    .in("id", missingIds)
     .order("name", { ascending: true });
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => mapChatUser(row as typeof data[number]));
+  const fetchedUsers = (data ?? []).map((row) => mapChatUser(row as typeof data[number]));
+  fetchedUsers.forEach((user) => chatUserCache.set(user.id, user));
+
+  return uniqueIds
+    .map((id) => chatUserCache.get(id))
+    .filter((user): user is ChatUser => Boolean(user));
 }
 
 export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {

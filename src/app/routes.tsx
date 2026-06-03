@@ -62,7 +62,7 @@ const logoutAndRedirect = async () => {
 };
 
 function AuthWrapper() {
-  const { clearCurrentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
+  const { clearCurrentUser, currentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("student");
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
@@ -78,6 +78,10 @@ function AuthWrapper() {
     setGlobalUserRole(role);
     setUserName(appUser?.name ?? fallbackName);
     setNeedsProfileSetup(!appUser?.profile_completed && role !== "admin" && role !== "delegate");
+
+    if (currentUser?.id === userId) {
+      return;
+    }
 
     const profile = await getCurrentUserProfile();
     if (profile) {

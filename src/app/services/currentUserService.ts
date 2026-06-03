@@ -82,6 +82,9 @@ export interface ChatUser {
   profile: ChatUserProfile | null;
 }
 
+const chatUsersCache = new Map<string, { timestamp: number; users: ChatUser[] }>();
+const CHAT_USERS_CACHE_TTL_MS = 5 * 60 * 1000;
+
 function toFavoritePlace(place: unknown): FavoritePlace | null {
   if (!place || typeof place !== "object") return null;
 
@@ -318,12 +321,19 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
 export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promise<ChatUser[]> {
   if (!supabase) return [];
 
+  const cacheKey = options?.role ?? "all";
+  const cachedUsers = chatUsersCache.get(cacheKey);
+  if (cachedUsers && Date.now() - cachedUsers.timestamp < CHAT_USERS_CACHE_TTL_MS) {
+    return cachedUsers.users;
+  }
+
   let query = supabase
     .from("users")
     .select(
       `id,
        name,
        role,
+       avatar_url,
        user_profiles(
          career,
          subjects,
@@ -346,10 +356,11 @@ export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promi
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => {
+  const users = (data ?? []).map((row) => {
     const profileValue = Array.isArray(row.user_profiles)
       ? row.user_profiles[0]
       : row.user_profiles;
+    const profileImageUrl = profileValue?.profile_image_url ?? row.avatar_url ?? null;
 
     return {
       id: String(row.id),
@@ -365,11 +376,16 @@ export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promi
             industry: profileValue.industry ?? null,
             is_independent: profileValue.is_independent ?? null,
             bio: profileValue.bio ?? null,
-            profile_image_url: profileValue.profile_image_url ?? null,
+            profile_image_url: profileImageUrl,
           }
-        : null,
+        : profileImageUrl
+          ? { profile_image_url: profileImageUrl }
+          : null,
     };
   });
+
+  chatUsersCache.set(cacheKey, { timestamp: Date.now(), users });
+  return users;
 }
 
 export async function getIsCurrentUserFavoritePlace(placeId: string) {

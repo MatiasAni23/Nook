@@ -6,6 +6,7 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { Skeleton } from "../../components/ui/skeleton";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import {
@@ -22,6 +23,61 @@ import {
 } from "../../services/chatService";
 
 type ConversationMap = Record<string, ChatMessage[]>;
+
+function ConversationListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Card key={`conversation-skeleton-${index}`} className="overflow-hidden">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Skeleton className="size-12 rounded-full" />
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-4 w-14" />
+                </div>
+                <Skeleton className="h-3 w-44" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ChatThreadSkeleton() {
+  return (
+    <div className="size-full flex flex-col bg-white">
+      <div className="border-b px-4 py-3 bg-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <Skeleton className="size-9 rounded-md" />
+          <Skeleton className="size-10 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="size-3 rounded-full" />
+        </div>
+      </div>
+      <div className="flex-1 space-y-4 overflow-auto bg-gray-50 p-4">
+        <Skeleton className="h-10 w-2/3 rounded-lg" />
+        <Skeleton className="ml-auto h-14 w-3/4 rounded-lg" />
+        <Skeleton className="h-12 w-1/2 rounded-lg" />
+        <Skeleton className="ml-auto h-10 w-2/3 rounded-lg" />
+      </div>
+      <div className="border-t bg-white p-4 pb-20">
+        <div className="flex gap-2">
+          <Skeleton className="h-10 flex-1 rounded-md" />
+          <Skeleton className="size-10 rounded-md" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const getUserRole = (): "student" | "worker" | "admin" | "delegate" | "support" => {
   return (window as any).__userRole || "student";
@@ -290,7 +346,7 @@ export function ChatView() {
           )}
           <div className="space-y-3">
             {isLoadingConversations ? (
-              <div className="text-sm text-gray-500">Cargando conversaciones...</div>
+              <ConversationListSkeleton />
             ) : conversationList.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-gray-500">
@@ -382,9 +438,7 @@ export function ChatView() {
   }
 
   if (!activePerson) {
-    return (
-      <div className="p-4 text-sm text-gray-500">Cargando chat...</div>
-    );
+    return <ChatThreadSkeleton />;
   }
 
   return (

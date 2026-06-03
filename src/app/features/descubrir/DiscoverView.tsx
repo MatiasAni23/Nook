@@ -9,6 +9,7 @@ import { NotificationsPanel } from "../shared/NotificationsPanel";
 import { studyPlaces, currentUser, placeIssues, notifications } from "../../data/mockData";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getFirstName, getInitials } from "../../services/currentUserService";
+import { DiscoverSkeleton } from "./DiscoverSkeleton";
 
 const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
 
@@ -17,7 +18,7 @@ export function DiscoverView() {
   const [activeTab, setActiveTab] = useState('cowork');
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
-  const { currentUser: cachedUser } = useCurrentUser();
+  const { currentUser: cachedUser, isLoadingCurrentUser } = useCurrentUser();
   const displayName = cachedUser?.name ?? currentUser.name;
   const profileImageUrl = cachedUser?.profile?.profile_image_url ?? null;
 
@@ -77,6 +78,10 @@ export function DiscoverView() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return (R * c).toFixed(1);
   };
+
+  if (isLoadingCurrentUser && !cachedUser) {
+    return <DiscoverSkeleton />;
+  }
 
   return (
     <div className="size-full flex flex-col bg-gray-50">

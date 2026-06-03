@@ -9,6 +9,7 @@ import { NotificationsPanel } from "../shared/NotificationsPanel";
 import { workPlaces, currentWorker, notifications } from "../../data/mockData";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getFirstName, getInitials } from "../../services/currentUserService";
+import { DiscoverSkeleton } from "./DiscoverSkeleton";
 
 const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
 
@@ -17,7 +18,7 @@ export function WorkerDiscoverView() {
   const [activeTab, setActiveTab] = useState('coworking');
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
-  const { currentUser: cachedUser } = useCurrentUser();
+  const { currentUser: cachedUser, isLoadingCurrentUser } = useCurrentUser();
   const displayName = cachedUser?.name ?? currentWorker.name;
   const profileImageUrl = cachedUser?.profile?.profile_image_url ?? null;
 
@@ -85,6 +86,10 @@ export function WorkerDiscoverView() {
       minimumFractionDigits: 0,
     }).format(price);
   };
+
+  if (isLoadingCurrentUser && !cachedUser) {
+    return <DiscoverSkeleton />;
+  }
 
   return (
     <div className="size-full flex flex-col bg-gray-50">
