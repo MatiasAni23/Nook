@@ -10,6 +10,8 @@ import { workPlaces, currentWorker, notifications } from "../../data/mockData";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getFirstName, getInitials } from "../../services/currentUserService";
 
+const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
+
 export function WorkerDiscoverView() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('coworking');
@@ -168,10 +170,13 @@ export function WorkerDiscoverView() {
             </div>
 
             {/* Right half - Image/Photo */}
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-br from-gray-400 to-gray-500">
-              <div className="absolute inset-0 opacity-40 bg-[repeating-linear-gradient(90deg,transparent,transparent_30px,rgba(0,0,0,0.1)_30px,rgba(0,0,0,0.1)_31px)]" />
-              <div className="absolute inset-0 opacity-30 bg-[repeating-linear-gradient(0deg,transparent,transparent_30px,rgba(0,0,0,0.1)_30px,rgba(0,0,0,0.1)_31px)]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-gray-600/20 to-transparent" />
+            <div className="absolute right-0 top-0 bottom-0 w-1/2">
+              <img
+                src={discoverImageUrl}
+                alt=""
+                className="size-full object-cover"
+                aria-hidden="true"
+              />
             </div>
           </div>
         </div>
