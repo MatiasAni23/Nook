@@ -1,5 +1,9 @@
 import { supabase } from "../lib/supabase";
 
+const PROFILE_IMAGES_BUCKET = "profile-images";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export interface CurrentUserProfile {
   id: string;
   email: string;
@@ -19,6 +23,10 @@ export interface CurrentUserProfile {
     industry?: string | null;
     bio?: string | null;
     profile_image_url?: string | null;
+    regions?: {
+      name: string | null;
+      code: string | null;
+    } | null;
     institutions?: {
       name: string | null;
       type: string | null;
@@ -32,6 +40,56 @@ export interface CurrentUserProfile {
   } | null;
 }
 
+export interface FavoritePlace {
+  id: string;
+  name: string;
+  type: string;
+  category: "study" | "work";
+  zone?: string | null;
+  address: string;
+  rating: number;
+  wifi: boolean;
+  outlets: boolean;
+  parking: boolean;
+  price_per_hour?: number | null;
+  images?: string[] | null;
+}
+
+export interface ProfileStats {
+  visitedPlaces: number;
+  companions: number;
+  studiedHours: number;
+  reservations: number;
+  reservedHours: number;
+}
+
+function toFavoritePlace(place: unknown): FavoritePlace | null {
+  if (!place || typeof place !== "object") return null;
+
+  const value = Array.isArray(place) ? place[0] : place;
+  if (!value || typeof value !== "object") return null;
+
+  const rawPlace = value as Record<string, unknown>;
+
+  return {
+    id: String(rawPlace.id),
+    name: String(rawPlace.name ?? ""),
+    type: String(rawPlace.type ?? "library"),
+    category: rawPlace.category === "work" ? "work" : "study",
+    zone: typeof rawPlace.zone === "string" ? rawPlace.zone : null,
+    address: String(rawPlace.address ?? ""),
+    rating: Number(rawPlace.rating ?? 0),
+    wifi: Boolean(rawPlace.wifi),
+    outlets: Boolean(rawPlace.outlets),
+    parking: Boolean(rawPlace.parking),
+    price_per_hour:
+      rawPlace.price_per_hour === null || rawPlace.price_per_hour === undefined
+        ? null
+        : Number(rawPlace.price_per_hour),
+    images: Array.isArray(rawPlace.images) ? (rawPlace.images as string[]) : null,
+  };
+}
+
 export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null> {
   if (!supabase) return null;
 
@@ -43,7 +101,7 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
 
   const { data: appUser } = await supabase
     .from("users")
-    .select("name, role, phone")
+    .select("name, role, phone, avatar_url")
     .eq("id", authData.user.id)
     .maybeSingle();
 
@@ -62,6 +120,7 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
       industry,
       bio,
       profile_image_url,
+      regions:region_id(name, code),
       institutions:institution_id(name, type),
       cities:city_id(name, regions:region_id(name))
     `)
@@ -78,7 +137,14 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
       "Usuario",
     role: appUser?.role ?? "student",
     phone: appUser?.phone ?? authData.user.user_metadata.phone ?? null,
-    profile: profile ?? null,
+    profile: profile
+      ? {
+          ...profile,
+          profile_image_url: profile.profile_image_url ?? appUser?.avatar_url ?? null,
+        }
+      : appUser?.avatar_url
+        ? { profile_image_url: appUser.avatar_url }
+        : null,
   };
 }
 
@@ -121,11 +187,166 @@ export async function updateCurrentUserProfile(input: {
         is_independent: input.profileData.isIndependent ?? false,
         industry: input.profileData.industry ?? null,
         bio: input.profileData.bio ?? null,
+        profile_image_url: input.profileData.profileImageUrl ?? null,
       },
       { onConflict: "user_id" },
     );
 
   if (profileError) throw profileError;
+
+  if (typeof input.profileData.profileImageUrl === "string") {
+    const { error: avatarError } = await supabase
+      .from("users")
+      .update({ avatar_url: input.profileData.profileImageUrl })
+      .eq("id", authData.user.id);
+
+    if (avatarError) throw avatarError;
+  }
+}
+
+export async function uploadCurrentUserProfileImage(file: File) {
+  if (!supabase) throw new Error("Supabase no esta configurado.");
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("No hay un usuario autenticado.");
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const safeName = `${Date.now()}.${extension}`;
+  const path = `${authData.user.id}/${safeName}`;
+  const { error: uploadError } = await supabase.storage
+    .from(PROFILE_IMAGES_BUCKET)
+    .upload(path, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: true,
+    });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from(PROFILE_IMAGES_BUCKET).getPublicUrl(path);
+  const imageUrl = data.publicUrl;
+
+  const { error: profileError } = await supabase
+    .from("user_profiles")
+    .upsert(
+      {
+        user_id: authData.user.id,
+        profile_image_url: imageUrl,
+      },
+      { onConflict: "user_id" },
+    );
+
+  if (profileError) throw profileError;
+
+  const { error: userError } = await supabase
+    .from("users")
+    .update({ avatar_url: imageUrl })
+    .eq("id", authData.user.id);
+
+  if (userError) throw userError;
+
+  return imageUrl;
+}
+
+export async function getCurrentUserProfileStats(): Promise<ProfileStats> {
+  return {
+    visitedPlaces: 0,
+    companions: 0,
+    studiedHours: 0,
+    reservations: 0,
+    reservedHours: 0,
+  };
+}
+
+export async function getCurrentUserFavoritePlaces(category?: "study" | "work") {
+  if (!supabase) return [];
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authData.user) return [];
+
+  const { data, error } = await supabase
+    .from("favorites")
+    .select(`
+      places:place_id(
+        id,
+        name,
+        type,
+        category,
+        zone,
+        address,
+        rating,
+        wifi,
+        outlets,
+        parking,
+        price_per_hour,
+        images
+      )
+    `)
+    .eq("user_id", authData.user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? [])
+    .map((favorite) => toFavoritePlace((favorite as { places?: unknown }).places))
+    .filter((place): place is FavoritePlace => Boolean(place))
+    .filter((place) => !category || place.category === category);
+}
+
+export async function getIsCurrentUserFavoritePlace(placeId: string) {
+  if (!supabase || !UUID_PATTERN.test(placeId)) return false;
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authData.user) return false;
+
+  const { data, error } = await supabase
+    .from("favorites")
+    .select("id")
+    .eq("user_id", authData.user.id)
+    .eq("place_id", placeId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return Boolean(data);
+}
+
+export async function setCurrentUserFavoritePlace(placeId: string, shouldFavorite: boolean) {
+  if (!supabase) throw new Error("Supabase no esta configurado.");
+  if (!UUID_PATTERN.test(placeId)) return false;
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+  if (!authData.user) throw new Error("No hay un usuario autenticado.");
+
+  if (shouldFavorite) {
+    const { error } = await supabase
+      .from("favorites")
+      .upsert(
+        {
+          user_id: authData.user.id,
+          place_id: placeId,
+        },
+        { onConflict: "user_id,place_id" },
+      );
+
+    if (error) throw error;
+    return true;
+  }
+
+  const { error } = await supabase
+    .from("favorites")
+    .delete()
+    .eq("user_id", authData.user.id)
+    .eq("place_id", placeId);
+
+  if (error) throw error;
+  return false;
 }
 
 export function getFirstName(name: string) {

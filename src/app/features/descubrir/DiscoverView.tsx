@@ -4,7 +4,7 @@ import { Search, Star, Bell, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
-import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { NotificationsPanel } from "../shared/NotificationsPanel";
 import { studyPlaces, currentUser, placeIssues, notifications } from "../../data/mockData";
 import { useCurrentUser } from "../../context/CurrentUserContext";
@@ -19,6 +19,7 @@ export function DiscoverView() {
   const [showNotifications, setShowNotifications] = useState(false);
   const { currentUser: cachedUser } = useCurrentUser();
   const displayName = cachedUser?.name ?? currentUser.name;
+  const profileImageUrl = cachedUser?.profile?.profile_image_url ?? null;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -97,6 +98,13 @@ export function DiscoverView() {
                 )}
               </button>
               <Avatar className="size-10">
+                {profileImageUrl && (
+                  <AvatarImage
+                    src={profileImageUrl}
+                    alt={displayName}
+                    className="object-cover"
+                  />
+                )}
                 <AvatarFallback className="bg-[#4F46E5] text-white">
                   {getInitials(displayName)}
                 </AvatarFallback>

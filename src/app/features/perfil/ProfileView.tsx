@@ -1,20 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { User, BookOpen, GraduationCap, Edit, LogOut, Star, Heart } from "lucide-react";
+import { BookOpen, Camera, GraduationCap, Edit, LogOut, Star, Heart } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Badge } from "../../components/ui/badge";
-import { Avatar, AvatarFallback } from "../../components/ui/avatar";
-import { currentUser, studyPlaces } from "../../data/mockData";
+import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { currentUser } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import {
   type CurrentUserProfile,
+  type FavoritePlace,
+  type ProfileStats,
+  getCurrentUserFavoritePlaces,
+  getCurrentUserProfileStats,
   getInitials,
   updateCurrentUserProfile,
+  uploadCurrentUserProfileImage,
 } from "../../services/currentUserService";
+
+const EMPTY_STATS: ProfileStats = {
+  visitedPlaces: 0,
+  companions: 0,
+  studiedHours: 0,
+  reservations: 0,
+  reservedHours: 0,
+};
 
 function buildStudentProfile(user: CurrentUserProfile | null) {
   if (!user) return currentUser;
@@ -34,6 +47,7 @@ function buildStudentProfile(user: CurrentUserProfile | null) {
 
 export function ProfileView() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const {
     clearCurrentUser,
     currentUser: cachedUser,
@@ -43,15 +57,52 @@ export function ProfileView() {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState(() => buildStudentProfile(cachedUser));
   const [newSubject, setNewSubject] = useState("");
-  const [favoritePlaces] = useState([studyPlaces[0], studyPlaces[2], studyPlaces[4]]);
+  const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>([]);
+  const [stats, setStats] = useState<ProfileStats>(EMPTY_STATS);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [profileError, setProfileError] = useState("");
 
   useEffect(() => {
     if (!isEditing) {
       setProfile(buildStudentProfile(cachedUser));
     }
   }, [cachedUser, isEditing]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfileData() {
+      if (!isSupabaseConfigured) {
+        setStats(EMPTY_STATS);
+        setFavoritePlaces([]);
+        return;
+      }
+
+      try {
+        const [nextStats, nextFavoritePlaces] = await Promise.all([
+          getCurrentUserProfileStats(),
+          getCurrentUserFavoritePlaces("study"),
+        ]);
+
+        if (!isMounted) return;
+        setStats(nextStats);
+        setFavoritePlaces(nextFavoritePlaces);
+      } catch (error) {
+        if (!isMounted) return;
+        setProfileError(
+          error instanceof Error ? error.message : "No se pudieron cargar los datos del perfil.",
+        );
+      }
+    }
+
+    loadProfileData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cachedUser?.id]);
 
   const handleSave = async () => {
     setIsSavingProfile(true);
@@ -66,14 +117,43 @@ export function ProfileView() {
             university: profile.university,
             subjects: profile.subjects,
             bio: profile.bio,
+            profileImageUrl: profile.avatar,
           },
         });
       }
 
       await refreshCurrentUser();
       setIsEditing(false);
+      setProfileError("");
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setProfileError("Selecciona un archivo de imagen valido.");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setProfileError("");
+
+    try {
+      const imageUrl = await uploadCurrentUserProfileImage(file);
+      setProfile((currentProfile) => ({ ...currentProfile, avatar: imageUrl }));
+      await refreshCurrentUser();
+    } catch (error) {
+      setProfileError(
+        error instanceof Error ? error.message : "No se pudo guardar la foto de perfil.",
+      );
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
     }
   };
 
@@ -118,7 +198,7 @@ export function ProfileView() {
       'from-cyan-400 to-cyan-600',
       'from-red-400 to-red-600',
     ];
-    const index = parseInt(id) % gradients.length;
+    const index = id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % gradients.length;
     return gradients[index];
   };
 
@@ -145,7 +225,7 @@ export function ProfileView() {
             <h1 className="text-2xl" style={{ fontWeight: 700 }}>Mi Perfil</h1>
             {!isEditing ? (
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={() => navigate("/app/profile/edit")}
                 className="px-4 py-2 rounded-full bg-[#4F46E5] text-white text-sm font-medium hover:bg-[#4338CA] transition-all"
               >
                 <Edit className="size-4 inline mr-1" />
@@ -172,11 +252,40 @@ export function ProfileView() {
 
           {/* Avatar and name */}
           <div className="flex items-center gap-4 mb-6">
-            <Avatar className="size-24 border-4 border-white shadow-lg">
-              <AvatarFallback className="bg-[#4F46E5] text-white text-3xl">
-                {getInitials(profile.name)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="size-24 border-4 border-white shadow-lg">
+                {profile.avatar && (
+                  <AvatarImage
+                    src={profile.avatar}
+                    alt={profile.name}
+                    className="object-cover"
+                  />
+                )}
+                <AvatarFallback className="bg-[#4F46E5] text-white text-3xl">
+                  {getInitials(profile.name)}
+                </AvatarFallback>
+              </Avatar>
+              {isEditing && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 flex size-9 items-center justify-center rounded-full bg-[#4F46E5] text-white shadow-md"
+                    aria-label="Cambiar foto de perfil"
+                  >
+                    <Camera className="size-4" />
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarChange}
+                  />
+                </>
+              )}
+            </div>
             <div className="flex-1">
               {isEditing ? (
                 <Input
@@ -196,6 +305,16 @@ export function ProfileView() {
               </div>
             </div>
           </div>
+
+          {isUploadingAvatar && (
+            <p className="-mt-4 mb-4 ml-28 text-xs text-gray-500">Subiendo foto...</p>
+          )}
+
+          {profileError && (
+            <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {profileError}
+            </div>
+          )}
 
           {/* Bio */}
           {isEditing ? (
@@ -246,19 +365,19 @@ export function ProfileView() {
           <div className="grid grid-cols-3 gap-3">
             <Card className="bg-white border-0 shadow-sm">
               <CardContent className="pt-4 pb-3 text-center">
-                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>12</p>
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>{stats.visitedPlaces}</p>
                 <p className="text-xs text-gray-600">Lugares visitados</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-0 shadow-sm">
               <CardContent className="pt-4 pb-3 text-center">
-                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>8</p>
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>{stats.companions}</p>
                 <p className="text-xs text-gray-600">Compañeros</p>
               </CardContent>
             </Card>
             <Card className="bg-white border-0 shadow-sm">
               <CardContent className="pt-4 pb-3 text-center">
-                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>45</p>
+                <p className="text-2xl text-[#4F46E5] mb-1" style={{ fontWeight: 700 }}>{stats.studiedHours}</p>
                 <p className="text-xs text-gray-600">Horas estudiadas</p>
               </CardContent>
             </Card>
@@ -320,8 +439,16 @@ export function ProfileView() {
               >
                 <CardContent className="p-0">
                   <div className="flex gap-3 p-3">
-                    <div className={`relative w-20 h-20 rounded-xl bg-gradient-to-br ${getPlaceImage(place.id)} flex items-center justify-center shrink-0`}>
-                      <span className="text-3xl">{getPlaceIcon(place.type)}</span>
+                    <div className={`relative w-20 h-20 overflow-hidden rounded-xl bg-gradient-to-br ${getPlaceImage(place.id)} flex items-center justify-center shrink-0`}>
+                      {place.images?.[0] ? (
+                        <img
+                          src={place.images[0]}
+                          alt={place.name}
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-3xl">{getPlaceIcon(place.type)}</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-1">
@@ -331,8 +458,20 @@ export function ProfileView() {
                           <span className="text-sm font-semibold">{place.rating}</span>
                         </div>
                       </div>
-                      <p className="text-xs text-gray-500 mb-1">Las Condes, Santiago</p>
+                      <p className="text-xs text-gray-500 mb-1">{place.zone ?? place.address}</p>
                       <div className="flex items-center gap-1">
+                        {place.wifi && (
+                          <Badge variant="outline" className="text-xs px-2 py-0 border-gray-300">
+                            WiFi
+                          </Badge>
+                        )}
+                        {place.outlets && (
+                          <Badge variant="outline" className="text-xs px-2 py-0 border-gray-300">
+                            Enchufes
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="hidden">
                         <Badge variant="outline" className="text-xs px-2 py-0 border-gray-300">
                           WiFi
                         </Badge>
@@ -345,6 +484,13 @@ export function ProfileView() {
                 </CardContent>
               </Card>
             ))}
+            {favoritePlaces.length === 0 && (
+              <Card className="bg-white border-0 shadow-sm">
+                <CardContent className="py-5 text-center text-sm text-gray-500">
+                  Todavia no tienes lugares favoritos guardados.
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

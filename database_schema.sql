@@ -134,6 +134,50 @@ CREATE INDEX idx_user_profiles_city_id ON user_profiles(city_id);
 CREATE INDEX idx_user_profiles_institution_id ON user_profiles(institution_id);
 
 -- =============================================
+-- STORAGE: profile-images
+-- Imagenes de perfil guardadas en Supabase Storage
+-- =============================================
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'profile-images',
+    'profile-images',
+    TRUE,
+    5242880,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO UPDATE
+SET
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS "Profile images are publicly readable" ON storage.objects;
+DROP POLICY IF EXISTS "Users can upload their own profile images" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own profile images" ON storage.objects;
+
+CREATE POLICY "Profile images are publicly readable"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'profile-images');
+
+CREATE POLICY "Users can upload their own profile images"
+ON storage.objects FOR INSERT
+WITH CHECK (
+    bucket_id = 'profile-images'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+CREATE POLICY "Users can update their own profile images"
+ON storage.objects FOR UPDATE
+USING (
+    bucket_id = 'profile-images'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+)
+WITH CHECK (
+    bucket_id = 'profile-images'
+    AND auth.uid()::text = (storage.foldername(name))[1]
+);
+
+-- =============================================
 -- TABLA: delegates
 -- Delegados que administran lugares
 -- =============================================

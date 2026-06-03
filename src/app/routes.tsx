@@ -21,6 +21,7 @@ import { StudentsView } from "./features/encontrar-estudiantes/StudentsView";
 import { CheckoutView } from "./features/mapa/CheckoutView";
 import { MapView } from "./features/mapa/MapView";
 import { PlaceDetails } from "./features/mapa/PlaceDetails";
+import { EditProfileView } from "./features/perfil/EditProfileView";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
 import { Layout } from "./features/shared/Layout";
 import { isSupabaseConfigured } from "./lib/supabase";
@@ -241,6 +242,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: MapView },
       { path: "profile", Component: ProfileWrapper },
+      { path: "profile/edit", Component: EditProfileView },
       { path: "students", Component: StudentsView },
       { path: "discover", Component: DiscoverWrapper },
       { path: "chat/:userId?", Component: ChatView },

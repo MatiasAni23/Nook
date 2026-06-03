@@ -1,10 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ArrowLeft, Star, MapPin, Wifi, Users, Clock, Coffee, Monitor, Lock, Heart, Calendar, AlertTriangle, ThumbsUp } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { ReportIssueModal } from "../shared/ReportIssueModal";
 import { studyPlaces, workPlaces, placeIssues, getIssueLabel, getIssueIcon, type IssueType } from "../../data/mockData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import {
+  getIsCurrentUserFavoritePlace,
+  setCurrentUserFavoritePlace,
+} from "../../services/currentUserService";
 
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
@@ -22,8 +27,47 @@ export function PlaceDetails() {
   const isWorkPlace = !!workPlace;
 
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isSavingFavorite, setIsSavingFavorite] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [issues, setIssues] = useState(placeIssues.filter(issue => issue.placeId === placeId));
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFavoriteState() {
+      if (!isSupabaseConfigured || !placeId) return;
+
+      try {
+        const nextIsFavorite = await getIsCurrentUserFavoritePlace(placeId);
+        if (isMounted) setIsFavorite(nextIsFavorite);
+      } catch {
+        if (isMounted) setIsFavorite(false);
+      }
+    }
+
+    loadFavoriteState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [placeId]);
+
+  const handleToggleFavorite = async () => {
+    const nextIsFavorite = !isFavorite;
+    setIsFavorite(nextIsFavorite);
+
+    if (!isSupabaseConfigured || !placeId) return;
+
+    setIsSavingFavorite(true);
+
+    try {
+      await setCurrentUserFavoritePlace(placeId, nextIsFavorite);
+    } catch {
+      setIsFavorite(!nextIsFavorite);
+    } finally {
+      setIsSavingFavorite(false);
+    }
+  };
 
   const handleReport = (type: IssueType, description: string) => {
     const newIssue = {
@@ -102,7 +146,8 @@ export function PlaceDetails() {
             <ArrowLeft className="size-5 text-gray-700" />
           </button>
           <button
-            onClick={() => setIsFavorite(!isFavorite)}
+            onClick={handleToggleFavorite}
+            disabled={isSavingFavorite}
             className="absolute top-4 right-4 size-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50"
           >
             <Heart className={`size-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} />
