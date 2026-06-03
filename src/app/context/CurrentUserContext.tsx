@@ -18,6 +18,7 @@ let currentUserMemoryCache: CurrentUserProfile | null = null;
 interface CurrentUserContextValue {
   currentUser: CurrentUserProfile | null;
   isLoadingCurrentUser: boolean;
+  onlineUserIds: Set<string>;
   refreshCurrentUser: () => Promise<CurrentUserProfile | null>;
   setCurrentUser: (user: CurrentUserProfile | null) => void;
   clearCurrentUser: () => void;
@@ -41,6 +42,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<CurrentUserProfile | null>(() =>
     readStoredCurrentUser(),
   );
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(() => new Set());
   const [isLoadingCurrentUser, setIsLoadingCurrentUser] = useState(
     isSupabaseConfigured && !readStoredCurrentUser(),
   );
@@ -97,10 +99,44 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     };
   }, [clearCurrentUser, refreshCurrentUser]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !currentUser?.id) {
+      setOnlineUserIds(new Set());
+      return;
+    }
+
+    const channel = supabase.channel("online-users", {
+      config: {
+        presence: {
+          key: currentUser.id,
+        },
+      },
+    });
+
+    channel.on("presence", { event: "sync" }, () => {
+      setOnlineUserIds(new Set(Object.keys(channel.presenceState())));
+    });
+
+    channel.subscribe(async (status) => {
+      if (status !== "SUBSCRIBED") return;
+
+      await channel.track({
+        user_id: currentUser.id,
+        online_at: new Date().toISOString(),
+      });
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+      setOnlineUserIds(new Set());
+    };
+  }, [currentUser?.id]);
+
   const value = useMemo(
     () => ({
       currentUser,
       isLoadingCurrentUser,
+      onlineUserIds,
       refreshCurrentUser,
       setCurrentUser,
       clearCurrentUser,
@@ -109,6 +145,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       clearCurrentUser,
       currentUser,
       isLoadingCurrentUser,
+      onlineUserIds,
       refreshCurrentUser,
       setCurrentUser,
     ],

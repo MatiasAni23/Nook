@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ArrowLeft, Building2, Send } from "lucide-react";
+import { ArrowLeft, Building2, CheckCheck, Send } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -17,6 +17,7 @@ import {
   getChatMessagesBetweenUsers,
   getChatMessagesForUser,
   getChatUsersByIds,
+  markChatMessagesAsRead,
   sendChatMessage,
   sendTypingEvent,
   subscribeToChatMessages,
@@ -79,6 +80,39 @@ function ChatThreadSkeleton() {
   );
 }
 
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 px-1 py-0.5" aria-label="Escribiendo">
+      {[0, 1, 2].map((dot) => (
+        <span
+          key={dot}
+          className="size-2 rounded-full bg-gray-400 animate-bounce"
+          style={{ animationDelay: `${dot * 120}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function getChatInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
+function MessageStatus({ message }: { message: ChatMessage }) {
+  return (
+    <span className={`inline-flex items-center gap-1 ${message.read ? "text-sky-200" : "text-purple-100"}`}>
+      <CheckCheck className="size-3.5" />
+      {message.read ? "Visto" : "Entregado"}
+    </span>
+  );
+}
+
 const getUserRole = (): "student" | "worker" | "admin" | "delegate" | "support" => {
   return (window as any).__userRole || "student";
 };
@@ -87,7 +121,7 @@ export function ChatView() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { currentUser: cachedUser } = useCurrentUser();
+  const { currentUser: cachedUser, onlineUserIds } = useCurrentUser();
   const fallbackRole = getUserRole();
   const userRole = cachedUser?.role ?? fallbackRole;
   const currentUserId = cachedUser?.id ?? "";
@@ -99,12 +133,15 @@ export function ChatView() {
   const [isSending, setIsSending] = useState(false);
   const [chatError, setChatError] = useState("");
   const [isOtherTyping, setIsOtherTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
   const typingChannelRef = useRef<ReturnType<typeof createTypingChannel> | null>(null);
   const typingTimeoutRef = useRef<number | null>(null);
+  const typingListTimeoutsRef = useRef<Record<string, number>>({});
   const typingLastSentRef = useRef(0);
 
   const activePerson = userId ? participants[userId] : null;
   const activeChat = userId ? conversations[userId] : null;
+  const isActivePersonOnline = Boolean(activePerson && onlineUserIds.has(activePerson.id));
 
   const subtitle = useMemo(() => {
     if (!activePerson) return "";
@@ -146,7 +183,12 @@ export function ChatView() {
 
     setConversations((prev) => {
       const existing = prev[otherUserId] ?? [];
-      if (existing.some((item) => item.id === message.id)) return prev;
+      if (existing.some((item) => item.id === message.id)) {
+        return {
+          ...prev,
+          [otherUserId]: existing.map((item) => (item.id === message.id ? message : item)),
+        };
+      }
       return {
         ...prev,
         [otherUserId]: [...existing, message].sort(
@@ -242,6 +284,39 @@ export function ChatView() {
   }, [currentUserId, userId]);
 
   useEffect(() => {
+    if (!isSupabaseConfigured || !currentUserId || userId) return;
+
+    const participantIds = Object.keys(participants);
+    const channels = participantIds.map((participantId) => {
+      const conversationId = getConversationId(currentUserId, participantId);
+      return createTypingChannel(conversationId, (event) => {
+        if (event.from !== participantId) return;
+
+        setTypingUsers((prev) => ({ ...prev, [participantId]: event.isTyping }));
+
+        if (typingListTimeoutsRef.current[participantId]) {
+          window.clearTimeout(typingListTimeoutsRef.current[participantId]);
+        }
+
+        if (event.isTyping) {
+          typingListTimeoutsRef.current[participantId] = window.setTimeout(() => {
+            setTypingUsers((prev) => ({ ...prev, [participantId]: false }));
+          }, 3000);
+        }
+      });
+    });
+
+    return () => {
+      Object.values(typingListTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      typingListTimeoutsRef.current = {};
+      channels.forEach((channel) => channel?.unsubscribe());
+      setTypingUsers({});
+    };
+  }, [currentUserId, Object.keys(participants).join("|"), userId]);
+
+  useEffect(() => {
     if (!userId || !isSupabaseConfigured || !currentUserId) return;
     if (conversations[userId]?.length) return;
 
@@ -260,6 +335,30 @@ export function ChatView() {
     if (!activeChat) return;
     scrollToBottom();
   }, [activeChat?.length]);
+
+  useEffect(() => {
+    if (!userId || !currentUserId || !activeChat?.some((message) => (
+      message.senderId === userId && message.receiverId === currentUserId && !message.read
+    ))) {
+      return;
+    }
+
+    markChatMessagesAsRead({ currentUserId, otherUserId: userId })
+      .then((messages) => {
+        if (messages.length === 0) return;
+        setConversations((prev) => {
+          const existing = prev[userId] ?? [];
+          return {
+            ...prev,
+            [userId]: existing.map((message) => {
+              const nextMessage = messages.find((item) => item.id === message.id);
+              return nextMessage ?? message;
+            }),
+          };
+        });
+      })
+      .catch(() => undefined);
+  }, [activeChat, currentUserId, userId]);
 
   const sendTypingStatus = (isTyping: boolean) => {
     if (!userId || !currentUserId) return;
@@ -363,50 +462,86 @@ export function ChatView() {
               conversationList.map(({ person, lastMessage, id }) => {
                 if (!person || !lastMessage) return null;
 
-                const showOnline = person.role === "student";
+                const isOnline = onlineUserIds.has(person.id);
+                const isUnread = lastMessage.receiverId === currentUserId && !lastMessage.read;
+                const isTyping = Boolean(typingUsers[id]);
+                const unreadCount = conversations[id].filter(
+                  (message) => message.receiverId === currentUserId && !message.read,
+                ).length;
 
                 return (
                   <Card
                     key={id}
-                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    className={`cursor-pointer transition-all hover:shadow-lg ${
+                      isUnread ? "border-[#4F46E5]/30 bg-white shadow-sm" : "bg-white"
+                    }`}
                     onClick={() => navigate(`/app/chat/${id}`)}
                   >
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-3">
-                        <Avatar className="size-12">
-                          {person.profile?.profile_image_url && (
-                            <AvatarImage
-                              src={person.profile.profile_image_url}
-                              alt={person.name}
-                            />
-                          )}
-                          <AvatarFallback className="bg-[#4F46E5] text-white">
-                            {person.role === "worker" ? (
-                              <Building2 className="size-6" />
-                            ) : (
-                              person.name.split(" ").map((n) => n[0]).join("")
+                        <div className="relative shrink-0">
+                          <Avatar className="size-12">
+                            {person.profile?.profile_image_url && (
+                              <AvatarImage
+                                src={person.profile.profile_image_url}
+                                alt={person.name}
+                              />
                             )}
-                          </AvatarFallback>
-                        </Avatar>
+                            <AvatarFallback className="bg-[#4F46E5] text-white">
+                              {person.role === "worker" ? (
+                                <Building2 className="size-6" />
+                              ) : (
+                                getChatInitials(person.name)
+                              )}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span
+                            className={`absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-white ${
+                              isOnline ? "bg-green-500" : "bg-gray-300"
+                            }`}
+                          />
+                        </div>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-semibold truncate">{person.name}</h3>
-                            {showOnline && (
-                              <Badge variant="secondary" className="text-xs shrink-0">
-                                En linea
-                              </Badge>
-                            )}
+                            <h3 className={`truncate ${isUnread ? "font-bold" : "font-semibold"}`}>
+                              {person.name}
+                            </h3>
+                            <Badge
+                              variant="secondary"
+                              className={`shrink-0 text-xs ${
+                                isOnline
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {isOnline ? "En linea" : "Desconectado"}
+                            </Badge>
                           </div>
-                          <p className="text-sm text-gray-600 truncate">
+                          <p className="truncate text-sm text-gray-600">
                             {person.role === "student"
                               ? person.profile?.career ?? "Estudiante"
                               : person.profile?.company ?? "Empresa"}
                           </p>
-                          <p className="text-sm text-gray-500 mt-1 truncate">
-                            {lastMessage.text}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <div className="mt-1 flex items-center justify-between gap-3">
+                            <p
+                              className={`truncate text-sm ${
+                                isTyping
+                                  ? "font-semibold text-[#4F46E5]"
+                                  : isUnread
+                                    ? "font-bold text-gray-900"
+                                    : "text-gray-500"
+                              }`}
+                            >
+                              {isTyping ? "Escribiendo..." : lastMessage.text}
+                            </p>
+                            {unreadCount > 0 && (
+                              <span className="grid size-5 shrink-0 place-items-center rounded-full bg-[#4F46E5] text-xs font-bold text-white">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          <p className={`mt-1 text-xs ${isUnread ? "font-semibold text-[#4F46E5]" : "text-gray-400"}`}>
                             {lastMessage.createdAt.toLocaleTimeString("es", {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -465,12 +600,16 @@ export function ChatView() {
 
           <div className="flex-1">
             <h3 className="font-semibold">{activePerson.name}</h3>
-            <p className="text-xs text-gray-600">{subtitle}</p>
+            <p className="text-xs text-gray-600">
+              {isOtherTyping ? "Escribiendo..." : `${subtitle} - ${isActivePersonOnline ? "En linea" : "Desconectado"}`}
+            </p>
           </div>
 
-          {activePerson.role === "student" && (
-            <div className="size-3 bg-green-500 rounded-full" />
-          )}
+          <div
+            className={`size-3 rounded-full ${
+              isActivePersonOnline ? "bg-green-500" : "bg-gray-300"
+            }`}
+          />
         </div>
       </div>
 
@@ -500,11 +639,18 @@ export function ChatView() {
                     }`}
                   >
                     <p className="text-sm">{message.text}</p>
-                    <p className={`text-xs mt-1 ${isOwn ? "text-purple-100" : "text-gray-500"}`}>
-                      {message.createdAt.toLocaleTimeString("es", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                    <p
+                      className={`mt-1 flex items-center justify-end gap-2 text-xs ${
+                        isOwn ? "text-purple-100" : "text-gray-500"
+                      }`}
+                    >
+                      <span>
+                        {message.createdAt.toLocaleTimeString("es", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {isOwn && <MessageStatus message={message} />}
                     </p>
                   </div>
                 </div>
@@ -512,8 +658,8 @@ export function ChatView() {
             })}
             {isOtherTyping && (
               <div className="flex justify-start">
-                <div className="max-w-[60%] rounded-lg bg-white border px-4 py-2 shadow-sm">
-                  <span className="text-sm text-gray-500">Escribiendo...</span>
+                <div className="rounded-2xl border bg-white px-4 py-3 shadow-sm">
+                  <TypingDots />
                 </div>
               </div>
             )}

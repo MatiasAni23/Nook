@@ -25,6 +25,8 @@ export interface ChatMessage {
   receiverId: string;
   text: string;
   createdAt: Date;
+  read: boolean;
+  readAt: Date | null;
 }
 
 export interface TypingEvent {
@@ -38,6 +40,8 @@ interface ChatMessageRow {
   receiver_id: string;
   message: string;
   created_at: string;
+  read: boolean;
+  read_at: string | null;
 }
 
 const chatUserCache = new Map<string, ChatUser>();
@@ -49,6 +53,8 @@ function mapChatMessage(row: ChatMessageRow): ChatMessage {
     receiverId: row.receiver_id,
     text: row.message,
     createdAt: new Date(row.created_at),
+    read: Boolean(row.read),
+    readAt: row.read_at ? new Date(row.read_at) : null,
   };
 }
 
@@ -135,7 +141,7 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
 
   const { data, error } = await supabase
     .from("messages")
-    .select("id, sender_id, receiver_id, message, created_at")
+    .select("id, sender_id, receiver_id, message, created_at, read, read_at")
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
     .order("created_at", { ascending: true });
 
@@ -152,7 +158,7 @@ export async function getChatMessagesBetweenUsers(
 
   const { data, error } = await supabase
     .from("messages")
-    .select("id, sender_id, receiver_id, message, created_at")
+    .select("id, sender_id, receiver_id, message, created_at, read, read_at")
     .or(
       `and(sender_id.eq.${userId},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${userId})`,
     )
@@ -179,12 +185,34 @@ export async function sendChatMessage(input: {
       receiver_id: input.receiverId,
       message: input.message,
     })
-    .select("id, sender_id, receiver_id, message, created_at")
+    .select("id, sender_id, receiver_id, message, created_at, read, read_at")
     .single();
 
   if (error || !data) throw error ?? new Error("No se pudo enviar el mensaje.");
 
   return mapChatMessage(data as ChatMessageRow);
+}
+
+export async function markChatMessagesAsRead(input: {
+  currentUserId: string;
+  otherUserId: string;
+}): Promise<ChatMessage[]> {
+  if (!isSupabaseConfigured || !supabase) return [];
+
+  const { data, error } = await supabase
+    .from("messages")
+    .update({
+      read: true,
+      read_at: new Date().toISOString(),
+    })
+    .eq("sender_id", input.otherUserId)
+    .eq("receiver_id", input.currentUserId)
+    .eq("read", false)
+    .select("id, sender_id, receiver_id, message, created_at, read, read_at");
+
+  if (error) throw error;
+
+  return (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
 }
 
 export function subscribeToChatMessages(
@@ -197,11 +225,18 @@ export function subscribeToChatMessages(
 
   channel.on(
     "postgres_changes",
-    {
-      event: "INSERT",
-      schema: "public",
-      table: "messages",
+    { event: "INSERT", schema: "public", table: "messages" },
+    (payload) => {
+      if (!payload.new) return;
+      const message = mapChatMessage(payload.new as ChatMessageRow);
+      if (message.senderId !== userId && message.receiverId !== userId) return;
+      onMessage(message);
     },
+  );
+
+  channel.on(
+    "postgres_changes",
+    { event: "UPDATE", schema: "public", table: "messages" },
     (payload) => {
       if (!payload.new) return;
       const message = mapChatMessage(payload.new as ChatMessageRow);
