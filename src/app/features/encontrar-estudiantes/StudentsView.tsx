@@ -19,7 +19,6 @@ interface StudentCard {
   university: string;
   subjects: string[];
   bio: string;
-  online: boolean;
 }
 
 const CACHE_KEY = "nook-students-cache-v1";
@@ -32,7 +31,7 @@ export function StudentsView() {
   const [people, setPeople] = useState<StudentCard[]>([]);
   const [isLoadingPeople, setIsLoadingPeople] = useState(false);
   const [peopleError, setPeopleError] = useState("");
-  const { currentUser: cachedUser } = useCurrentUser();
+  const { currentUser: cachedUser, onlineUserIds } = useCurrentUser();
 
   const referenceCareer = cachedUser?.profile?.career ?? "";
   const referenceUniversity = cachedUser?.profile?.university ?? "";
@@ -74,7 +73,6 @@ export function StudentsView() {
             university: user.profile?.university ?? "Sin institucion",
             subjects: user.profile?.subjects ?? [],
             bio: user.profile?.bio ?? "",
-            online: true,
           }));
 
         setPeople(nextPeople);
@@ -208,6 +206,7 @@ export function StudentsView() {
         {filteredStudents.map((student) => {
           const matchPercentage = getMatchPercentage(student);
           const commonSubjects = student.subjects.filter(s => referenceSubjects.includes(s));
+          const isOnline = onlineUserIds.has(student.id);
 
           return (
             <Card key={student.id} className="hover:shadow-lg transition-shadow">
@@ -227,9 +226,9 @@ export function StudentsView() {
                       <div>
                         <h3 className="font-semibold truncate">{student.name}</h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <div className={`size-2 rounded-full ${student.online ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <div className={`size-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
                           <span className="text-xs text-gray-500">
-                            {student.online ? 'En línea' : 'Desconectado'}
+                            {isOnline ? 'En línea' : 'Desconectado'}
                           </span>
                         </div>
                       </div>
