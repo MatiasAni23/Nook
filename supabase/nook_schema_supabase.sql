@@ -780,7 +780,8 @@ ALTER TABLE support_ticket_messages ENABLE ROW LEVEL SECURITY;
 -- Permisos de API para usuarios con sesion. Las policies de abajo filtran filas.
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON users, user_profiles TO authenticated;
-GRANT SELECT ON places, place_hours, place_amenities, place_issues TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON places, place_amenities TO authenticated;
+GRANT SELECT ON place_hours, place_issues TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON reservations, reviews, place_reports, favorites, messages TO authenticated;
 GRANT SELECT, UPDATE ON notifications TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON support_tickets, support_ticket_messages TO authenticated;
@@ -809,6 +810,39 @@ CREATE POLICY user_profiles_update_own ON user_profiles
 CREATE POLICY places_select_active ON places
     FOR SELECT USING (status = 'active');
 
+CREATE OR REPLACE FUNCTION is_current_user_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM users
+        WHERE users.id = auth.uid()
+        AND users.role = 'admin'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE OR REPLACE FUNCTION is_current_user_place_manager()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM users
+        WHERE users.id = auth.uid()
+        AND users.role IN ('admin', 'delegate')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE POLICY places_insert_admin ON places
+    FOR INSERT WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY places_update_admin ON places
+    FOR UPDATE USING (is_current_user_place_manager()) WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY places_delete_admin ON places
+    FOR DELETE USING (is_current_user_place_manager());
+
 CREATE POLICY place_hours_select_active_places ON place_hours
     FOR SELECT USING (
         EXISTS (
@@ -826,6 +860,15 @@ CREATE POLICY place_amenities_select_active_places ON place_amenities
             AND places.status = 'active'
         )
     );
+
+CREATE POLICY place_amenities_insert_admin ON place_amenities
+    FOR INSERT WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY place_amenities_update_admin ON place_amenities
+    FOR UPDATE USING (is_current_user_place_manager()) WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY place_amenities_delete_admin ON place_amenities
+    FOR DELETE USING (is_current_user_place_manager());
 
 -- Reservas propias.
 CREATE POLICY reservations_select_own ON reservations
@@ -935,6 +978,41 @@ CREATE POLICY delegate_places_select_own ON delegate_places
             AND delegates.user_id = auth.uid()
         )
     );
+
+-- Bucket publico para imagenes de lugares.
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'place-images',
+    'place-images',
+    TRUE,
+    10485760,
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+ON CONFLICT (id) DO UPDATE SET
+    public = EXCLUDED.public,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+DROP POLICY IF EXISTS place_images_select_public ON storage.objects;
+DROP POLICY IF EXISTS place_images_insert_admin ON storage.objects;
+DROP POLICY IF EXISTS place_images_update_admin ON storage.objects;
+DROP POLICY IF EXISTS place_images_delete_admin ON storage.objects;
+
+CREATE POLICY place_images_select_public ON storage.objects
+    FOR SELECT USING (bucket_id = 'place-images');
+
+CREATE POLICY place_images_insert_admin ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'place-images' AND public.is_current_user_place_manager());
+
+CREATE POLICY place_images_update_admin ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'place-images' AND public.is_current_user_place_manager())
+    WITH CHECK (bucket_id = 'place-images' AND public.is_current_user_place_manager());
+
+CREATE POLICY place_images_delete_admin ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'place-images' AND public.is_current_user_place_manager());
 
 -- Trigger que crea/sincroniza public.users cuando se crea un usuario en Supabase Auth.
 CREATE OR REPLACE FUNCTION handle_new_auth_user()

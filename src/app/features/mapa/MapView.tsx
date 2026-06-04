@@ -6,6 +6,8 @@ import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { studyPlaces, workPlaces } from "../../data/mockData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import { listPlaces, type AppPlace } from "../../services/placeService";
 
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
@@ -21,10 +23,58 @@ export function MapView() {
   const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
   const [startY, setStartY] = useState(0);
+  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  const [placesError, setPlacesError] = useState("");
   const sheetRef = useRef<HTMLDivElement>(null);
 
-  // Use workPlaces for workers, studyPlaces for students
-  const places = userRole === 'worker' ? workPlaces : studyPlaces;
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    let isMounted = true;
+    setIsLoadingPlaces(true);
+    setPlacesError("");
+
+    listPlaces()
+      .then((places) => {
+        if (isMounted) setDbPlaces(places);
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setDbPlaces([]);
+          setPlacesError(error instanceof Error ? error.message : "No se pudieron cargar los lugares.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingPlaces(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const mockPlaces = userRole === 'worker'
+    ? workPlaces.map((place) => ({ ...place, category: "work" as const, images: [] }))
+    : studyPlaces.map((place) => ({ ...place, category: "study" as const, images: [] }));
+  const basePlaces = isSupabaseConfigured
+    ? dbPlaces.filter((place) => (userRole === 'worker' ? place.category === 'work' : place.category === 'study'))
+    : mockPlaces;
+  const places = basePlaces.filter((place) => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const matchesSearch = !normalizedSearch ||
+      place.name.toLowerCase().includes(normalizedSearch) ||
+      place.address?.toLowerCase().includes(normalizedSearch) ||
+      place.zone?.toLowerCase().includes(normalizedSearch);
+    const matchesTab =
+      activeTab === "cowork" ? place.type === "coworking" :
+      activeTab === "estudios" ? ["library", "cafe"].includes(place.type) :
+      activeTab === "reuniones" ? ["meeting_room", "private_office", "office"].includes(place.type) :
+      activeTab === "parques" ? place.type === "park" :
+      true;
+
+    return matchesSearch && matchesTab;
+  });
 
   const tabs = [
     { id: 'cowork', label: 'Cowork' },
@@ -44,7 +94,7 @@ export function MapView() {
       'from-cyan-400 to-cyan-600',
       'from-red-400 to-red-600',
     ];
-    const index = parseInt(id) % gradients.length;
+    const index = Math.abs(id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % gradients.length;
     return gradients[index];
   };
 
@@ -82,6 +132,10 @@ export function MapView() {
     return 'Centro';
   };
 
+  const getPlaceZoneLabel = (place: any) => {
+    return place.zone || place.address || getZoneName(place.name);
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY);
   };
@@ -116,6 +170,12 @@ export function MapView() {
             <SlidersHorizontal className="size-5 text-white" />
           </button>
         </div>
+
+        {placesError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {placesError}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
@@ -250,6 +310,22 @@ export function MapView() {
         {/* Cards */}
         <div className="px-4 pb-4 overflow-hidden">
           <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-2">
+            {isLoadingPlaces && (
+              <Card className="w-40 shrink-0">
+                <CardContent className="p-3 text-sm text-gray-600">
+                  Cargando lugares...
+                </CardContent>
+              </Card>
+            )}
+
+            {!isLoadingPlaces && places.length === 0 && (
+              <Card className="w-52 shrink-0">
+                <CardContent className="p-3 text-sm text-gray-600">
+                  No hay lugares para este filtro.
+                </CardContent>
+              </Card>
+            )}
+
             {places.slice(0, 5).map((place) => {
               const placeHasPrice = hasPrice(place);
               const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
@@ -261,18 +337,27 @@ export function MapView() {
                 >
                   <CardContent className="p-0">
                     {/* Image */}
-                    <div
-                      className={`h-20 bg-gradient-to-br ${getPlaceImage(place.id)} rounded-t-lg flex items-center justify-center cursor-pointer`}
-                      onClick={() => navigate(placeUrl)}
-                    >
-                      <span className="text-2xl">{getPlaceIcon(place.type)}</span>
-                    </div>
+                    {place.images?.[0] ? (
+                      <button
+                        className="h-20 w-full overflow-hidden rounded-t-lg bg-gray-100"
+                        onClick={() => navigate(placeUrl)}
+                      >
+                        <img src={place.images[0]} alt={place.name} className="size-full object-cover" />
+                      </button>
+                    ) : (
+                      <div
+                        className={`h-20 bg-gradient-to-br ${getPlaceImage(place.id)} rounded-t-lg flex items-center justify-center cursor-pointer`}
+                        onClick={() => navigate(placeUrl)}
+                      >
+                        <span className="text-2xl">{getPlaceIcon(place.type)}</span>
+                      </div>
+                    )}
 
                     {/* Info */}
                     <div className="p-2">
                       <div onClick={() => navigate(placeUrl)} className="cursor-pointer">
                         <h4 className="font-semibold text-xs line-clamp-1 mb-0.5">{place.name}</h4>
-                        <p className="text-xs text-gray-400 mb-1">{getZoneName(place.name)}</p>
+                        <p className="text-xs text-gray-400 mb-1 line-clamp-1">{getPlaceZoneLabel(place)}</p>
                         {placeHasPrice ? (
                           <>
                             <p className="text-xs font-semibold text-[#4F46E5]">{formatPrice((place as any).pricePerHour)}</p>
