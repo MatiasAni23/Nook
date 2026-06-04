@@ -18,7 +18,7 @@ const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 export function MapView() {
   const navigate = useNavigate();
   const userRole = getUserRole();
-  const [activeTab, setActiveTab] = useState('cowork');
+  const [activeTab, setActiveTab] = useState('todos');
   const [searchTerm, setSearchTerm] = useState("");
   const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
@@ -67,6 +67,7 @@ export function MapView() {
       place.address?.toLowerCase().includes(normalizedSearch) ||
       place.zone?.toLowerCase().includes(normalizedSearch);
     const matchesTab =
+      activeTab === "todos" ? true :
       activeTab === "cowork" ? place.type === "coworking" :
       activeTab === "estudios" ? ["library", "cafe"].includes(place.type) :
       activeTab === "reuniones" ? ["meeting_room", "private_office", "office"].includes(place.type) :
@@ -77,6 +78,7 @@ export function MapView() {
   });
 
   const tabs = [
+    { id: 'todos', label: 'Todos' },
     { id: 'cowork', label: 'Cowork' },
     { id: 'estudios', label: 'Estudios' },
     { id: 'reuniones', label: 'Reuniones' },
