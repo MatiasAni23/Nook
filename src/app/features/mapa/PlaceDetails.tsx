@@ -4,14 +4,24 @@ import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Briefcase,
   Coffee,
+  DollarSign,
+  ExternalLink,
   Heart,
+  Lightbulb,
   Lock,
   MapPin,
   Monitor,
+  ParkingCircle,
+  Plug,
+  Presentation,
   Star,
   ThumbsUp,
   Users,
+  Volume2,
   Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -30,6 +40,7 @@ const getUserRole = (): "student" | "worker" | "admin" => {
 
 const fallbackAmenities = [
   { key: "wifi", name: "WiFi de alta velocidad" },
+  { key: "outlets", name: "Enchufes disponibles" },
   { key: "coffee_tea", name: "Cafe y te ilimitados" },
   { key: "meeting_room", name: "Sala de reunion" },
   { key: "screen", name: "Pantalla disponible" },
@@ -50,6 +61,7 @@ export function PlaceDetails() {
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [issues, setIssues] = useState(placeIssues.filter((issue) => issue.placeId === placeId));
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     if (initialPlace || !placeId || !isSupabaseConfigured) return;
@@ -93,6 +105,17 @@ export function PlaceDetails() {
       isMounted = false;
     };
   }, [placeId]);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [place?.id]);
+
+  useEffect(() => {
+    const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
+    if (imageCount > 0 && activeImageIndex > imageCount - 1) {
+      setActiveImageIndex(0);
+    }
+  }, [activeImageIndex, place?.images]);
 
   const handleToggleFavorite = async () => {
     const nextIsFavorite = !isFavorite;
@@ -176,9 +199,68 @@ export function PlaceDetails() {
         return Monitor;
       case "lockers":
         return Lock;
+      case "outlets":
+        return Plug;
+      case "parking":
+        return ParkingCircle;
+      case "presentation":
+        return Presentation;
+      case "quiet_area":
+        return Volume2;
+      case "workstations":
+        return Briefcase;
       default:
         return Star;
     }
+  };
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      minimumFractionDigits: 0,
+    }).format(price);
+  };
+
+  const goToPreviousImage = () => {
+    setActiveImageIndex((currentIndex) => {
+      const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
+      if (imageCount <= 1) return currentIndex;
+      return currentIndex === 0 ? imageCount - 1 : currentIndex - 1;
+    });
+  };
+
+  const goToNextImage = () => {
+    setActiveImageIndex((currentIndex) => {
+      const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
+      if (imageCount <= 1) return currentIndex;
+      return currentIndex === imageCount - 1 ? 0 : currentIndex + 1;
+    });
+  };
+
+  const handleOpenDirections = () => {
+    const destination = typeof place?.lat === "number" && typeof place?.lng === "number"
+      ? `${place.lat},${place.lng}`
+      : place?.address ?? "";
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const renderRatingDots = (value?: number | null) => {
+    const filledDots = Math.max(0, Math.min(5, Math.round(value ?? 0)));
+
+    return (
+      <div className="flex items-center gap-1.5" aria-label={`${filledDots} de 5`}>
+        {Array.from({ length: 5 }).map((_, index) => (
+          <span
+            key={index}
+            className={`size-2.5 rounded-full ${
+              index < filledDots ? "bg-[#4F46E5]" : "bg-gray-300"
+            }`}
+          />
+        ))}
+      </div>
+    );
   };
 
   if (isLoadingPlace) {
@@ -207,20 +289,37 @@ export function PlaceDetails() {
 
   const isWorkPlace = place.category === "work" || !!workPlace;
   const placeImages = Array.isArray(place.images) ? place.images : [];
+  const selectedImage = placeImages[activeImageIndex];
+  const explicitAmenities = [
+    { key: "wifi", name: "WiFi disponible", isAvailable: Boolean(place.wifi) },
+    { key: "outlets", name: "Enchufes disponibles", isAvailable: Boolean(place.outlets) },
+    { key: "parking", name: "Estacionamiento", isAvailable: Boolean(place.parking) },
+  ];
+  const savedAmenities = Array.isArray(place.amenities)
+    ? place.amenities.filter((amenity: any) => amenity.isAvailable !== false)
+    : [];
+  const savedAmenityKeys = new Set(savedAmenities.map((amenity: any) => amenity.key));
+  const availableExplicitAmenities = explicitAmenities.filter((amenity) => amenity.isAvailable);
   const includedAmenities =
-    Array.isArray(place.amenities) && place.amenities.length > 0
-      ? place.amenities.filter((amenity: any) => amenity.isAvailable !== false)
+    savedAmenities.length > 0
+      ? [
+          ...savedAmenities,
+          ...availableExplicitAmenities.filter((amenity) => !savedAmenityKeys.has(amenity.key)),
+        ]
+      : availableExplicitAmenities.length > 0
+        ? availableExplicitAmenities
       : fallbackAmenities;
   const capacityText = place.capacityMax || place.capacity
     ? `${place.capacityMin ?? 1} - ${place.capacityMax ?? place.capacity}`
     : "1 - 20";
+  const priceText = typeof place.pricePerHour === "number" ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
 
   return (
     <div className="size-full flex flex-col bg-white">
       <div className="flex-1 overflow-auto pb-28">
         <div className="relative h-72 bg-gradient-to-br from-gray-300 to-gray-500">
-          {placeImages[0] ? (
-            <img src={placeImages[0]} alt={place.name} className="absolute inset-0 size-full object-cover" />
+          {selectedImage ? (
+            <img src={selectedImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
           ) : (
             <div className={`absolute inset-0 bg-gradient-to-br ${getPlaceImage(place.id)}`} />
           )}
@@ -239,8 +338,39 @@ export function PlaceDetails() {
             <Heart className={`size-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-700"}`} />
           </button>
 
+          {placeImages.length > 1 && (
+            <>
+              <button
+                onClick={goToPreviousImage}
+                className="absolute left-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white"
+                aria-label="Imagen anterior"
+              >
+                <ChevronLeft className="size-5 text-gray-700" />
+              </button>
+              <button
+                onClick={goToNextImage}
+                className="absolute right-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white"
+                aria-label="Imagen siguiente"
+              >
+                <ChevronRight className="size-5 text-gray-700" />
+              </button>
+              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
+                {placeImages.map((image, index) => (
+                  <button
+                    key={`${image}-${index}`}
+                    onClick={() => setActiveImageIndex(index)}
+                    className={`size-2 rounded-full transition-all ${
+                      activeImageIndex === index ? "w-5 bg-white" : "bg-white/60"
+                    }`}
+                    aria-label={`Ver imagen ${index + 1}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
           <div className="absolute bottom-4 right-4 px-3 py-1 rounded-full bg-black/70 text-white text-sm font-medium">
-            {placeImages.length > 0 ? `1/${placeImages.length}` : "1/1"}
+            {placeImages.length > 0 ? `${activeImageIndex + 1}/${placeImages.length}` : "1/1"}
           </div>
         </div>
 
@@ -279,9 +409,65 @@ export function PlaceDetails() {
 
             <Card className="bg-gray-50 border-0">
               <CardContent className="pt-4 pb-3 px-3 text-center">
-                <Star className="size-6 text-[#4F46E5] mx-auto mb-2" />
-                <p className="text-xs font-semibold mb-1">Valoracion</p>
-                <p className="text-xs text-gray-600 leading-tight">{place.rating}/5.0<br />estrellas</p>
+                <DollarSign className="size-6 text-[#4F46E5] mx-auto mb-2" />
+                <p className="text-xs font-semibold mb-1">Acceso</p>
+                <p className="text-xs text-gray-600 leading-tight">{priceText}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {place.description && (
+            <div>
+              <h3 className="text-lg mb-2" style={{ fontWeight: 700 }}>Descripcion</h3>
+              <p className="text-sm leading-relaxed text-gray-700">{place.description}</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Card className="bg-gray-50 border-0">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <MapPin className="mt-0.5 size-5 shrink-0 text-[#4F46E5]" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">Direccion</p>
+                      <p className="text-sm text-gray-600">{place.address}</p>
+                      {place.zone && <p className="text-xs text-gray-500">{place.zone}</p>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenDirections}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#4F46E5] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-[#4338CA]"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Como llegar
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-50 border-0">
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Ambiente</p>
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <Volume2 className="size-4 text-[#4F46E5]" />
+                        <span>Silencio</span>
+                      </div>
+                      {renderRatingDots(place.quietness)}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm text-gray-700">
+                        <Lightbulb className="size-4 text-[#4F46E5]" />
+                        <span>Iluminacion</span>
+                      </div>
+                      {renderRatingDots(place.lighting)}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
