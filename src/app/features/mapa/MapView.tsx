@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { APIProvider, AdvancedMarker, Map, Pin } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
@@ -14,6 +14,36 @@ const getUserRole = (): 'student' | 'worker' | 'admin' => {
 };
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+const cleanMapStyles: google.maps.MapTypeStyle[] = [
+  {
+    featureType: "poi",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "transit",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "administrative",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+];
+
+const createSvgMarkerUrl = (svg: string) => {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 export function MapView() {
   const navigate = useNavigate();
@@ -115,6 +145,35 @@ export function MapView() {
     }
   };
 
+  const getPlaceMarkerIcon = (type: string) => {
+    const glyph = getPlaceIcon(type);
+    return createSvgMarkerUrl(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="52" height="58" viewBox="0 0 52 58">
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#111827" flood-opacity="0.26"/>
+          </filter>
+          <path
+            d="M26 55C20.8 47.7 11 36.9 11 24.5C11 16.2 17.7 9.5 26 9.5C34.3 9.5 41 16.2 41 24.5C41 36.9 31.2 47.7 26 55Z"
+            fill="#ffffff"
+            stroke="#4F46E5"
+            stroke-width="3"
+            filter="url(#shadow)"
+          />
+          <circle cx="26" cy="24.5" r="11.5" fill="#EEF2FF"/>
+          <text x="26" y="31.5" text-anchor="middle" font-size="20" font-family="Arial, sans-serif">${glyph}</text>
+        </svg>
+      `);
+  };
+
+  const getUserMarkerIcon = () => {
+    return createSvgMarkerUrl(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="30" fill="#c4b5fd" fill-opacity="0.45"/>
+          <circle cx="32" cy="32" r="8" fill="#7c3aed" stroke="#ffffff" stroke-width="4"/>
+        </svg>
+      `);
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('es-CL', {
       style: 'currency',
@@ -124,7 +183,7 @@ export function MapView() {
   };
 
   const hasPrice = (place: any) => {
-    return 'pricePerHour' in place;
+    return Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
   };
 
   const getZoneName = (name: string) => {
@@ -204,38 +263,24 @@ export function MapView() {
             <Map
               defaultCenter={userLocation}
               defaultZoom={13}
-              mapId="nook-map"
               disableDefaultUI
+              clickableIcons={false}
               gestureHandling="greedy"
+              styles={cleanMapStyles}
               className="absolute inset-0"
             >
-              <AdvancedMarker position={userLocation} zIndex={30}>
-                <div className="relative">
-                  <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
-                    <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
-                  </div>
-                </div>
-              </AdvancedMarker>
+              <Marker position={userLocation} icon={getUserMarkerIcon()} zIndex={30} />
 
               {places.map((place) => {
                 const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
 
                 return (
-                  <AdvancedMarker
+                  <Marker
                     key={place.id}
                     position={{ lat: place.lat, lng: place.lng }}
                     onClick={() => navigate(placeUrl)}
-                  >
-                    <button className="transition-transform hover:scale-110">
-                      <Pin
-                        background="#ffffff"
-                        borderColor="#4F46E5"
-                        glyphColor="#4F46E5"
-                        glyph={getPlaceIcon(place.type)}
-                        scale={1.15}
-                      />
-                    </button>
-                  </AdvancedMarker>
+                    icon={getPlaceMarkerIcon(place.type)}
+                  />
                 );
               })}
             </Map>

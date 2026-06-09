@@ -312,7 +312,8 @@ export function PlaceDetails() {
   const capacityText = place.capacityMax || place.capacity
     ? `${place.capacityMin ?? 1} - ${place.capacityMax ?? place.capacity}`
     : "1 - 20";
-  const priceText = typeof place.pricePerHour === "number" ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
+  const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
+  const priceText = hasValidPrice ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
 
   return (
     <div className="size-full flex flex-col bg-white">
@@ -354,13 +355,15 @@ export function PlaceDetails() {
               >
                 <ChevronRight className="size-5 text-gray-700" />
               </button>
-              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5">
+              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
                 {placeImages.map((image, index) => (
                   <button
                     key={`${image}-${index}`}
                     onClick={() => setActiveImageIndex(index)}
                     className={`size-2 rounded-full transition-all ${
-                      activeImageIndex === index ? "w-5 bg-white" : "bg-white/60"
+                      activeImageIndex === index
+                        ? "w-5 bg-[#C4B5FD] shadow-sm"
+                        : "bg-white/45 ring-1 ring-white/30"
                     }`}
                     aria-label={`Ver imagen ${index + 1}`}
                   />
@@ -555,7 +558,7 @@ export function PlaceDetails() {
             </div>
           </div>
 
-          {isWorkPlace && userRole === "worker" && (
+          {isWorkPlace && userRole === "worker" && hasValidPrice && (
             <div className="pb-4">
               <button
                 onClick={() => navigate(`/app/checkout/${placeId}`)}
