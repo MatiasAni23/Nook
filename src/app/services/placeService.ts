@@ -68,6 +68,10 @@ export interface CreatePlaceInput {
 }
 
 const PLACE_IMAGES_BUCKET = "place-images";
+const PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let placesCache: { timestamp: number; places: AppPlace[] } | null = null;
+let placesRequest: Promise<AppPlace[]> | null = null;
 
 type PlaceRow = {
   id: string;
@@ -153,7 +157,7 @@ function toAppPlace(row: PlaceRow): AppPlace {
   };
 }
 
-export async function listPlaces(): Promise<AppPlace[]> {
+async function fetchPlaces(): Promise<AppPlace[]> {
   const client = requireSupabase();
   const { data, error } = await client
     .from("places")
@@ -196,7 +200,36 @@ export async function listPlaces(): Promise<AppPlace[]> {
   return ((data ?? []) as PlaceRow[]).map(toAppPlace);
 }
 
+export function getCachedPlaces() {
+  return placesCache?.places ?? null;
+}
+
+export async function listPlaces(options?: { forceRefresh?: boolean }): Promise<AppPlace[]> {
+  const isFresh = placesCache && Date.now() - placesCache.timestamp < PLACES_CACHE_TTL_MS;
+  if (!options?.forceRefresh && isFresh) {
+    return placesCache.places;
+  }
+
+  if (!options?.forceRefresh && placesRequest) {
+    return placesRequest;
+  }
+
+  placesRequest = fetchPlaces()
+    .then((places) => {
+      placesCache = { timestamp: Date.now(), places };
+      return places;
+    })
+    .finally(() => {
+      placesRequest = null;
+    });
+
+  return placesRequest;
+}
+
 export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
+  const cachedPlace = placesCache?.places.find((place) => place.id === placeId);
+  if (cachedPlace) return cachedPlace;
+
   const client = requireSupabase();
   const { data, error } = await client
     .from("places")
@@ -237,7 +270,16 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
   if (error) throw error;
   if (!data) return null;
 
-  return toAppPlace(data as PlaceRow);
+  const place = toAppPlace(data as PlaceRow);
+  if (placesCache) {
+    placesCache = {
+      timestamp: placesCache.timestamp,
+      places: placesCache.places.some((cachedPlace) => cachedPlace.id === place.id)
+        ? placesCache.places.map((cachedPlace) => cachedPlace.id === place.id ? place : cachedPlace)
+        : [place, ...placesCache.places],
+    };
+  }
+  return place;
 }
 
 async function uploadPlaceImages(placeId: string, imageFiles: File[]) {
@@ -340,8 +382,14 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
     if (amenitiesError) throw amenitiesError;
   }
 
-  return {
+  const createdPlace = {
     ...toAppPlace({ ...(data as PlaceRow), place_amenities: [] }),
     amenities: availableAmenities,
   };
+  placesCache = {
+    timestamp: Date.now(),
+    places: [createdPlace, ...(placesCache?.places ?? [])],
+  };
+
+  return createdPlace;
 }

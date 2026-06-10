@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { BookOpen, Camera, GraduationCap, Edit, LogOut, Star, Heart } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
+import { Skeleton } from "../../components/ui/skeleton";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Badge } from "../../components/ui/badge";
@@ -11,11 +12,13 @@ import { currentUser } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
+import { getDetailNavigationState } from "../mapa/navigationState";
 import { ProfileSkeleton } from "./ProfileSkeleton";
 import {
   type CurrentUserProfile,
   type FavoritePlace,
   type ProfileStats,
+  getCachedCurrentUserFavoritePlaces,
   getCurrentUserFavoritePlaces,
   getCurrentUserProfileStats,
   getInitials,
@@ -60,6 +63,7 @@ export function ProfileView() {
   const [profile, setProfile] = useState(() => buildStudentProfile(cachedUser));
   const [newSubject, setNewSubject] = useState("");
   const [favoritePlaces, setFavoritePlaces] = useState<FavoritePlace[]>([]);
+  const [isLoadingFavoritePlaces, setIsLoadingFavoritePlaces] = useState(false);
   const [stats, setStats] = useState<ProfileStats>(EMPTY_STATS);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -82,6 +86,13 @@ export function ProfileView() {
         return;
       }
 
+      const cachedFavoritePlaces = getCachedCurrentUserFavoritePlaces(cachedUser?.id, "study");
+      if (cachedFavoritePlaces) {
+        setFavoritePlaces(cachedFavoritePlaces);
+      }
+
+      setIsLoadingFavoritePlaces(!cachedFavoritePlaces);
+
       try {
         const [nextStats, nextFavoritePlaces] = await Promise.all([
           getCurrentUserProfileStats(),
@@ -96,6 +107,8 @@ export function ProfileView() {
         setProfileError(
           error instanceof Error ? error.message : "No se pudieron cargar los datos del perfil.",
         );
+      } finally {
+        if (isMounted) setIsLoadingFavoritePlaces(false);
       }
     }
 
@@ -433,11 +446,29 @@ export function ProfileView() {
             <Heart className="size-5 text-red-500 fill-red-500" />
           </div>
           <div className="space-y-3">
+            {isLoadingFavoritePlaces && (
+              <>
+                {Array.from({ length: 2 }).map((_, index) => (
+                  <Card key={`favorite-place-skeleton-${index}`} className="overflow-hidden bg-white">
+                    <CardContent className="p-3">
+                      <div className="flex gap-3">
+                        <Skeleton className="size-20 shrink-0 rounded-xl" />
+                        <div className="flex-1 space-y-3">
+                          <Skeleton className="h-4 w-36" />
+                          <Skeleton className="h-3 w-28" />
+                          <Skeleton className="h-5 w-24 rounded-full" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            )}
             {favoritePlaces.map((place) => (
               <Card
                 key={place.id}
                 className="cursor-pointer hover:shadow-lg transition-all overflow-hidden bg-white"
-                onClick={() => navigate(`/app/place/${place.id}`)}
+                onClick={() => navigate(`/app/place/${place.id}`, { state: getDetailNavigationState("/app/profile") })}
               >
                 <CardContent className="p-0">
                   <div className="flex gap-3 p-3">
@@ -486,7 +517,7 @@ export function ProfileView() {
                 </CardContent>
               </Card>
             ))}
-            {favoritePlaces.length === 0 && (
+            {!isLoadingFavoritePlaces && favoritePlaces.length === 0 && (
               <Card className="bg-white border-0 shadow-sm">
                 <CardContent className="py-5 text-center text-sm text-gray-500">
                   Todavia no tienes lugares favoritos guardados.

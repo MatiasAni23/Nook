@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { X, Bell, AlertTriangle, MessageCircle, Calendar, Info } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { type Notification, notifications as initialNotifications } from "../../data/mockData";
+import { getDetailNavigationState } from "../mapa/navigationState";
 
 interface NotificationsPanelProps {
   onClose: () => void;
@@ -11,6 +12,7 @@ interface NotificationsPanelProps {
 
 export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [notifications, setNotifications] = useState(initialNotifications);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -38,7 +40,10 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
     // Navigate if there's a place
     if (notification.placeId) {
       const isWorkplace = notification.placeId.startsWith('w');
-      navigate(isWorkplace ? `/app/workplace/${notification.placeId}` : `/app/place/${notification.placeId}`);
+      navigate(
+        isWorkplace ? `/app/workplace/${notification.placeId}` : `/app/place/${notification.placeId}`,
+        { state: getDetailNavigationState(location.pathname) },
+      );
       onClose();
     } else if (notification.type === 'new_message') {
       navigate('/app/chat');

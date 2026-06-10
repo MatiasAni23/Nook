@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -34,6 +34,7 @@ import {
   setCurrentUserFavoritePlace,
 } from "../../services/currentUserService";
 import { getPlaceById, type AppPlace } from "../../services/placeService";
+import type { DetailNavigationState } from "./navigationState";
 
 const getUserRole = (): "student" | "worker" | "admin" => {
   return (window as any).__userRole || "student";
@@ -51,6 +52,9 @@ const fallbackAmenities = [
 export function PlaceDetails() {
   const { placeId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationState = location.state as DetailNavigationState | null;
+  const backPath = navigationState?.from ?? "/app/discover";
   const userRole = getUserRole();
   const studyPlace = studyPlaces.find((item) => item.id === placeId);
   const workPlace = workPlaces.find((item) => item.id === placeId);
@@ -267,7 +271,7 @@ export function PlaceDetails() {
   if (isLoadingPlace) {
     return (
       <div className="p-4">
-        <button onClick={() => navigate("/app")} className="flex items-center gap-2 text-gray-600">
+        <button onClick={() => navigate(backPath)} className="flex items-center gap-2 text-gray-600">
           <ArrowLeft className="size-4" />
           Volver
         </button>
@@ -279,7 +283,7 @@ export function PlaceDetails() {
   if (!place) {
     return (
       <div className="p-4">
-        <button onClick={() => navigate("/app")} className="flex items-center gap-2 text-gray-600">
+        <button onClick={() => navigate(backPath)} className="flex items-center gap-2 text-gray-600">
           <ArrowLeft className="size-4" />
           Volver
         </button>
@@ -328,7 +332,7 @@ export function PlaceDetails() {
           )}
 
           <button
-            onClick={() => navigate("/app")}
+            onClick={() => navigate(backPath)}
             className="absolute top-4 left-4 size-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50"
           >
             <ArrowLeft className="size-5 text-gray-700" />

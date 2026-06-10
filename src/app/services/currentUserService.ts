@@ -84,6 +84,9 @@ export interface ChatUser {
 
 const chatUsersCache = new Map<string, { timestamp: number; users: ChatUser[] }>();
 const CHAT_USERS_CACHE_TTL_MS = 5 * 60 * 1000;
+const favoritePlacesCache = new Map<string, { timestamp: number; places: FavoritePlace[] }>();
+const favoritePlacesRequests = new Map<string, Promise<FavoritePlace[]>>();
+const FAVORITE_PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
 function toFavoritePlace(place: unknown): FavoritePlace | null {
   if (!place || typeof place !== "object") return null;
@@ -289,7 +292,16 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
 
   if (authError || !authData.user) return [];
 
-  const { data, error } = await supabase
+  const cacheKey = `${authData.user.id}:${category ?? "all"}`;
+  const cachedPlaces = favoritePlacesCache.get(cacheKey);
+  if (cachedPlaces && Date.now() - cachedPlaces.timestamp < FAVORITE_PLACES_CACHE_TTL_MS) {
+    return cachedPlaces.places;
+  }
+
+  const existingRequest = favoritePlacesRequests.get(cacheKey);
+  if (existingRequest) return existingRequest;
+
+  const request = supabase
     .from("favorites")
     .select(`
       places:place_id(
@@ -308,14 +320,29 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
       )
     `)
     .eq("user_id", authData.user.id)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .then(({ data, error }) => {
+      if (error) throw error;
 
-  if (error) throw error;
+      const places = (data ?? [])
+        .map((favorite) => toFavoritePlace((favorite as { places?: unknown }).places))
+        .filter((place): place is FavoritePlace => Boolean(place))
+        .filter((place) => !category || place.category === category);
 
-  return (data ?? [])
-    .map((favorite) => toFavoritePlace((favorite as { places?: unknown }).places))
-    .filter((place): place is FavoritePlace => Boolean(place))
-    .filter((place) => !category || place.category === category);
+      favoritePlacesCache.set(cacheKey, { timestamp: Date.now(), places });
+      return places;
+    })
+    .finally(() => {
+      favoritePlacesRequests.delete(cacheKey);
+    });
+
+  favoritePlacesRequests.set(cacheKey, request);
+  return request;
+}
+
+export function getCachedCurrentUserFavoritePlaces(userId?: string, category?: "study" | "work") {
+  if (!userId) return null;
+  return favoritePlacesCache.get(`${userId}:${category ?? "all"}`)?.places ?? null;
 }
 
 export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promise<ChatUser[]> {
@@ -428,6 +455,7 @@ export async function setCurrentUserFavoritePlace(placeId: string, shouldFavorit
       );
 
     if (error) throw error;
+    favoritePlacesCache.clear();
     return true;
   }
 
@@ -438,6 +466,7 @@ export async function setCurrentUserFavoritePlace(placeId: string, shouldFavorit
     .eq("place_id", placeId);
 
   if (error) throw error;
+  favoritePlacesCache.clear();
   return false;
 }
 

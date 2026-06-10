@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { cn } from "./utils";
 
@@ -79,23 +79,44 @@ export function CachedImage({
   src,
   className,
   onLoad,
+  onError,
   ...props
 }: React.ImgHTMLAttributes<HTMLImageElement>) {
   const cachedSource = useCachedImageSrc(src);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [isLoaded, setIsLoaded] = useState(() => Boolean(cachedSource));
 
   useEffect(() => {
+    const image = imageRef.current;
+
+    if (!cachedSource) {
+      setIsLoaded(false);
+      return;
+    }
+
+    if (image?.complete) {
+      setIsLoaded(true);
+      return;
+    }
+
     setIsLoaded(false);
+    const fallbackTimer = window.setTimeout(() => setIsLoaded(true), 700);
+    return () => window.clearTimeout(fallbackTimer);
   }, [cachedSource]);
 
   return (
     <img
       {...props}
+      ref={imageRef}
       src={cachedSource}
       className={cn("transition-opacity duration-200", isLoaded ? "opacity-100" : "opacity-0", className)}
       onLoad={(event) => {
         setIsLoaded(true);
         onLoad?.(event);
+      }}
+      onError={(event) => {
+        setIsLoaded(true);
+        onError?.(event);
       }}
     />
   );

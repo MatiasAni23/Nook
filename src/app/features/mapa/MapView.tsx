@@ -7,8 +7,9 @@ import { Card, CardContent } from "../../components/ui/card";
 import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { listPlaces, type AppPlace } from "../../services/placeService";
+import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./placeFilters";
+import { getDetailNavigationState } from "./navigationState";
 
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
@@ -63,10 +64,12 @@ export function MapView() {
     if (!isSupabaseConfigured) return;
 
     let isMounted = true;
-    setIsLoadingPlaces(true);
+    const cachedPlaces = getCachedPlaces();
+    if (cachedPlaces) setDbPlaces(cachedPlaces);
+    setIsLoadingPlaces(!cachedPlaces);
     setPlacesError("");
 
-    listPlaces()
+    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
       .then((places) => {
         if (isMounted) setDbPlaces(places);
       })
@@ -266,7 +269,7 @@ export function MapView() {
                   <Marker
                     key={place.id}
                     position={{ lat: place.lat, lng: place.lng }}
-                    onClick={() => navigate(placeUrl)}
+                    onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                     icon={getPlaceMarkerIcon(place.type)}
                   />
                 );
@@ -303,7 +306,7 @@ export function MapView() {
                     top: `calc(50% + ${offsetY}px)`,
                     transform: 'translate(-50%, -50%)',
                   }}
-                  onClick={() => navigate(placeUrl)}
+                  onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                 >
                   <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-white">
                     <span className="text-2xl">{getPlaceIcon(place.type)}</span>
@@ -375,14 +378,14 @@ export function MapView() {
                     {place.images?.[0] ? (
                       <button
                         className="h-20 w-full overflow-hidden rounded-t-lg bg-gray-100"
-                        onClick={() => navigate(placeUrl)}
+                        onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                       >
                         <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
                       </button>
                     ) : (
                       <div
                         className={`h-20 bg-gradient-to-br ${getPlaceImage(place.id)} rounded-t-lg flex items-center justify-center cursor-pointer`}
-                        onClick={() => navigate(placeUrl)}
+                        onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                       >
                         <span className="text-2xl">{getPlaceIcon(place.type)}</span>
                       </div>
@@ -390,7 +393,7 @@ export function MapView() {
 
                     {/* Info */}
                     <div className="p-2">
-                      <div onClick={() => navigate(placeUrl)} className="cursor-pointer">
+                      <div onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })} className="cursor-pointer">
                         <h4 className="font-semibold text-xs line-clamp-1 mb-0.5">{place.name}</h4>
                         <p className="text-xs text-gray-400 mb-1 line-clamp-1">{getPlaceZoneLabel(place)}</p>
                         {placeHasPrice ? (

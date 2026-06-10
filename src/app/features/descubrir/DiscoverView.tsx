@@ -11,13 +11,14 @@ import { currentUser, currentWorker, notifications, placeIssues, studyPlaces, wo
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getFirstName, getInitials } from "../../services/currentUserService";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { listPlaces, type AppPlace } from "../../services/placeService";
+import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import {
   getPlaceTypeLabel,
   hasValidPlacePrice,
   placeMatchesSearch,
   placeMatchesTab,
 } from "../mapa/placeFilters";
+import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
 
 const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
@@ -55,10 +56,12 @@ export function DiscoverView() {
     if (!isSupabaseConfigured) return;
 
     let isMounted = true;
-    setIsLoadingPlaces(true);
+    const cachedPlaces = getCachedPlaces();
+    if (cachedPlaces) setDbPlaces(cachedPlaces);
+    setIsLoadingPlaces(!cachedPlaces);
     setPlacesError("");
 
-    listPlaces()
+    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
       .then((places) => {
         if (isMounted) setDbPlaces(places);
       })
@@ -235,7 +238,7 @@ export function DiscoverView() {
                 Encuentra el lugar perfecto<br />para crear, reunirte y crecer.
               </p>
             </div>
-            <div className="absolute right-0 top-0 bottom-0 w-1/2">
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gray-100">
               <CachedImage src={discoverImageUrl} alt="" className="size-full object-cover" aria-hidden="true" />
             </div>
           </div>
@@ -282,7 +285,7 @@ export function DiscoverView() {
               <Card
                 key={place.id}
                 className="cursor-pointer hover:shadow-lg transition-all overflow-hidden bg-white"
-                onClick={() => navigate(placeUrl)}
+                onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app/discover") })}
               >
                 <CardContent className="p-3">
                   <div className="flex gap-3">

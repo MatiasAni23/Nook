@@ -7,7 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { listPlaces, type AppPlace } from "../../services/placeService";
+import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import { AdminAddPlace } from "./AdminAddPlace";
 import { AdminEditPlace } from "./AdminEditPlace";
 
@@ -24,10 +24,12 @@ export function AdminManagePlaces() {
     if (!isSupabaseConfigured) return;
 
     let isMounted = true;
-    setIsLoading(true);
+    const cachedPlaces = getCachedPlaces();
+    if (cachedPlaces) setDbPlaces(cachedPlaces);
+    setIsLoading(!cachedPlaces);
     setErrorMessage("");
 
-    listPlaces()
+    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
       .then((places) => {
         if (isMounted) setDbPlaces(places);
       })
