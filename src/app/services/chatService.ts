@@ -45,6 +45,10 @@ interface ChatMessageRow {
 }
 
 const chatUserCache = new Map<string, ChatUser>();
+const CHAT_MESSAGES_CACHE_TTL_MS = 2 * 60 * 1000;
+const chatMessagesCache = new Map<string, { timestamp: number; messages: ChatMessage[] }>();
+const chatMessagesRequests = new Map<string, Promise<ChatMessage[]>>();
+let chatSubscriptionId = 0;
 
 function mapChatMessage(row: ChatMessageRow): ChatMessage {
   return {
@@ -139,15 +143,32 @@ export async function getChatUsersByIds(ids: string[]): Promise<ChatUser[]> {
 export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
-  const { data, error } = await supabase
+  const cachedMessages = chatMessagesCache.get(userId);
+  if (cachedMessages && Date.now() - cachedMessages.timestamp < CHAT_MESSAGES_CACHE_TTL_MS) {
+    return cachedMessages.messages;
+  }
+
+  const existingRequest = chatMessagesRequests.get(userId);
+  if (existingRequest) return existingRequest;
+
+  const request = supabase
     .from("messages")
     .select("id, sender_id, receiver_id, message, created_at, read, read_at")
     .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .then(({ data, error }) => {
+      if (error) throw error;
 
-  if (error) throw error;
+      const messages = (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+      chatMessagesCache.set(userId, { timestamp: Date.now(), messages });
+      return messages;
+    })
+    .finally(() => {
+      chatMessagesRequests.delete(userId);
+    });
 
-  return (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+  chatMessagesRequests.set(userId, request);
+  return request;
 }
 
 export async function getChatMessagesBetweenUsers(
@@ -190,7 +211,10 @@ export async function sendChatMessage(input: {
 
   if (error || !data) throw error ?? new Error("No se pudo enviar el mensaje.");
 
-  return mapChatMessage(data as ChatMessageRow);
+  const message = mapChatMessage(data as ChatMessageRow);
+  upsertCachedChatMessage(input.senderId, message);
+  upsertCachedChatMessage(input.receiverId, message);
+  return message;
 }
 
 export async function markChatMessagesAsRead(input: {
@@ -212,7 +236,24 @@ export async function markChatMessagesAsRead(input: {
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+  const messages = (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+  messages.forEach((message) => upsertCachedChatMessage(input.currentUserId, message));
+  return messages;
+}
+
+export function getCachedChatMessagesForUser(userId?: string) {
+  if (!userId) return null;
+  return chatMessagesCache.get(userId)?.messages ?? null;
+}
+
+export function upsertCachedChatMessage(userId: string, message: ChatMessage) {
+  const cachedMessages = chatMessagesCache.get(userId)?.messages ?? [];
+  const nextMessages = cachedMessages.some((item) => item.id === message.id)
+    ? cachedMessages.map((item) => (item.id === message.id ? message : item))
+    : [...cachedMessages, message];
+
+  nextMessages.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
+  chatMessagesCache.set(userId, { timestamp: Date.now(), messages: nextMessages });
 }
 
 export function subscribeToChatMessages(
@@ -221,7 +262,8 @@ export function subscribeToChatMessages(
 ) {
   if (!isSupabaseConfigured || !supabase) return () => undefined;
 
-  const channel = supabase.channel(`messages-${userId}`);
+  chatSubscriptionId += 1;
+  const channel = supabase.channel(`messages-${userId}-${chatSubscriptionId}`);
 
   channel.on(
     "postgres_changes",
@@ -230,6 +272,7 @@ export function subscribeToChatMessages(
       if (!payload.new) return;
       const message = mapChatMessage(payload.new as ChatMessageRow);
       if (message.senderId !== userId && message.receiverId !== userId) return;
+      upsertCachedChatMessage(userId, message);
       onMessage(message);
     },
   );
@@ -241,6 +284,7 @@ export function subscribeToChatMessages(
       if (!payload.new) return;
       const message = mapChatMessage(payload.new as ChatMessageRow);
       if (message.senderId !== userId && message.receiverId !== userId) return;
+      upsertCachedChatMessage(userId, message);
       onMessage(message);
     },
   );

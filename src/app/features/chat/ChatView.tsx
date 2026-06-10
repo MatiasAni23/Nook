@@ -14,6 +14,7 @@ import {
   type ChatUser,
   createTypingChannel,
   getConversationId,
+  getCachedChatMessagesForUser,
   getChatMessagesBetweenUsers,
   getChatMessagesForUser,
   getChatUsersByIds,
@@ -210,7 +211,35 @@ export function ChatView() {
   useEffect(() => {
     if (!isSupabaseConfigured || !currentUserId) return;
 
-    setIsLoadingConversations(true);
+    const cachedMessages = getCachedChatMessagesForUser(currentUserId);
+    if (cachedMessages) {
+      const grouped: ConversationMap = {};
+      cachedMessages.forEach((message) => {
+        const otherUserId =
+          message.senderId === currentUserId ? message.receiverId : message.senderId;
+        if (!grouped[otherUserId]) grouped[otherUserId] = [];
+        grouped[otherUserId].push(message);
+      });
+
+      setConversations(grouped);
+
+      const participantIds = Array.from(new Set(Object.keys(grouped)));
+      if (userId && !participantIds.includes(userId)) {
+        participantIds.push(userId);
+      }
+
+      getChatUsersByIds(participantIds)
+        .then((users) => {
+          const nextParticipants = users.reduce<Record<string, ChatUser>>((acc, user) => {
+            acc[user.id] = user;
+            return acc;
+          }, {});
+          setParticipants(nextParticipants);
+        })
+        .catch(() => undefined);
+    }
+
+    setIsLoadingConversations(!cachedMessages);
     setChatError("");
 
     getChatMessagesForUser(currentUserId)

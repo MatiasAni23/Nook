@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { Map, User, Users, MessageCircle, Search } from "lucide-react";
+import { MessageNotificationBanner } from "./MessageNotificationBanner";
 
 // Get user role from routes.tsx global state
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
@@ -40,6 +41,7 @@ export function Layout() {
       <main className="size-full">
         <Outlet />
       </main>
+      <MessageNotificationBanner />
 
       {/* Gradient overlay for navigation */}
       <div className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-none z-40" />

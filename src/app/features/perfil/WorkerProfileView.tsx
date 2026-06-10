@@ -95,9 +95,12 @@ export function WorkerProfileView() {
       const cachedFavoritePlaces = getCachedCurrentUserFavoritePlaces(cachedUser?.id, "work");
       if (cachedFavoritePlaces) {
         setFavoritePlaces(cachedFavoritePlaces);
+        setIsLoadingFavoritePlaces(false);
+        setStats(EMPTY_STATS);
+        return;
       }
 
-      setIsLoadingFavoritePlaces(!cachedFavoritePlaces);
+      setIsLoadingFavoritePlaces(true);
 
       try {
         const [nextStats, nextFavoritePlaces] = await Promise.all([
