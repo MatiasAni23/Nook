@@ -1,161 +1,258 @@
-import { useState } from "react";
-import { Plus, Search, Edit, Trash2, UserCheck, UserX, MapPin, Mail, Phone } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+import { useEffect, useMemo, useState } from "react";
+import { Edit, Mail, MapPin, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { mockDelegates, type Delegate } from "../../data/managementData";
-import { studyPlaces, workPlaces } from "../../data/mockData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import {
+  createDelegateInvitation,
+  deleteManagedDelegate,
+  listManagedDelegates,
+  listManagedPlaceOptions,
+  saveManagedDelegate,
+  updateManagedDelegateStatus,
+  type DelegateStatus,
+  type ManagedDelegate,
+  type ManagedPlaceOption,
+} from "../../services/adminManagementService";
+
+interface DelegateFormData {
+  name: string;
+  email: string;
+  phone: string;
+  status: DelegateStatus;
+  assignedPlaces: string[];
+}
+
+const emptyFormData: DelegateFormData = {
+  name: "",
+  email: "",
+  phone: "",
+  status: "pending",
+  assignedPlaces: [],
+};
 
 export function AdminDelegates() {
-  const [delegates, setDelegates] = useState(mockDelegates);
+  const [delegates, setDelegates] = useState<ManagedDelegate[]>([]);
+  const [places, setPlaces] = useState<ManagedPlaceOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [editingDelegate, setEditingDelegate] = useState<Delegate | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    assignedPlaces: [] as string[],
-  });
+  const [editingDelegate, setEditingDelegate] = useState<ManagedDelegate | null>(null);
+  const [formData, setFormData] = useState<DelegateFormData>(emptyFormData);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [updatingDelegateId, setUpdatingDelegateId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [formError, setFormError] = useState("");
+  const [createdInviteUrl, setCreatedInviteUrl] = useState("");
+  const [createdInviteEmail, setCreatedInviteEmail] = useState("");
 
-  const allPlaces = [...studyPlaces, ...workPlaces];
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setErrorMessage("Supabase no esta configurado. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY.");
+      return;
+    }
 
-  const filteredDelegates = delegates.filter(delegate =>
-    delegate.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    delegate.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    let isMounted = true;
+    setIsLoading(true);
+    setErrorMessage("");
+
+    Promise.all([listManagedDelegates(), listManagedPlaceOptions()])
+      .then(([loadedDelegates, loadedPlaces]) => {
+        if (!isMounted) return;
+        setDelegates(loadedDelegates);
+        setPlaces(loadedPlaces);
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar la gestion de delegados.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const placeById = useMemo(() => new Map(places.map((place) => [place.id, place])), [places]);
+
+  const filteredDelegates = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return delegates.filter(
+      (delegate) =>
+        !normalizedSearch ||
+        delegate.name.toLowerCase().includes(normalizedSearch) ||
+        delegate.email.toLowerCase().includes(normalizedSearch),
+    );
+  }, [delegates, searchTerm]);
 
   const handleCreate = () => {
     setEditingDelegate(null);
-    setFormData({ name: '', email: '', phone: '', assignedPlaces: [] });
+    setFormData(emptyFormData);
+    setFormError("");
+    setCreatedInviteUrl("");
+    setCreatedInviteEmail("");
     setShowModal(true);
   };
 
-  const handleEdit = (delegate: Delegate) => {
+  const handleEdit = (delegate: ManagedDelegate) => {
     setEditingDelegate(delegate);
     setFormData({
       name: delegate.name,
       email: delegate.email,
-      phone: delegate.phone,
+      phone: delegate.phone ?? "",
+      status: delegate.status,
       assignedPlaces: delegate.assignedPlaces,
     });
+    setFormError("");
+    setCreatedInviteUrl("");
+    setCreatedInviteEmail("");
     setShowModal(true);
   };
 
-  const handleSave = () => {
-    if (!formData.name || !formData.email || !formData.phone) {
-      alert('Por favor completa todos los campos');
+  const handleSave = async () => {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.phone.trim()) {
+      setFormError("Completa nombre, email y telefono.");
       return;
     }
 
-    if (editingDelegate) {
-      setDelegates(delegates.map(d =>
-        d.id === editingDelegate.id
-          ? {
-              ...d,
-              name: formData.name,
-              email: formData.email,
-              phone: formData.phone,
-              assignedPlaces: formData.assignedPlaces,
-              placesCount: formData.assignedPlaces.length,
-            }
-          : d
-      ));
-    } else {
-      const newDelegate: Delegate = {
-        id: `d${Date.now()}`,
+    setIsSaving(true);
+    setFormError("");
+    setErrorMessage("");
+
+    try {
+      if (!editingDelegate) {
+        const { inviteUrl } = await createDelegateInvitation({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          assignedPlaces: formData.assignedPlaces,
+        });
+
+        setCreatedInviteUrl(inviteUrl);
+        setCreatedInviteEmail(formData.email.trim().toLowerCase());
+        setFormData(emptyFormData);
+        return;
+      }
+
+      const savedDelegate = await saveManagedDelegate({
+        id: editingDelegate?.id,
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        status: 'pending',
-        placesCount: formData.assignedPlaces.length,
+        status: formData.status,
         assignedPlaces: formData.assignedPlaces,
-        joinedDate: new Date(),
-        lastActive: new Date(),
-      };
-      setDelegates([...delegates, newDelegate]);
-    }
+      });
 
-    setShowModal(false);
+      setDelegates((current) => {
+        const exists = current.some((delegate) => delegate.id === savedDelegate.id);
+        return exists
+          ? current.map((delegate) => (delegate.id === savedDelegate.id ? savedDelegate : delegate))
+          : [savedDelegate, ...current];
+      });
+      setShowModal(false);
+      setEditingDelegate(null);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "No se pudo guardar el delegado.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (delegateId: string) => {
-    if (confirm('¿Estás seguro de eliminar este delegado?')) {
-      setDelegates(delegates.filter(d => d.id !== delegateId));
+  const handleDelete = async (delegate: ManagedDelegate) => {
+    if (!confirm("Estas seguro de eliminar este delegado? Se quitaran sus lugares asignados.")) return;
+
+    const previousDelegates = delegates;
+    setUpdatingDelegateId(delegate.id);
+    setErrorMessage("");
+    setDelegates((current) => current.filter((item) => item.id !== delegate.id));
+
+    try {
+      await deleteManagedDelegate(delegate);
+    } catch (error) {
+      setDelegates(previousDelegates);
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el delegado.");
+    } finally {
+      setUpdatingDelegateId(null);
     }
   };
 
-  const handleStatusChange = (delegateId: string) => {
-    setDelegates(delegates.map(d =>
-      d.id === delegateId
-        ? { ...d, status: d.status === 'active' ? 'suspended' : 'active' as any }
-        : d
-    ));
+  const handleStatusChange = async (delegate: ManagedDelegate) => {
+    const newStatus: DelegateStatus = delegate.status === "active" ? "suspended" : "active";
+    const previousDelegates = delegates;
+    setUpdatingDelegateId(delegate.id);
+    setErrorMessage("");
+    setDelegates((current) =>
+      current.map((item) => (item.id === delegate.id ? { ...item, status: newStatus } : item)),
+    );
+
+    try {
+      await updateManagedDelegateStatus(delegate, newStatus);
+    } catch (error) {
+      setDelegates(previousDelegates);
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar el delegado.");
+    } finally {
+      setUpdatingDelegateId(null);
+    }
   };
 
   const togglePlaceSelection = (placeId: string) => {
-    if (formData.assignedPlaces.includes(placeId)) {
-      setFormData({
-        ...formData,
-        assignedPlaces: formData.assignedPlaces.filter(id => id !== placeId),
-      });
-    } else {
-      setFormData({
-        ...formData,
-        assignedPlaces: [...formData.assignedPlaces, placeId],
-      });
-    }
-  };
-
-  const getStatusColor = (status: Delegate['status']) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-700 border-green-300';
-      case 'suspended': return 'bg-red-100 text-red-700 border-red-300';
-      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-    }
-  };
-
-  const getStatusLabel = (status: Delegate['status']) => {
-    switch (status) {
-      case 'active': return 'Activo';
-      case 'suspended': return 'Suspendido';
-      case 'pending': return 'Pendiente';
-    }
+    setFormData((current) => ({
+      ...current,
+      assignedPlaces: current.assignedPlaces.includes(placeId)
+        ? current.assignedPlaces.filter((id) => id !== placeId)
+        : [...current.assignedPlaces, placeId],
+    }));
   };
 
   return (
     <>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg" style={{ fontWeight: 700 }}>Delegados</h3>
+            <h3 className="text-lg" style={{ fontWeight: 700 }}>
+              Delegados
+            </h3>
             <p className="text-sm text-gray-600">{filteredDelegates.length} delegados registrados</p>
           </div>
-          <Button
-            onClick={handleCreate}
-            size="sm"
-            className="bg-[#4F46E5] hover:bg-[#4338CA]"
-          >
+          <Button onClick={handleCreate} size="sm" className="bg-[#4F46E5] hover:bg-[#4338CA]">
             <Plus className="size-4 mr-2" />
             Nuevo Delegado
           </Button>
         </div>
 
-        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
           <Input
             placeholder="Buscar delegados..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(event) => setSearchTerm(event.target.value)}
             className="pl-10"
           />
         </div>
 
-        {/* Delegates List */}
+        {errorMessage && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">Cargando delegados...</div>
+        )}
+
+        {!isLoading && filteredDelegates.length === 0 && (
+          <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
+            No hay delegados que coincidan con la busqueda.
+          </div>
+        )}
+
         <div className="space-y-3">
           {filteredDelegates.map((delegate) => (
             <Card key={delegate.id}>
@@ -163,11 +260,9 @@ export function AdminDelegates() {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="font-semibold">{delegate.name}</h4>
-                        <Badge className={getStatusColor(delegate.status)}>
-                          {getStatusLabel(delegate.status)}
-                        </Badge>
+                        <Badge className={getStatusColor(delegate.status)}>{getStatusLabel(delegate.status)}</Badge>
                       </div>
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
@@ -176,21 +271,35 @@ export function AdminDelegates() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Phone className="size-3" />
-                          {delegate.phone}
+                          {delegate.phone || "Sin telefono"}
                         </div>
                         <div className="flex items-center gap-2">
                           <MapPin className="size-3" />
                           {delegate.placesCount} lugar(es) asignado(s)
                         </div>
+                        {delegate.assignedPlaces.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {delegate.assignedPlaces.slice(0, 4).map((placeId) => (
+                              <Badge key={placeId} variant="outline" className="text-xs">
+                                {placeById.get(placeId)?.name ?? "Lugar sin nombre"}
+                              </Badge>
+                            ))}
+                            {delegate.assignedPlaces.length > 4 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{delegate.assignedPlaces.length - 4}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2 flex-wrap">
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={updatingDelegateId === delegate.id}
                       onClick={() => handleEdit(delegate)}
                       className="text-[#4F46E5] border-[#4F46E5] hover:bg-purple-50"
                     >
@@ -200,10 +309,11 @@ export function AdminDelegates() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(delegate.id)}
-                      className={delegate.status === 'active' ? 'text-orange-600 border-orange-300' : 'text-green-600 border-green-300'}
+                      disabled={updatingDelegateId === delegate.id}
+                      onClick={() => handleStatusChange(delegate)}
+                      className={delegate.status === "active" ? "text-orange-600 border-orange-300" : "text-green-600 border-green-300"}
                     >
-                      {delegate.status === 'active' ? (
+                      {delegate.status === "active" ? (
                         <>
                           <UserX className="size-3 mr-1" />
                           Suspender
@@ -218,7 +328,8 @@ export function AdminDelegates() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(delegate.id)}
+                      disabled={updatingDelegateId === delegate.id}
+                      onClick={() => handleDelete(delegate)}
                       className="text-red-600 border-red-300 hover:bg-red-50"
                     >
                       <Trash2 className="size-3 mr-1" />
@@ -232,28 +343,69 @@ export function AdminDelegates() {
         </div>
       </div>
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
             <CardContent className="p-6 space-y-4">
               <div>
-                <h3 className="text-xl font-semibold mb-2">
-                  {editingDelegate ? 'Editar Delegado' : 'Nuevo Delegado'}
-                </h3>
+                <h3 className="text-xl font-semibold mb-2">{editingDelegate ? "Editar Delegado" : "Nuevo Delegado"}</h3>
                 <p className="text-sm text-gray-600">
-                  Completa la información del delegado
+                  {editingDelegate
+                    ? "Actualiza sus datos y lugares asignados."
+                    : "Crea una invitacion con correo fijo para que el delegado configure su contrasena."}
                 </p>
               </div>
+
+              {createdInviteUrl && (
+                <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-800">Invitacion creada</p>
+                    <p className="text-xs text-emerald-700">
+                      Envia este link al delegado. El correo quedara bloqueado en la vista de registro.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input value={createdInviteUrl} readOnly className="bg-white text-xs" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const subject = encodeURIComponent("Invitacion para ser delegado en Nook");
+                        const body = encodeURIComponent(
+                          `Hola,\n\nTe invitamos a configurar tu cuenta de delegado en Nook.\n\nIngresa aqui: ${createdInviteUrl}\n\nEl link vence en 7 dias.`,
+                        );
+                        window.location.href = `mailto:${encodeURIComponent(createdInviteEmail)}?subject=${subject}&body=${body}`;
+                      }}
+                      className="shrink-0 bg-white"
+                    >
+                      Enviar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigator.clipboard?.writeText(createdInviteUrl)}
+                      className="shrink-0 bg-white"
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {formError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre completo *</Label>
                   <Input
                     id="name"
-                    placeholder="Ej: María González"
+                    placeholder="Ej: Maria Gonzalez"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                   />
                 </div>
 
@@ -264,58 +416,72 @@ export function AdminDelegates() {
                     type="email"
                     placeholder="Ej: maria@nook.cl"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    disabled={Boolean(editingDelegate) || Boolean(createdInviteUrl)}
+                    onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Teléfono *</Label>
+                  <Label htmlFor="phone">Telefono *</Label>
                   <Input
                     id="phone"
                     placeholder="Ej: +56 9 1234 5678"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    disabled={Boolean(createdInviteUrl)}
+                    onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
                   />
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="status">Estado</Label>
+                  <select
+                    id="status"
+                    value={formData.status}
+                    disabled={Boolean(createdInviteUrl)}
+                    onChange={(event) => setFormData({ ...formData, status: event.target.value as DelegateStatus })}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="pending">Pendiente</option>
+                    <option value="active">Activo</option>
+                    <option value="suspended">Suspendido</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
                   <Label>Lugares asignados</Label>
-                  <div className="border rounded-lg p-3 max-h-48 overflow-auto space-y-2">
-                    {allPlaces.map((place) => (
-                      <label
-                        key={place.id}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
-                      >
+                  <div className="border rounded-lg p-3 max-h-56 overflow-auto space-y-2">
+                    {places.map((place) => (
+                      <label key={place.id} className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                         <input
                           type="checkbox"
                           checked={formData.assignedPlaces.includes(place.id)}
+                          disabled={Boolean(createdInviteUrl)}
                           onChange={() => togglePlaceSelection(place.id)}
-                          className="size-4"
+                          className="size-4 mt-0.5"
                         />
-                        <span className="text-sm">{place.name}</span>
+                        <span className="text-sm">
+                          <span className="block font-medium">{place.name}</span>
+                          <span className="block text-xs text-gray-500">
+                            {place.category === "work" ? "Trabajo" : "Estudio"} - {place.address}
+                          </span>
+                        </span>
                       </label>
                     ))}
+                    {places.length === 0 && <p className="text-sm text-gray-500">No hay lugares disponibles.</p>}
                   </div>
-                  <p className="text-xs text-gray-500">
-                    {formData.assignedPlaces.length} lugar(es) seleccionado(s)
-                  </p>
+                  <p className="text-xs text-gray-500">{formData.assignedPlaces.length} lugar(es) seleccionado(s)</p>
                 </div>
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1"
-                >
-                  Cancelar
+                <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1" disabled={isSaving}>
+                  {createdInviteUrl ? "Cerrar" : "Cancelar"}
                 </Button>
-                <Button
-                  onClick={handleSave}
-                  className="flex-1 bg-[#4F46E5] hover:bg-[#4338CA]"
-                >
-                  {editingDelegate ? 'Guardar Cambios' : 'Crear Delegado'}
-                </Button>
+                {!createdInviteUrl && (
+                  <Button onClick={handleSave} className="flex-1 bg-[#4F46E5] hover:bg-[#4338CA]" disabled={isSaving}>
+                    {isSaving ? "Guardando..." : editingDelegate ? "Guardar Cambios" : "Crear Invitacion"}
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -323,4 +489,26 @@ export function AdminDelegates() {
       )}
     </>
   );
+}
+
+function getStatusColor(status: DelegateStatus) {
+  switch (status) {
+    case "active":
+      return "bg-green-100 text-green-700 border-green-300";
+    case "suspended":
+      return "bg-red-100 text-red-700 border-red-300";
+    case "pending":
+      return "bg-yellow-100 text-yellow-700 border-yellow-300";
+  }
+}
+
+function getStatusLabel(status: DelegateStatus) {
+  switch (status) {
+    case "active":
+      return "Activo";
+    case "suspended":
+      return "Suspendido";
+    case "pending":
+      return "Pendiente";
+  }
 }

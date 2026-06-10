@@ -5,6 +5,7 @@ import { AdminLayout } from "./features/admin/AdminLayout";
 import { AdminManagement } from "./features/admin/AdminManagement";
 import { AdminManagePlaces } from "./features/admin/AdminManagePlaces";
 import { AdminStats } from "./features/admin/AdminStats";
+import { DelegateInviteView } from "./features/auth/DelegateInviteView";
 import { LoginView } from "./features/auth/LoginView";
 import { ProfileSetupView } from "./features/auth/ProfileSetupView";
 import { RecoverPasswordView } from "./features/auth/RecoverPasswordView";
@@ -239,6 +240,10 @@ export const router = createBrowserRouter([
   {
     path: "/verify-account",
     Component: VerifyAccountView,
+  },
+  {
+    path: "/delegate-invite",
+    Component: DelegateInviteView,
   },
   {
     path: "/app",

@@ -8,6 +8,8 @@ export interface RegisterInput {
   email: string;
   phone: string;
   password: string;
+  role?: UserRole;
+  emailRedirectTo?: string;
 }
 
 export interface ProfileSetupInput {
@@ -67,15 +69,17 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function signUpWithEmail({ name, email, phone, password }: RegisterInput) {
+export async function signUpWithEmail({ name, email, phone, password, role = "student", emailRedirectTo }: RegisterInput) {
   const client = requireSupabase();
   const { data, error } = await client.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo,
       data: {
         full_name: name,
         phone,
+        role,
       },
     },
   });

@@ -1,160 +1,151 @@
-import { useState } from "react";
-import { Search, UserCheck, UserX, Shield, Ban, Filter } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { Ban, Briefcase, CalendarDays, GraduationCap, Search, Shield, UserCheck, UserX } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
-import { mockAppUsers, type AppUser } from "../../data/managementData";
+import { Button } from "../../components/ui/button";
+import { Card, CardContent } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import {
+  listManagedUsers,
+  updateManagedUserStatus,
+  type ManagedUser,
+  type ManagedUserRole,
+  type ManagedUserStatus,
+} from "../../services/adminManagementService";
+
+type RoleFilter = "all" | ManagedUserRole;
+type StatusFilter = "all" | ManagedUserStatus;
 
 export function AdminUsers() {
-  const [users, setUsers] = useState(mockAppUsers);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<'all' | 'student' | 'worker'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'verified' | 'suspended' | 'blocked'>('all');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [isLoading, setIsLoading] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const handleStatusChange = (userId: string, newStatus: AppUser['status']) => {
-    setUsers(users.map(u =>
-      u.id === userId ? { ...u, status: newStatus } : u
-    ));
-  };
-
-  const getStatusColor = (status: AppUser['status']) => {
-    switch (status) {
-      case 'verified': return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'active': return 'bg-green-100 text-green-700 border-green-300';
-      case 'suspended': return 'bg-orange-100 text-orange-700 border-orange-300';
-      case 'blocked': return 'bg-red-100 text-red-700 border-red-300';
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setErrorMessage("Supabase no esta configurado. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY.");
+      return;
     }
-  };
 
-  const getStatusLabel = (status: AppUser['status']) => {
-    switch (status) {
-      case 'verified': return 'Verificado';
-      case 'active': return 'Activo';
-      case 'suspended': return 'Suspendido';
-      case 'blocked': return 'Bloqueado';
+    let isMounted = true;
+    setIsLoading(true);
+    setErrorMessage("");
+
+    listManagedUsers()
+      .then((loadedUsers) => {
+        if (isMounted) setUsers(loadedUsers);
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los usuarios.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredUsers = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return users.filter((user) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        user.name.toLowerCase().includes(normalizedSearch) ||
+        user.email.toLowerCase().includes(normalizedSearch);
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesStatus = statusFilter === "all" || user.status === statusFilter;
+
+      return matchesSearch && matchesRole && matchesStatus;
+    });
+  }, [roleFilter, searchTerm, statusFilter, users]);
+
+  const handleStatusChange = async (userId: string, newStatus: ManagedUserStatus) => {
+    const previousUsers = users;
+    setUpdatingUserId(userId);
+    setErrorMessage("");
+    setUsers((current) => current.map((user) => (user.id === userId ? { ...user, status: newStatus } : user)));
+
+    try {
+      await updateManagedUserStatus(userId, newStatus);
+    } catch (error) {
+      setUsers(previousUsers);
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar el estado del usuario.");
+    } finally {
+      setUpdatingUserId(null);
     }
-  };
-
-  const getRoleLabel = (role: AppUser['role']) => {
-    return role === 'student' ? 'Estudiante' : 'Trabajador';
-  };
-
-  const getRoleColor = (role: AppUser['role']) => {
-    return role === 'student' ? 'bg-purple-100 text-purple-700' : 'bg-cyan-100 text-cyan-700';
   };
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div>
-        <h3 className="text-lg" style={{ fontWeight: 700 }}>Usuarios de la Aplicación</h3>
+        <h3 className="text-lg" style={{ fontWeight: 700 }}>
+          Usuarios de la Aplicacion
+        </h3>
         <p className="text-sm text-gray-600">{filteredUsers.length} usuarios registrados</p>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
         <Input
           placeholder="Buscar por nombre o email..."
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(event) => setSearchTerm(event.target.value)}
           className="pl-10"
         />
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="pt-4 pb-4">
           <div className="space-y-3">
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Tipo de usuario</Label>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={roleFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRoleFilter('all')}
-                  className={roleFilter === 'all' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Todos
-                </Button>
-                <Button
-                  variant={roleFilter === 'student' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRoleFilter('student')}
-                  className={roleFilter === 'student' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Estudiantes
-                </Button>
-                <Button
-                  variant={roleFilter === 'worker' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRoleFilter('worker')}
-                  className={roleFilter === 'worker' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Trabajadores
-                </Button>
-              </div>
-            </div>
+            <FilterGroup label="Tipo de usuario">
+              <FilterButton active={roleFilter === "all"} onClick={() => setRoleFilter("all")}>
+                Todos
+              </FilterButton>
+              <FilterButton active={roleFilter === "student"} onClick={() => setRoleFilter("student")}>
+                Estudiantes
+              </FilterButton>
+              <FilterButton active={roleFilter === "worker"} onClick={() => setRoleFilter("worker")}>
+                Trabajadores
+              </FilterButton>
+            </FilterGroup>
 
-            <div>
-              <Label className="text-sm font-medium mb-2 block">Estado</Label>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={statusFilter === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('all')}
-                  className={statusFilter === 'all' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Todos
-                </Button>
-                <Button
-                  variant={statusFilter === 'verified' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('verified')}
-                  className={statusFilter === 'verified' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Verificados
-                </Button>
-                <Button
-                  variant={statusFilter === 'active' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('active')}
-                  className={statusFilter === 'active' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Activos
-                </Button>
-                <Button
-                  variant={statusFilter === 'suspended' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('suspended')}
-                  className={statusFilter === 'suspended' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Suspendidos
-                </Button>
-                <Button
-                  variant={statusFilter === 'blocked' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setStatusFilter('blocked')}
-                  className={statusFilter === 'blocked' ? 'bg-[#4F46E5]' : ''}
-                >
-                  Bloqueados
-                </Button>
-              </div>
-            </div>
+            <FilterGroup label="Estado">
+              {(["all", "verified", "active", "pending", "suspended", "blocked"] as StatusFilter[]).map((status) => (
+                <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>
+                  {status === "all" ? "Todos" : getStatusLabel(status)}
+                </FilterButton>
+              ))}
+            </FilterGroup>
           </div>
         </CardContent>
       </Card>
 
-      {/* Users List */}
+      {errorMessage && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">Cargando usuarios...</div>
+      )}
+
+      {!isLoading && filteredUsers.length === 0 && (
+        <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
+          No hay usuarios que coincidan con los filtros.
+        </div>
+      )}
+
       <div className="space-y-3">
         {filteredUsers.map((user) => (
           <Card key={user.id}>
@@ -164,68 +155,78 @@ export function AdminUsers() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                       <h4 className="font-semibold">{user.name}</h4>
-                      <Badge className={getRoleColor(user.role)}>
-                        {getRoleLabel(user.role)}
-                      </Badge>
-                      <Badge className={getStatusColor(user.status)}>
-                        {getStatusLabel(user.status)}
-                      </Badge>
+                      <Badge className={getRoleColor(user.role)}>{getRoleLabel(user.role)}</Badge>
+                      <Badge className={getStatusColor(user.status)}>{getStatusLabel(user.status)}</Badge>
                     </div>
                     <div className="space-y-1 text-sm text-gray-600">
                       <p>{user.email}</p>
-                      <p>
-                        {user.role === 'student' && user.university && `🎓 ${user.university}`}
-                        {user.role === 'worker' && user.company && `💼 ${user.company}`}
-                      </p>
-                      <div className="flex gap-4 pt-1">
-                        <span>📅 Registrado: {user.registeredDate.toLocaleDateString('es-CL')}</span>
-                        <span>📋 {user.reservationsCount} reservas</span>
-                        <span>⚠️ {user.reportsCount} reportes</span>
+                      {user.role === "student" && user.university && (
+                        <p className="flex items-center gap-2">
+                          <GraduationCap className="size-3" />
+                          {user.university}
+                        </p>
+                      )}
+                      {user.role === "worker" && user.company && (
+                        <p className="flex items-center gap-2">
+                          <Briefcase className="size-3" />
+                          {user.company}
+                        </p>
+                      )}
+                      <div className="flex gap-4 pt-1 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <CalendarDays className="size-3" />
+                          Registrado: {user.registeredDate.toLocaleDateString("es-CL")}
+                        </span>
+                        <span>{user.reservationsCount} reservas</span>
+                        <span>{user.reportsCount} reportes</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-2 flex-wrap">
-                  {user.status !== 'verified' && (
+                  {user.status !== "verified" && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(user.id, 'verified')}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => handleStatusChange(user.id, "verified")}
                       className="text-blue-600 border-blue-300 hover:bg-blue-50"
                     >
                       <Shield className="size-3 mr-1" />
                       Verificar
                     </Button>
                   )}
-                  {user.status !== 'suspended' && user.status !== 'blocked' && (
+                  {user.status !== "suspended" && user.status !== "blocked" && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(user.id, 'suspended')}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => handleStatusChange(user.id, "suspended")}
                       className="text-orange-600 border-orange-300 hover:bg-orange-50"
                     >
                       <UserX className="size-3 mr-1" />
                       Suspender
                     </Button>
                   )}
-                  {user.status !== 'active' && user.status !== 'verified' && (
+                  {user.status !== "active" && user.status !== "verified" && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(user.id, 'active')}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => handleStatusChange(user.id, "active")}
                       className="text-green-600 border-green-300 hover:bg-green-50"
                     >
                       <UserCheck className="size-3 mr-1" />
                       Activar
                     </Button>
                   )}
-                  {user.status !== 'blocked' && (
+                  {user.status !== "blocked" && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(user.id, 'blocked')}
+                      disabled={updatingUserId === user.id}
+                      onClick={() => handleStatusChange(user.id, "blocked")}
                       className="text-red-600 border-red-300 hover:bg-red-50"
                     >
                       <Ban className="size-3 mr-1" />
@@ -242,6 +243,67 @@ export function AdminUsers() {
   );
 }
 
-function Label({ className, children, ...props }: any) {
-  return <label className={`text-sm font-medium ${className}`} {...props}>{children}</label>;
+function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <label className="text-sm font-medium mb-2 block">{label}</label>
+      <div className="flex gap-2 flex-wrap">{children}</div>
+    </div>
+  );
+}
+
+function FilterButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <Button variant={active ? "default" : "outline"} size="sm" onClick={onClick} className={active ? "bg-[#4F46E5]" : ""}>
+      {children}
+    </Button>
+  );
+}
+
+function getStatusColor(status: ManagedUserStatus) {
+  switch (status) {
+    case "verified":
+      return "bg-blue-100 text-blue-700 border-blue-300";
+    case "active":
+      return "bg-green-100 text-green-700 border-green-300";
+    case "pending":
+      return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    case "suspended":
+      return "bg-orange-100 text-orange-700 border-orange-300";
+    case "blocked":
+      return "bg-red-100 text-red-700 border-red-300";
+  }
+}
+
+function getStatusLabel(status: StatusFilter) {
+  switch (status) {
+    case "verified":
+      return "Verificado";
+    case "active":
+      return "Activo";
+    case "pending":
+      return "Pendiente";
+    case "suspended":
+      return "Suspendido";
+    case "blocked":
+      return "Bloqueado";
+    case "all":
+      return "Todos";
+  }
+}
+
+function getRoleLabel(role: ManagedUserRole) {
+  return role === "student" ? "Estudiante" : "Trabajador";
+}
+
+function getRoleColor(role: ManagedUserRole) {
+  return role === "student" ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700";
 }
