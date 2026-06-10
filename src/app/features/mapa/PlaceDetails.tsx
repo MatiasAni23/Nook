@@ -314,6 +314,10 @@ export function PlaceDetails() {
       : availableExplicitAmenities.length > 0
         ? availableExplicitAmenities
       : fallbackAmenities;
+  const uniqueIncludedAmenities = includedAmenities.filter((amenity: any, index, amenities) => {
+    const normalizedKey = String(amenity.key ?? amenity.name).toLowerCase();
+    return amenities.findIndex((item: any) => String(item.key ?? item.name).toLowerCase() === normalizedKey) === index;
+  });
   const capacityText = place.capacityMax || place.capacity
     ? `${place.capacityMin ?? 1} - ${place.capacityMax ?? place.capacity}`
     : "1 - 20";
@@ -484,10 +488,10 @@ export function PlaceDetails() {
           <div>
             <h3 className="text-lg mb-3" style={{ fontWeight: 700 }}>Servicios incluidos</h3>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-              {includedAmenities.map((amenity: any) => {
+              {uniqueIncludedAmenities.map((amenity: any, amenityIndex) => {
                 const AmenityIcon = getAmenityIcon(amenity.key);
                 return (
-                  <div key={amenity.key} className="flex flex-col items-center">
+                  <div key={`${amenity.key ?? amenity.name}-${amenityIndex}`} className="flex flex-col items-center">
                     <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
                       <AmenityIcon className="size-6 text-gray-700" />
                     </div>

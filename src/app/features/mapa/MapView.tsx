@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
-import { Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
+import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
+import { LocateFixed, Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
 import { CachedImage } from "../../components/ui/cached-image";
@@ -16,6 +16,10 @@ const getUserRole = (): 'student' | 'worker' | 'admin' => {
 };
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+const googleGeolocationUrl = "https://www.googleapis.com/geolocation/v1/geolocate";
+const defaultMapCenter = { lat: -33.4569, lng: -70.6483 };
+
+type UserLocationSource = "browser" | "google";
 
 const cleanMapStyles: google.maps.MapTypeStyle[] = [
   {
@@ -47,18 +51,148 @@ const createSvgMarkerUrl = (svg: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
+function RecenterMap({ center }: { center: { lat: number; lng: number } | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!center) return;
+    map?.panTo(center);
+  }, [center?.lat, center?.lng, map]);
+
+  return null;
+}
+
 export function MapView() {
   const navigate = useNavigate();
   const userRole = getUserRole();
   const [activeTab, setActiveTab] = useState('todos');
   const [searchTerm, setSearchTerm] = useState("");
-  const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [hasResolvedUserLocation, setHasResolvedUserLocation] = useState(false);
+  const [userLocationSource, setUserLocationSource] = useState<UserLocationSource | null>(null);
+  const [isLocatingUser, setIsLocatingUser] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
   const [startY, setStartY] = useState(0);
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
   const sheetRef = useRef<HTMLDivElement>(null);
+  const hasRequestedGoogleFallbackRef = useRef(false);
+
+  const applyUserCoordinates = (coords: { lat: number; lng: number }, source: UserLocationSource) => {
+    setUserLocation(coords);
+    setUserLocationSource(source);
+    setHasResolvedUserLocation(true);
+    setLocationError("");
+    setIsLocatingUser(false);
+  };
+
+  const applyUserPosition = (position: GeolocationPosition) => {
+    hasRequestedGoogleFallbackRef.current = false;
+    applyUserCoordinates(
+      {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      },
+      "browser",
+    );
+  };
+
+  const requestGoogleApproximateLocation = async () => {
+    if (!googleMapsApiKey) {
+      setLocationError("No se pudo obtener tu ubicacion.");
+      setIsLocatingUser(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${googleGeolocationUrl}?key=${googleMapsApiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ considerIp: true }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Google Geolocation no disponible.");
+      }
+
+      const data = await response.json();
+      const lat = data?.location?.lat;
+      const lng = data?.location?.lng;
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error("Google Geolocation no devolvio coordenadas.");
+      }
+
+      applyUserCoordinates({ lat, lng }, "google");
+    } catch {
+      setHasResolvedUserLocation(false);
+      setUserLocationSource(null);
+      setIsLocatingUser(false);
+      setLocationError("No se pudo obtener tu ubicacion. Activa permisos del navegador o Geolocation API en GCP.");
+    }
+  };
+
+  const handleLocationError = (error?: GeolocationPositionError, allowGoogleFallback = true) => {
+    if (allowGoogleFallback && !hasRequestedGoogleFallbackRef.current) {
+      hasRequestedGoogleFallbackRef.current = true;
+      requestGoogleApproximateLocation();
+      return;
+    }
+
+    setUserLocationSource(null);
+    setHasResolvedUserLocation(false);
+    setIsLocatingUser(false);
+
+    if (error?.code === error.PERMISSION_DENIED) {
+      setLocationError("Permiso de ubicacion bloqueado en el navegador.");
+      return;
+    }
+
+    setLocationError("No se pudo obtener tu ubicacion.");
+  };
+
+  const requestUserLocation = () => {
+    hasRequestedGoogleFallbackRef.current = false;
+
+    if (!navigator.geolocation) {
+      setIsLocatingUser(true);
+      requestGoogleApproximateLocation();
+      return;
+    }
+
+    setIsLocatingUser(true);
+    navigator.geolocation.getCurrentPosition(applyUserPosition, (error) => handleLocationError(error), {
+      enableHighAccuracy: true,
+      maximumAge: 30_000,
+      timeout: 12_000,
+    });
+  };
+
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setIsLocatingUser(true);
+      requestGoogleApproximateLocation();
+      return;
+    }
+
+    setIsLocatingUser(true);
+
+    const watchId = navigator.geolocation.watchPosition(
+      applyUserPosition,
+      (error) => handleLocationError(error),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 60_000,
+        timeout: 10_000,
+      },
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -203,6 +337,8 @@ export function MapView() {
     }
   };
 
+  const mapCenter = userLocation ?? defaultMapCenter;
+
   return (
     <div className="size-full flex flex-col bg-gray-50">
       {/* Header */}
@@ -252,7 +388,7 @@ export function MapView() {
         {googleMapsApiKey ? (
           <APIProvider apiKey={googleMapsApiKey}>
             <Map
-              defaultCenter={userLocation}
+              defaultCenter={mapCenter}
               defaultZoom={13}
               disableDefaultUI
               clickableIcons={false}
@@ -260,7 +396,10 @@ export function MapView() {
               styles={cleanMapStyles}
               className="absolute inset-0"
             >
-              <Marker position={userLocation} icon={getUserMarkerIcon()} zIndex={30} />
+              <RecenterMap center={userLocation} />
+              {userLocation && (
+                <Marker position={userLocation} icon={getUserMarkerIcon()} zIndex={30} />
+              )}
 
               {places.map((place) => {
                 const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
@@ -275,6 +414,26 @@ export function MapView() {
                 );
               })}
             </Map>
+            <div className="absolute right-4 top-4 z-30 flex flex-col items-end gap-2">
+              <button
+                type="button"
+                onClick={requestUserLocation}
+                className="flex size-11 items-center justify-center rounded-full bg-white text-[#4F46E5] shadow-lg transition-all hover:bg-purple-50"
+                aria-label="Centrar en mi ubicacion"
+              >
+                <LocateFixed className={`size-5 ${isLocatingUser ? "animate-pulse" : ""}`} />
+              </button>
+              {locationError && (
+                <div className="max-w-56 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-right text-xs text-yellow-800 shadow-md">
+                  {locationError}
+                </div>
+              )}
+              {hasResolvedUserLocation && !locationError && (
+                <div className="rounded-full bg-white/95 px-3 py-1 text-xs font-medium text-[#4F46E5] shadow-md">
+                  {userLocationSource === "google" ? "Ubicacion aproximada" : "Ubicacion activa"}
+                </div>
+              )}
+            </div>
           </APIProvider>
         ) : (
           <div className="absolute inset-0">
@@ -283,18 +442,20 @@ export function MapView() {
             </div>
 
             {/* User location */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
-              <div className="relative">
-                <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
-                  <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
+            {userLocation && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+                <div className="relative">
+                  <div className="size-16 rounded-full bg-purple-200/50 flex items-center justify-center">
+                    <div className="size-4 bg-purple-600 rounded-full border-2 border-white shadow-lg" />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Place markers with icons only */}
             {places.map((place) => {
-              const offsetX = (place.lng - userLocation.lng) * 3000;
-              const offsetY = (userLocation.lat - place.lat) * 3000;
+              const offsetX = (place.lng - mapCenter.lng) * 3000;
+              const offsetY = (mapCenter.lat - place.lat) * 3000;
               const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
 
               return (

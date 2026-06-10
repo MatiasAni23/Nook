@@ -277,7 +277,10 @@ export function DiscoverView() {
                 label: amenity.name,
                 variant: "outline" as const,
               })),
-            ];
+            ].filter((badge, index, badges) => {
+              const normalizedKey = String(badge.key ?? badge.label).toLowerCase();
+              return badges.findIndex((item) => String(item.key ?? item.label).toLowerCase() === normalizedKey) === index;
+            });
             const visibleBadges = detailBadges.slice(0, 4);
             const hiddenBadgeCount = Math.max(0, detailBadges.length - visibleBadges.length);
 
@@ -315,9 +318,9 @@ export function DiscoverView() {
 
                       <div className="flex items-end justify-between gap-2">
                         <div className="flex max-h-12 flex-wrap gap-1 overflow-hidden">
-                          {visibleBadges.map((badge) => (
+                          {visibleBadges.map((badge, badgeIndex) => (
                             <Badge
-                              key={badge.key}
+                              key={`${place.id}-${badge.key ?? badge.label}-${badgeIndex}`}
                               variant={badge.variant}
                               className={`text-xs px-2 py-0.5 ${badge.variant === "secondary" ? "bg-gray-100" : "border-gray-300"}`}
                             >
