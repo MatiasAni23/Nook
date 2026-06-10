@@ -102,13 +102,13 @@ export async function sendPasswordRecoveryCode(email: string) {
   }
 }
 
-export async function resendSignupVerificationCode(email: string) {
+export async function resendSignupVerificationCode(email: string, emailRedirectTo?: string) {
   const client = requireSupabase();
   const { error } = await client.auth.resend({
     type: "signup",
     email,
     options: {
-      emailRedirectTo: `${window.location.origin}/verify-account`,
+      emailRedirectTo: emailRedirectTo ?? `${window.location.origin}/verify-account`,
     },
   });
 

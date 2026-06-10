@@ -47,7 +47,7 @@ export function AdminDelegates() {
   const [errorMessage, setErrorMessage] = useState("");
   const [formError, setFormError] = useState("");
   const [createdInviteUrl, setCreatedInviteUrl] = useState("");
-  const [createdInviteEmail, setCreatedInviteEmail] = useState("");
+  const [createdInviteEmailStatus, setCreatedInviteEmailStatus] = useState<"sent" | "failed" | "">("");
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -97,7 +97,7 @@ export function AdminDelegates() {
     setFormData(emptyFormData);
     setFormError("");
     setCreatedInviteUrl("");
-    setCreatedInviteEmail("");
+    setCreatedInviteEmailStatus("");
     setShowModal(true);
   };
 
@@ -112,7 +112,7 @@ export function AdminDelegates() {
     });
     setFormError("");
     setCreatedInviteUrl("");
-    setCreatedInviteEmail("");
+    setCreatedInviteEmailStatus("");
     setShowModal(true);
   };
 
@@ -128,7 +128,7 @@ export function AdminDelegates() {
 
     try {
       if (!editingDelegate) {
-        const { inviteUrl } = await createDelegateInvitation({
+        const { emailError, emailSent, inviteUrl } = await createDelegateInvitation({
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
@@ -136,7 +136,10 @@ export function AdminDelegates() {
         });
 
         setCreatedInviteUrl(inviteUrl);
-        setCreatedInviteEmail(formData.email.trim().toLowerCase());
+        setCreatedInviteEmailStatus(emailSent ? "sent" : "failed");
+        if (emailError) {
+          setFormError(`La invitacion se creo, pero el correo no se pudo enviar automaticamente: ${emailError}`);
+        }
         setFormData(emptyFormData);
         return;
       }
@@ -361,25 +364,13 @@ export function AdminDelegates() {
                   <div>
                     <p className="text-sm font-semibold text-emerald-800">Invitacion creada</p>
                     <p className="text-xs text-emerald-700">
-                      Envia este link al delegado. El correo quedara bloqueado en la vista de registro.
+                      {createdInviteEmailStatus === "sent"
+                        ? "El correo se envio automaticamente. El link queda disponible como respaldo."
+                        : "La invitacion se creo, pero el correo automatico fallo. Copia este link como respaldo."}
                     </p>
                   </div>
                   <div className="flex gap-2">
                     <Input value={createdInviteUrl} readOnly className="bg-white text-xs" />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        const subject = encodeURIComponent("Invitacion para ser delegado en Nook");
-                        const body = encodeURIComponent(
-                          `Hola,\n\nTe invitamos a configurar tu cuenta de delegado en Nook.\n\nIngresa aqui: ${createdInviteUrl}\n\nEl link vence en 7 dias.`,
-                        );
-                        window.location.href = `mailto:${encodeURIComponent(createdInviteEmail)}?subject=${subject}&body=${body}`;
-                      }}
-                      className="shrink-0 bg-white"
-                    >
-                      Enviar
-                    </Button>
                     <Button
                       type="button"
                       variant="outline"

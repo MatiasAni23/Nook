@@ -1,0 +1,24 @@
+<h2>Tu invitacion para ser delegado en Nook</h2>
+
+<p>Hola {{ params.name }},</p>
+
+<p>
+  Te invitamos a administrar lugares en Nook. Para aceptar la invitacion, abre el siguiente enlace
+  y configura tu contrasena de acceso.
+</p>
+
+<p>
+  <a href="{{ params.invite_url }}" style="display:inline-block;padding:12px 18px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+    Aceptar invitacion
+  </a>
+</p>
+
+<p>
+  Si el boton no funciona, copia y pega este enlace en tu navegador:
+  <br />
+  <a href="{{ params.invite_url }}">{{ params.invite_url }}</a>
+</p>
+
+<p>Este enlace vence el {{ params.expires_at }}.</p>
+
+<p>Si no esperabas esta invitacion, puedes ignorar este correo.</p>

@@ -1,0 +1,30 @@
+<h2>Activa tu cuenta de delegado en Nook</h2>
+
+<p>Hola {{ .Data.full_name }},</p>
+
+<p>
+  Te invitamos a administrar lugares en Nook. Para activar tu cuenta, confirma tu correo y vuelve
+  a la vista de invitacion.
+</p>
+
+<p>
+  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:12px 18px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
+    Confirmar correo y continuar
+  </a>
+</p>
+
+<p>Tambien puedes usar este codigo en la pantalla de invitacion:</p>
+
+<p style="font-size:28px;font-weight:700;letter-spacing:4px;">{{ .Token }}</p>
+
+<p>
+  Si el boton no funciona, copia y pega este enlace en tu navegador:
+  <br />
+  <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a>
+</p>
+
+<p>Este enlace te llevara a:</p>
+
+<p>{{ .RedirectTo }}</p>
+
+<p>Si no esperabas esta invitacion, puedes ignorar este correo.</p>

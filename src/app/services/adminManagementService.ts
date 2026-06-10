@@ -74,6 +74,13 @@ export interface DelegateInvitation {
   createdAt: Date;
 }
 
+export interface CreateDelegateInvitationResult {
+  invitation: DelegateInvitation;
+  inviteUrl: string;
+  emailSent: boolean;
+  emailError: string | null;
+}
+
 export interface CreateDelegateInvitationInput {
   name: string;
   email: string;
@@ -416,7 +423,32 @@ function toDelegateInvitation(row: Record<string, any>): DelegateInvitation {
   };
 }
 
-export async function createDelegateInvitation(input: CreateDelegateInvitationInput) {
+async function getFunctionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : "No se pudo invocar la Edge Function.";
+  const context = (error as { context?: unknown } | null)?.context;
+
+  if (context instanceof Response) {
+    try {
+      const payload = await context.clone().json();
+      const message = typeof payload.message === "string" ? payload.message : null;
+      const code = typeof payload.error === "string" ? payload.error : null;
+      if (message && code) return `${code}: ${message}`;
+      if (message) return message;
+      if (code) return code;
+    } catch {
+      try {
+        const text = await context.clone().text();
+        if (text) return text;
+      } catch {
+        return fallback;
+      }
+    }
+  }
+
+  return fallback;
+}
+
+export async function createDelegateInvitation(input: CreateDelegateInvitationInput): Promise<CreateDelegateInvitationResult> {
   const client = requireSupabase();
   const { data: userData, error: userError } = await client.auth.getUser();
 
@@ -445,11 +477,37 @@ export async function createDelegateInvitation(input: CreateDelegateInvitationIn
   if (error) throw error;
 
   const invitation = toDelegateInvitation(data);
+  const inviteUrl = `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`;
   delegateInvitationCache.set(token, { timestamp: Date.now(), invitation });
+
+  let emailSent = false;
+  let emailError: string | null = null;
+
+  const { error: functionError } = await client.functions.invoke("send-delegate-invitation", {
+    body: {
+      invitationId: invitation.id,
+      email: invitation.email,
+      name: invitation.name,
+      phone: invitation.phone,
+      inviteUrl,
+    },
+  });
+
+  if (functionError) {
+    const functionMessage = await getFunctionErrorMessage(functionError);
+    emailError =
+      functionMessage === "Failed to send a request to the Edge Function"
+        ? "No se pudo invocar la Edge Function. Verifica que send-delegate-invitation este desplegada y con CORS/JWT configurado."
+        : functionMessage;
+  } else {
+    emailSent = true;
+  }
 
   return {
     invitation,
-    inviteUrl: `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
+    inviteUrl,
+    emailSent,
+    emailError,
   };
 }
 

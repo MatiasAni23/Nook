@@ -1,0 +1,2 @@
+[functions.send-delegate-invitation]
+verify_jwt = false

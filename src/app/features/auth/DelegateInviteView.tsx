@@ -12,8 +12,10 @@ import {
 } from "../../services/adminManagementService";
 import {
   ensureAppUserRecord,
+  getCurrentSession,
   resendSignupVerificationCode,
   signUpWithEmail,
+  updateRecoveredPassword,
   verifySignupCode,
 } from "../../services/authService";
 
@@ -149,6 +151,18 @@ export function DelegateInviteView() {
     setSuccessMessage("");
 
     try {
+      const existingSession = await getCurrentSession();
+      const existingUser = existingSession?.user;
+      const hasInviteSession = existingUser?.email?.toLowerCase() === invitation.email.toLowerCase();
+
+      if (existingUser && hasInviteSession) {
+        await updateRecoveredPassword(password);
+        await ensureAppUserRecord(existingUser, "delegate");
+        await claimDelegateInvitation(token);
+        setStep("done");
+        return;
+      }
+
       const { session, user } = await signUpWithEmail({
         name: invitation.name,
         email: invitation.email,
@@ -208,7 +222,10 @@ export function DelegateInviteView() {
     setSuccessMessage("");
 
     try {
-      await resendSignupVerificationCode(invitation.email);
+      await resendSignupVerificationCode(
+        invitation.email,
+        `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
+      );
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");
     } catch (error) {
       setErrorMessage(getInviteErrorMessage(error));
@@ -230,7 +247,7 @@ export function DelegateInviteView() {
             Volver
           </button>
           <CardTitle className="text-2xl">Invitacion de delegado</CardTitle>
-          <p className="text-sm text-gray-600">Configura tu acceso para administrar los lugares asignados.</p>
+          <p className="text-sm text-gray-600">Configura tu contrasena para administrar los lugares asignados.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {errorMessage && (
