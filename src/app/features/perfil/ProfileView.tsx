@@ -6,6 +6,7 @@ import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Badge } from "../../components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { CachedImage } from "../../components/ui/cached-image";
 import { currentUser } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
@@ -440,9 +441,9 @@ export function ProfileView() {
               >
                 <CardContent className="p-0">
                   <div className="flex gap-3 p-3">
-                    <div className={`relative w-20 h-20 overflow-hidden rounded-xl bg-gradient-to-br ${getPlaceImage(place.id)} flex items-center justify-center shrink-0`}>
+                    <div className={`relative w-20 h-20 overflow-hidden rounded-xl ${place.images?.[0] ? "bg-gray-100" : `bg-gradient-to-br ${getPlaceImage(place.id)}`} flex items-center justify-center shrink-0`}>
                       {place.images?.[0] ? (
-                        <img
+                        <CachedImage
                           src={place.images[0]}
                           alt={place.name}
                           className="size-full object-cover"

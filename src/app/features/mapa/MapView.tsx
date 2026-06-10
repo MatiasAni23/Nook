@@ -4,10 +4,11 @@ import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
+import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { listPlaces, type AppPlace } from "../../services/placeService";
+import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./placeFilters";
 
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
@@ -91,20 +92,7 @@ export function MapView() {
     ? dbPlaces.filter((place) => (userRole === 'worker' ? place.category === 'work' : place.category === 'study'))
     : mockPlaces;
   const places = basePlaces.filter((place) => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const matchesSearch = !normalizedSearch ||
-      place.name.toLowerCase().includes(normalizedSearch) ||
-      place.address?.toLowerCase().includes(normalizedSearch) ||
-      place.zone?.toLowerCase().includes(normalizedSearch);
-    const matchesTab =
-      activeTab === "todos" ? true :
-      activeTab === "cowork" ? place.type === "coworking" :
-      activeTab === "estudios" ? ["library", "cafe"].includes(place.type) :
-      activeTab === "reuniones" ? ["meeting_room", "private_office", "office"].includes(place.type) :
-      activeTab === "parques" ? place.type === "park" :
-      true;
-
-    return matchesSearch && matchesTab;
+    return placeMatchesSearch(place, searchTerm) && placeMatchesTab(place, activeTab);
   });
 
   const tabs = [
@@ -183,7 +171,7 @@ export function MapView() {
   };
 
   const hasPrice = (place: any) => {
-    return Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
+    return hasValidPlacePrice(place);
   };
 
   const getZoneName = (name: string) => {
@@ -389,7 +377,7 @@ export function MapView() {
                         className="h-20 w-full overflow-hidden rounded-t-lg bg-gray-100"
                         onClick={() => navigate(placeUrl)}
                       >
-                        <img src={place.images[0]} alt={place.name} className="size-full object-cover" />
+                        <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
                       </button>
                     ) : (
                       <div

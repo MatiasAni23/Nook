@@ -4,6 +4,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Badge } from "../../components/ui/badge";
+import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { listPlaces, type AppPlace } from "../../services/placeService";
@@ -233,7 +234,7 @@ export function AdminManagePlaces() {
                   <div className="flex gap-3">
                     <div className="size-16 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
                       {place.images?.[0] ? (
-                        <img src={place.images[0]} alt={place.name} className="size-full object-cover" />
+                        <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
                       ) : (
                         <span className="text-sm font-semibold text-[#4F46E5]">{getPlaceIcon(place.type)}</span>
                       )}

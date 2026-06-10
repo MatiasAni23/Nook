@@ -25,6 +25,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
+import { CachedImage } from "../../components/ui/cached-image";
 import { ReportIssueModal } from "../shared/ReportIssueModal";
 import { getIssueIcon, getIssueLabel, placeIssues, studyPlaces, type IssueType, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
@@ -314,13 +315,14 @@ export function PlaceDetails() {
     : "1 - 20";
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
   const priceText = hasValidPrice ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
+  const canReservePlace = hasValidPrice && (userRole === "worker" || place.type !== "coworking");
 
   return (
     <div className="size-full flex flex-col bg-white">
       <div className="flex-1 overflow-auto pb-28">
         <div className="relative h-72 bg-gradient-to-br from-gray-300 to-gray-500">
           {selectedImage ? (
-            <img src={selectedImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
+            <CachedImage src={selectedImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
           ) : (
             <div className={`absolute inset-0 bg-gradient-to-br ${getPlaceImage(place.id)}`} />
           )}
@@ -558,7 +560,7 @@ export function PlaceDetails() {
             </div>
           </div>
 
-          {isWorkPlace && userRole === "worker" && hasValidPrice && (
+          {canReservePlace && (
             <div className="pb-4">
               <button
                 onClick={() => navigate(`/app/checkout/${placeId}`)}
