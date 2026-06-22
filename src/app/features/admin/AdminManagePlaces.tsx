@@ -1,15 +1,35 @@
 import { useEffect, useState } from "react";
-import { Edit, MapPin, Plus, Search, Star, Trash2, Wifi } from "lucide-react";
+import { CheckCircle2, Edit, MapPin, Plus, Search, Star, Trash2, Wifi } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Badge } from "../../components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../../components/ui/dialog";
 import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+import { deletePlace, getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import { AdminAddPlace } from "./AdminAddPlace";
 import { AdminEditPlace } from "./AdminEditPlace";
+
+type SuccessDialogKind = "created" | "updated" | "deleted";
 
 export function AdminManagePlaces() {
   const [view, setView] = useState<"list" | "add" | "edit">("list");
@@ -19,6 +39,9 @@ export function AdminManagePlaces() {
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successDialog, setSuccessDialog] = useState<SuccessDialogKind | null>(null);
+  const [placeToDelete, setPlaceToDelete] = useState<AppPlace | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -67,20 +90,78 @@ export function AdminManagePlaces() {
     setView("edit");
   };
 
-  const handleDelete = (placeId: string) => {
-    if (confirm("Estas seguro de eliminar este lugar?")) {
-      alert(`Lugar ${placeId} eliminado`);
-    }
+  const handleDeleteRequest = (place: AppPlace) => {
+    setPlaceToDelete(place);
   };
 
-  const handleSaveComplete = () => {
+  const handleSaveComplete = (updatedPlace?: AppPlace) => {
+    if (updatedPlace) {
+      setDbPlaces((current) =>
+        current.map((place) => place.id === updatedPlace.id ? updatedPlace : place),
+      );
+      setSuccessDialog("updated");
+    }
     setView("list");
     setEditingPlace(null);
   };
 
   const handlePlaceCreated = (place: AppPlace) => {
     setDbPlaces((current) => [place, ...current]);
+    setSuccessDialog("created");
+  };
+
+  const goToPlacesList = () => {
+    setSuccessDialog(null);
     setView("list");
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!placeToDelete) return;
+
+    if (!isSupabaseConfigured) {
+      setErrorMessage("Supabase no esta configurado. No se puede eliminar el lugar.");
+      setPlaceToDelete(null);
+      return;
+    }
+
+    setIsDeleting(true);
+    setErrorMessage("");
+
+    try {
+      await deletePlace(placeToDelete.id);
+      setDbPlaces((current) => current.filter((place) => place.id !== placeToDelete.id));
+      setPlaceToDelete(null);
+      setSuccessDialog("deleted");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el lugar.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const getSuccessCopy = () => {
+    switch (successDialog) {
+      case "created":
+        return {
+          title: "Lugar agregado con exito",
+          description: "El lugar se guardo correctamente y ya esta disponible en la gestion de lugares.",
+          action: "Ir a gestion de lugares",
+        };
+      case "updated":
+        return {
+          title: "Lugar actualizado",
+          description: "Los cambios se guardaron correctamente.",
+          action: "Entendido",
+        };
+      case "deleted":
+        return {
+          title: "Lugar eliminado",
+          description: "El lugar se elimino correctamente de la gestion de lugares.",
+          action: "Entendido",
+        };
+      default:
+        return null;
+    }
   };
 
   const getPlaceIcon = (type: string) => {
@@ -133,6 +214,29 @@ export function AdminManagePlaces() {
             Volver a listado
           </Button>
         </div>
+        <Dialog open={successDialog !== null} onOpenChange={(open) => {
+          if (open) {
+            return;
+          }
+          goToPlacesList();
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="items-center text-center sm:text-center">
+              <span className="flex size-12 items-center justify-center rounded-full bg-green-100 text-green-700">
+                <CheckCircle2 className="size-7" />
+              </span>
+              <DialogTitle>{getSuccessCopy()?.title}</DialogTitle>
+              <DialogDescription>
+                {getSuccessCopy()?.description}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="sm:justify-center">
+              <Button onClick={goToPlacesList} className="w-full bg-[#4F46E5] hover:bg-[#4338CA] sm:w-auto">
+                {getSuccessCopy()?.action}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -284,7 +388,7 @@ export function AdminManagePlaces() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDelete(place.id)}
+                          onClick={() => handleDeleteRequest(place as AppPlace)}
                           className="text-red-600 border-red-300 hover:bg-red-50"
                         >
                           <Trash2 className="size-3 mr-1" />
@@ -299,6 +403,49 @@ export function AdminManagePlaces() {
           </div>
         </div>
       </div>
+      <AlertDialog open={Boolean(placeToDelete)} onOpenChange={(open) => {
+        if (!open && !isDeleting) setPlaceToDelete(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar lugar</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estas seguro de eliminar el lugar {placeToDelete ? `"${placeToDelete.name}"` : ""}? Esta accion lo quitara de la gestion de lugares.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmDelete();
+              }}
+              disabled={isDeleting}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <Dialog open={successDialog !== null && view === "list"} onOpenChange={(open) => {
+        if (!open) setSuccessDialog(null);
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="items-center text-center sm:text-center">
+            <span className="flex size-12 items-center justify-center rounded-full bg-green-100 text-green-700">
+              <CheckCircle2 className="size-7" />
+            </span>
+            <DialogTitle>{getSuccessCopy()?.title}</DialogTitle>
+            <DialogDescription>{getSuccessCopy()?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button onClick={() => setSuccessDialog(null)} className="w-full bg-[#4F46E5] hover:bg-[#4338CA] sm:w-auto">
+              {getSuccessCopy()?.action}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

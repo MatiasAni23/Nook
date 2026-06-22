@@ -193,7 +193,7 @@ CREATE TABLE places (
     -- Capacidad y horarios
     capacity_min INTEGER CHECK (capacity_min IS NULL OR capacity_min >= 0),
     capacity_max INTEGER CHECK (capacity_max IS NULL OR capacity_max >= 0),
-    hours VARCHAR(100),
+    hours VARCHAR(255),
 
     -- Precios
     price_per_hour DECIMAL(10, 2) CHECK (price_per_hour IS NULL OR price_per_hour >= 0),

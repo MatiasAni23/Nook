@@ -51,6 +51,30 @@ type AmenityOption = {
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const defaultPosition = { lat: -33.4569, lng: -70.6483 };
 
+type DaySchedule = {
+  key: string;
+  label: string;
+  shortLabel: string;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+};
+
+type Coordinates = typeof defaultPosition;
+type ParsedCoordinates =
+  | { position: Coordinates; error?: never }
+  | { position?: never; error: string };
+
+const weekDays: DaySchedule[] = [
+  { key: "monday", label: "Lunes", shortLabel: "Lun", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "tuesday", label: "Martes", shortLabel: "Mar", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "wednesday", label: "Miercoles", shortLabel: "Mie", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "thursday", label: "Jueves", shortLabel: "Jue", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "friday", label: "Viernes", shortLabel: "Vie", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "saturday", label: "Sabado", shortLabel: "Sab", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+  { key: "sunday", label: "Domingo", shortLabel: "Dom", isOpen: true, openTime: "08:00", closeTime: "22:00" },
+];
+
 const amenityOptions: AmenityOption[] = [
   { key: "wifi", name: "WiFi de alta velocidad", Icon: Wifi },
   { key: "coffee_tea", name: "Cafe y te ilimitados", Icon: Coffee },
@@ -86,8 +110,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [zone, setZone] = useState("");
-  const [openTime, setOpenTime] = useState("08:00");
-  const [closeTime, setCloseTime] = useState("22:00");
+  const [dailySchedule, setDailySchedule] = useState<DaySchedule[]>(weekDays);
   const [capacityMin, setCapacityMin] = useState("1");
   const [capacityMax, setCapacityMax] = useState("20");
   const [accessType, setAccessType] = useState<"free" | "reservation">("free");
@@ -98,6 +121,8 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const [quietness, setQuietness] = useState([3]);
   const [lighting, setLighting] = useState([4]);
   const [pinPosition, setPinPosition] = useState(defaultPosition);
+  const [latitudeInput, setLatitudeInput] = useState(defaultPosition.lat.toFixed(6));
+  const [longitudeInput, setLongitudeInput] = useState(defaultPosition.lng.toFixed(6));
   const [selectedAmenityKeys, setSelectedAmenityKeys] = useState<string[]>([
     "wifi",
     "outlets",
@@ -127,9 +152,50 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   }, [selectedAmenityKeys]);
 
   const hours = useMemo(() => {
-    if (!openTime || !closeTime) return "";
-    return `${openTime} - ${closeTime}`;
-  }, [openTime, closeTime]);
+    return dailySchedule
+      .map((day) => `${day.shortLabel}: ${day.isOpen ? `${day.openTime} - ${day.closeTime}` : "Cerrado"}`)
+      .join("; ");
+  }, [dailySchedule]);
+
+  const setPinCoordinates = (position: Coordinates) => {
+    setPinPosition(position);
+    setLatitudeInput(position.lat.toFixed(6));
+    setLongitudeInput(position.lng.toFixed(6));
+  };
+
+  const updateScheduleDay = (dayKey: string, changes: Partial<DaySchedule>) => {
+    setDailySchedule((current) =>
+      current.map((day) => day.key === dayKey ? { ...day, ...changes } : day),
+    );
+  };
+
+  const getParsedCoordinates = (): ParsedCoordinates => {
+    const latitude = Number(latitudeInput);
+    const longitude = Number(longitudeInput);
+
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      return { error: "Ingresa una latitud valida entre -90 y 90." };
+    }
+
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return { error: "Ingresa una longitud valida entre -180 y 180." };
+    }
+
+    return { position: { lat: latitude, lng: longitude } };
+  };
+
+  const applyCoordinateInputs = () => {
+    const parsed = getParsedCoordinates();
+    if (parsed.error) {
+      setErrorMessage(parsed.error);
+      setLatitudeInput(pinPosition.lat.toFixed(6));
+      setLongitudeInput(pinPosition.lng.toFixed(6));
+      return;
+    }
+
+    setErrorMessage("");
+    setPinCoordinates(parsed.position);
+  };
 
   const handleFallbackMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -138,13 +204,13 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     const lng = defaultPosition.lng + (x - rect.width / 2) / 3000;
     const lat = defaultPosition.lat - (y - rect.height / 2) / 3000;
 
-    setPinPosition({ lat, lng });
+    setPinCoordinates({ lat, lng });
   };
 
   const handleGoogleMapClick = (event: any) => {
     const latLng = event.detail?.latLng;
     if (!latLng) return;
-    setPinPosition({ lat: latLng.lat, lng: latLng.lng });
+    setPinCoordinates({ lat: latLng.lat, lng: latLng.lng });
   };
 
   const toggleAmenity = (amenityKey: string) => {
@@ -172,8 +238,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setDescription("");
     setAddress("");
     setZone("");
-    setOpenTime("08:00");
-    setCloseTime("22:00");
+    setDailySchedule(weekDays);
     setCapacityMin("1");
     setCapacityMax("20");
     setAccessType("free");
@@ -183,7 +248,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setParking(false);
     setQuietness([3]);
     setLighting([4]);
-    setPinPosition(defaultPosition);
+    setPinCoordinates(defaultPosition);
     setSelectedAmenityKeys(["wifi", "outlets"]);
     setImageFiles([]);
   };
@@ -191,13 +256,28 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const handleSubmit = async () => {
     setErrorMessage("");
 
-    if (!name || !type || !description || !address || !openTime || !closeTime) {
+    const parsedCoordinates = getParsedCoordinates();
+    if (parsedCoordinates.error) {
+      setErrorMessage(parsedCoordinates.error);
+      return;
+    }
+
+    if (!name || !type || !description || !address) {
       setErrorMessage("Completa nombre, tipo, direccion, descripcion y horario.");
       return;
     }
 
-    if (closeTime <= openTime) {
-      setErrorMessage("La hora de cierre debe ser posterior a la hora de apertura.");
+    const invalidScheduleDay = dailySchedule.find(
+      (day) => day.isOpen && (!day.openTime || !day.closeTime || day.closeTime <= day.openTime),
+    );
+    if (invalidScheduleDay) {
+      setErrorMessage(`Revisa el horario de ${invalidScheduleDay.label}: el cierre debe ser posterior a la apertura.`);
+      return;
+    }
+
+    const hasOpenDay = dailySchedule.some((day) => day.isOpen);
+    if (!hasOpenDay) {
+      setErrorMessage("Deja al menos un dia abierto para el lugar.");
       return;
     }
 
@@ -221,8 +301,8 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
         description,
         address,
         zone: zone || null,
-        latitude: pinPosition.lat,
-        longitude: pinPosition.lng,
+        latitude: parsedCoordinates.position.lat,
+        longitude: parsedCoordinates.position.lng,
         hours,
         capacityMin: capacityMin ? Number(capacityMin) : null,
         capacityMax: capacityMax ? Number(capacityMax) : null,
@@ -250,7 +330,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
 
   return (
     <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto p-4 pb-20">
+      <div className="flex-1 overflow-auto p-4 pb-32">
         <div className="space-y-4">
           <div>
             <h2 className="text-2xl mb-1" style={{ fontWeight: 700 }}>Agregar Nuevo Lugar</h2>
@@ -276,6 +356,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                   <APIProvider apiKey={googleMapsApiKey}>
                     <Map
                       defaultCenter={pinPosition}
+                      center={pinPosition}
                       defaultZoom={14}
                       mapId="nook-admin-place-map"
                       gestureHandling="greedy"
@@ -312,6 +393,30 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                 <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-white/90 px-3 py-2 text-xs shadow-md">
                   <p><span className="font-semibold">Lat:</span> {pinPosition.lat.toFixed(6)}</p>
                   <p><span className="font-semibold">Lng:</span> {pinPosition.lng.toFixed(6)}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitud exacta</Label>
+                  <Input
+                    id="latitude"
+                    inputMode="decimal"
+                    value={latitudeInput}
+                    onChange={(e) => setLatitudeInput(e.target.value)}
+                    onBlur={applyCoordinateInputs}
+                    placeholder="-33.456900"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitud exacta</Label>
+                  <Input
+                    id="longitude"
+                    inputMode="decimal"
+                    value={longitudeInput}
+                    onChange={(e) => setLongitudeInput(e.target.value)}
+                    onBlur={applyCoordinateInputs}
+                    placeholder="-70.648300"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -384,27 +489,46 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                   <Clock className="size-4 text-[#4F46E5]" />
                   Horario *
                 </Label>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="openTime" className="text-xs text-gray-600">Apertura</Label>
-                    <Input
-                      id="openTime"
-                      type="time"
-                      value={openTime}
-                      onChange={(e) => setOpenTime(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="closeTime" className="text-xs text-gray-600">Cierre</Label>
-                    <Input
-                      id="closeTime"
-                      type="time"
-                      value={closeTime}
-                      onChange={(e) => setCloseTime(e.target.value)}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  {dailySchedule.map((day) => (
+                    <div
+                      key={day.key}
+                      className="grid grid-cols-2 gap-3 rounded-lg border bg-white p-3 sm:grid-cols-[120px_1fr_1fr_auto]"
+                    >
+                      <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-start">
+                        <span className="text-sm font-medium text-gray-800">{day.label}</span>
+                        <Switch
+                          checked={day.isOpen}
+                          onCheckedChange={(checked) => updateScheduleDay(day.key, { isOpen: checked })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`${day.key}-open`} className="text-xs text-gray-600">Apertura</Label>
+                        <Input
+                          id={`${day.key}-open`}
+                          type="time"
+                          value={day.openTime}
+                          disabled={!day.isOpen}
+                          onChange={(e) => updateScheduleDay(day.key, { openTime: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor={`${day.key}-close`} className="text-xs text-gray-600">Cierre</Label>
+                        <Input
+                          id={`${day.key}-close`}
+                          type="time"
+                          value={day.closeTime}
+                          disabled={!day.isOpen}
+                          onChange={(e) => updateScheduleDay(day.key, { closeTime: e.target.value })}
+                        />
+                      </div>
+                      <div className="hidden items-center text-xs font-medium text-gray-500 sm:flex">
+                        {day.isOpen ? "Abierto" : "Cerrado"}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="text-xs text-gray-500">Se guardara como: {hours || "Selecciona apertura y cierre"}</p>
+                <p className="text-xs text-gray-500">Se guardara como: {hours}</p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -583,7 +707,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
           <Button
             onClick={handleSubmit}
             disabled={isSaving}
-            className="w-full bg-[#4F46E5] hover:bg-[#4338CA] h-12"
+            className="mb-6 h-12 w-full bg-[#4F46E5] hover:bg-[#4338CA]"
           >
             <Check className="size-5 mr-2" />
             {isSaving ? "Guardando..." : "Guardar lugar"}

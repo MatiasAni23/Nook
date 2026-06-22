@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { listCurrentDelegatePlaces, type DelegateAssignedPlace } from "../../services/adminManagementService";
+import type { AppPlace } from "../../services/placeService";
 import { AdminAddPlace } from "../admin/AdminAddPlace";
 import { AdminEditPlace } from "../admin/AdminEditPlace";
 
@@ -48,7 +49,12 @@ export function DelegateMyPlaces() {
     setView("edit");
   };
 
-  const handleSaveComplete = () => {
+  const handleSaveComplete = (updatedPlace?: AppPlace) => {
+    if (updatedPlace) {
+      setMyPlaces((current) =>
+        current.map((place) => place.id === updatedPlace.id ? { ...place, ...updatedPlace } : place),
+      );
+    }
     setView("list");
     setEditingPlace(null);
   };

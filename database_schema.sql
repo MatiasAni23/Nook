@@ -221,7 +221,7 @@ CREATE TABLE places (
     -- Capacidad y horarios
     capacity_min INTEGER,
     capacity_max INTEGER,
-    hours VARCHAR(100), -- Ej: "8:00 - 22:00"
+    hours VARCHAR(255), -- Ej: "Lun: 8:00 - 22:00; Mar: 9:00 - 20:00"
 
     -- Precios (para lugares de trabajo)
     price_per_hour DECIMAL(10, 2),

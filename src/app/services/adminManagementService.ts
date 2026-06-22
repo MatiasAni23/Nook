@@ -44,12 +44,29 @@ export interface DelegateAssignedPlace {
   name: string;
   type: string;
   category: "study" | "work";
+  description: string;
+  lat: number;
+  lng: number;
+  zone: string | null;
   rating: number;
   reviews: number;
   hours: string;
+  pricePerHour?: number;
+  capacityMin: number | null;
+  capacityMax: number | null;
   wifi: boolean;
   outlets: boolean;
+  parking: boolean;
+  quietness: number | null;
+  lighting: number | null;
   address: string;
+  images: string[];
+  amenities: Array<{
+    key: string;
+    name: string;
+    isAvailable: boolean;
+    additionalInfo?: string | null;
+  }>;
   reservationsCount: number;
 }
 
@@ -610,13 +627,30 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         name,
         type,
         category,
+        description,
+        latitude,
+        longitude,
+        zone,
         rating,
         reviews_count,
+        capacity_min,
+        capacity_max,
         hours,
+        price_per_hour,
         wifi,
         outlets,
+        parking,
+        quietness_level,
+        lighting_level,
         address,
-        reservations(id)
+        images,
+        reservations(id),
+        place_amenities(
+          amenity_key,
+          amenity_name,
+          is_available,
+          additional_info
+        )
       )
     `,
     )
@@ -634,12 +668,29 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         name: String(place.name ?? ""),
         type: String(place.type ?? "library"),
         category: place.category === "work" ? "work" : "study",
+        description: String(place.description ?? ""),
+        lat: Number(place.latitude ?? 0),
+        lng: Number(place.longitude ?? 0),
+        zone: place.zone == null ? null : String(place.zone),
         rating: Number(place.rating ?? 0),
         reviews: Number(place.reviews_count ?? 0),
         hours: String(place.hours ?? "Horario no informado"),
+        pricePerHour: place.price_per_hour == null ? undefined : Number(place.price_per_hour),
+        capacityMin: place.capacity_min == null ? null : Number(place.capacity_min),
+        capacityMax: place.capacity_max == null ? null : Number(place.capacity_max),
         wifi: Boolean(place.wifi),
         outlets: Boolean(place.outlets),
+        parking: Boolean(place.parking),
+        quietness: place.quietness_level == null ? null : Number(place.quietness_level),
+        lighting: place.lighting_level == null ? null : Number(place.lighting_level),
         address: String(place.address ?? ""),
+        images: Array.isArray(place.images) ? place.images : [],
+        amenities: (place.place_amenities ?? []).map((amenity) => ({
+          key: String(amenity.amenity_key),
+          name: String(amenity.amenity_name),
+          isAvailable: Boolean(amenity.is_available),
+          additionalInfo: amenity.additional_info == null ? null : String(amenity.additional_info),
+        })),
         reservationsCount: Array.isArray(place.reservations) ? place.reservations.length : 0,
       };
     })

@@ -67,6 +67,11 @@ export interface CreatePlaceInput {
   imageFiles: File[];
 }
 
+export interface UpdatePlaceInput extends CreatePlaceInput {
+  id: string;
+  existingImageUrls: string[];
+}
+
 const PLACE_IMAGES_BUCKET = "place-images";
 const PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -392,4 +397,115 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
   };
 
   return createdPlace;
+}
+
+export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
+  const client = requireSupabase();
+  const uploadedImageUrls = input.imageFiles.length > 0 ? await uploadPlaceImages(input.id, input.imageFiles) : [];
+  const imageUrls = [...input.existingImageUrls, ...uploadedImageUrls];
+
+  const { data, error } = await client
+    .from("places")
+    .update({
+      name: input.name,
+      type: input.type,
+      category: input.category,
+      description: input.description,
+      address: input.address,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      zone: input.zone || null,
+      capacity_min: input.capacityMin ?? null,
+      capacity_max: input.capacityMax ?? null,
+      hours: input.hours,
+      price_per_hour: input.pricePerHour ?? null,
+      wifi: input.wifi,
+      outlets: input.outlets,
+      parking: input.parking,
+      quietness_level: input.quietnessLevel,
+      lighting_level: input.lightingLevel,
+      images: imageUrls,
+    })
+    .eq("id", input.id)
+    .select(
+      `
+      id,
+      name,
+      type,
+      category,
+      description,
+      address,
+      latitude,
+      longitude,
+      zone,
+      rating,
+      reviews_count,
+      capacity_min,
+      capacity_max,
+      hours,
+      price_per_hour,
+      wifi,
+      outlets,
+      parking,
+      quietness_level,
+      lighting_level,
+      images
+    `,
+    )
+    .single();
+
+  if (error) throw error;
+
+  const availableAmenities = input.amenities.filter((amenity) => amenity.isAvailable);
+  const { error: deleteAmenitiesError } = await client
+    .from("place_amenities")
+    .delete()
+    .eq("place_id", input.id);
+
+  if (deleteAmenitiesError) throw deleteAmenitiesError;
+
+  if (availableAmenities.length > 0) {
+    const { error: amenitiesError } = await client.from("place_amenities").insert(
+      availableAmenities.map((amenity) => ({
+        place_id: input.id,
+        amenity_key: amenity.key,
+        amenity_name: amenity.name,
+        is_available: true,
+        additional_info: amenity.additionalInfo ?? null,
+      })),
+    );
+
+    if (amenitiesError) throw amenitiesError;
+  }
+
+  const updatedPlace = {
+    ...toAppPlace({ ...(data as PlaceRow), place_amenities: [] }),
+    amenities: availableAmenities,
+  };
+
+  if (placesCache) {
+    placesCache = {
+      timestamp: Date.now(),
+      places: placesCache.places.map((cachedPlace) => cachedPlace.id === updatedPlace.id ? updatedPlace : cachedPlace),
+    };
+  }
+
+  return updatedPlace;
+}
+
+export async function deletePlace(placeId: string): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client
+    .from("places")
+    .update({ status: "inactive" })
+    .eq("id", placeId);
+
+  if (error) throw error;
+
+  if (placesCache) {
+    placesCache = {
+      timestamp: Date.now(),
+      places: placesCache.places.filter((place) => place.id !== placeId),
+    };
+  }
 }
