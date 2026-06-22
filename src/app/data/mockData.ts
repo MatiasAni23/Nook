@@ -18,6 +18,7 @@ export interface Issue {
   reportedBy: string;
   timestamp: Date;
   upvotes: number;
+  hasConfirmed?: boolean;
 }
 
 export type NotificationType =

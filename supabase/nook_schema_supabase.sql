@@ -18,6 +18,7 @@ DROP VIEW IF EXISTS places_with_stats CASCADE;
 -- Eliminar tablas si existen (orden inverso por dependencias)
 DROP TABLE IF EXISTS support_ticket_messages CASCADE;
 DROP TABLE IF EXISTS support_tickets CASCADE;
+DROP TABLE IF EXISTS place_report_confirmations CASCADE;
 DROP TABLE IF EXISTS place_reports CASCADE;
 DROP TABLE IF EXISTS reservations CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
@@ -399,6 +400,22 @@ CREATE INDEX idx_place_reports_status ON place_reports(status);
 CREATE INDEX idx_place_reports_type ON place_reports(type);
 
 -- =============================================
+-- TABLA: place_report_confirmations
+-- Confirmaciones unicas por usuario para reportes de lugar
+-- =============================================
+CREATE TABLE place_report_confirmations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id UUID NOT NULL REFERENCES place_reports(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(report_id, user_id)
+);
+
+CREATE INDEX idx_place_report_confirmations_report ON place_report_confirmations(report_id);
+CREATE INDEX idx_place_report_confirmations_user ON place_report_confirmations(user_id);
+
+-- =============================================
 -- TABLA: place_issues
 -- Problemas/incidencias históricas (para analytics)
 -- =============================================
@@ -770,6 +787,7 @@ ALTER TABLE place_amenities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE place_report_confirmations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
@@ -783,6 +801,7 @@ GRANT SELECT, INSERT, UPDATE ON users, user_profiles TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON places, place_amenities TO authenticated;
 GRANT SELECT ON place_hours, place_issues TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON reservations, reviews, place_reports, favorites, messages TO authenticated;
+GRANT SELECT, INSERT ON place_report_confirmations TO authenticated;
 GRANT SELECT, UPDATE ON notifications TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON support_tickets, support_ticket_messages TO authenticated;
 GRANT SELECT ON delegates, delegate_places TO authenticated;
@@ -905,8 +924,56 @@ CREATE POLICY place_reports_update_own_pending ON place_reports
     FOR UPDATE USING (auth.uid() = user_id AND status = 'pending')
     WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY place_report_confirmations_select_own_or_public_reports ON place_report_confirmations
+    FOR SELECT USING (
+        auth.uid() = user_id
+        OR EXISTS (
+            SELECT 1 FROM place_reports
+            WHERE place_reports.id = place_report_confirmations.report_id
+            AND place_reports.status IN ('pending', 'reviewing', 'resolved')
+        )
+    );
+
+CREATE POLICY place_report_confirmations_insert_own ON place_report_confirmations
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 CREATE POLICY place_issues_select_all ON place_issues
     FOR SELECT USING (true);
+
+CREATE OR REPLACE FUNCTION confirm_place_report(target_report_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    inserted_count INTEGER;
+    next_upvotes INTEGER;
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'not_authenticated';
+    END IF;
+
+    INSERT INTO place_report_confirmations (report_id, user_id)
+    VALUES (target_report_id, auth.uid())
+    ON CONFLICT (report_id, user_id) DO NOTHING;
+
+    GET DIAGNOSTICS inserted_count = ROW_COUNT;
+
+    IF inserted_count = 1 THEN
+        UPDATE place_reports
+        SET upvotes_count = upvotes_count + 1,
+            updated_at = NOW()
+        WHERE id = target_report_id
+        RETURNING upvotes_count INTO next_upvotes;
+    ELSE
+        SELECT upvotes_count
+        INTO next_upvotes
+        FROM place_reports
+        WHERE id = target_report_id;
+    END IF;
+
+    RETURN COALESCE(next_upvotes, 0);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION confirm_place_report(UUID) TO authenticated;
 
 -- Favoritos propios.
 CREATE POLICY favorites_select_own ON favorites

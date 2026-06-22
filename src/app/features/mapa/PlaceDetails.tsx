@@ -34,6 +34,11 @@ import {
   setCurrentUserFavoritePlace,
 } from "../../services/currentUserService";
 import { getPlaceById, type AppPlace } from "../../services/placeService";
+import {
+  confirmPlaceReport,
+  createPlaceReport,
+  listPlaceReports,
+} from "../../services/placeReportService";
 import type { DetailNavigationState } from "./navigationState";
 
 const getUserRole = (): "student" | "worker" | "admin" => {
@@ -66,6 +71,8 @@ export function PlaceDetails() {
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [issues, setIssues] = useState(placeIssues.filter((issue) => issue.placeId === placeId));
+  const [issuesMessage, setIssuesMessage] = useState("");
+  const [confirmingIssueIds, setConfirmingIssueIds] = useState<string[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
@@ -112,6 +119,32 @@ export function PlaceDetails() {
   }, [placeId]);
 
   useEffect(() => {
+    if (!placeId) return;
+
+    if (!isSupabaseConfigured) {
+      setIssues(placeIssues.filter((issue) => issue.placeId === placeId));
+      return;
+    }
+
+    let isMounted = true;
+    setIssuesMessage("");
+
+    listPlaceReports(placeId)
+      .then((nextIssues) => {
+        if (isMounted) setIssues(nextIssues);
+      })
+      .catch((error) => {
+        if (isMounted) {
+          setIssuesMessage(error instanceof Error ? error.message : "No se pudieron cargar los reportes.");
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [placeId]);
+
+  useEffect(() => {
     setActiveImageIndex(0);
   }, [place?.id]);
 
@@ -139,26 +172,59 @@ export function PlaceDetails() {
     }
   };
 
-  const handleReport = (type: IssueType, description: string) => {
+  const handleReport = async (type: IssueType, description: string) => {
+    if (!placeId) return;
+
+    if (isSupabaseConfigured) {
+      const newIssue = await createPlaceReport(placeId, type, description);
+      setIssues((currentIssues) => [newIssue, ...currentIssues]);
+      setIssuesMessage("Reporte enviado. Gracias por ayudar a la comunidad.");
+      return;
+    }
+
     const newIssue = {
       id: `i${Date.now()}`,
-      placeId: placeId!,
+      placeId,
       type,
       description,
       reportedBy: "Tu",
       timestamp: new Date(),
       upvotes: 0,
     };
-    setIssues([newIssue, ...issues]);
-    alert("Reporte enviado. Gracias por ayudar a la comunidad.");
+    setIssues((currentIssues) => [newIssue, ...currentIssues]);
+    setIssuesMessage("Reporte enviado. Gracias por ayudar a la comunidad.");
   };
 
-  const handleUpvote = (issueId: string) => {
+  const handleUpvote = async (issueId: string) => {
+    const currentIssue = issues.find((issue) => issue.id === issueId);
+    if (!currentIssue || currentIssue.hasConfirmed || confirmingIssueIds.includes(issueId)) return;
+
+    if (isSupabaseConfigured) {
+      setConfirmingIssueIds((current) => [...current, issueId]);
+      setIssuesMessage("");
+
+      try {
+        const nextUpvotes = await confirmPlaceReport(issueId);
+        setIssues((currentIssues) =>
+          currentIssues.map((issue) =>
+            issue.id === issueId ? { ...issue, upvotes: nextUpvotes, hasConfirmed: true } : issue,
+          ),
+        );
+        setIssuesMessage("Confirmacion guardada.");
+      } catch (error) {
+        setIssuesMessage(error instanceof Error ? error.message : "No se pudo confirmar el problema.");
+      } finally {
+        setConfirmingIssueIds((current) => current.filter((id) => id !== issueId));
+      }
+      return;
+    }
+
     setIssues((currentIssues) =>
       currentIssues.map((issue) =>
-        issue.id === issueId ? { ...issue, upvotes: issue.upvotes + 1 } : issue,
+        issue.id === issueId ? { ...issue, upvotes: issue.upvotes + 1, hasConfirmed: true } : issue,
       ),
     );
+    setIssuesMessage("Confirmacion guardada.");
   };
 
   const getPlaceImage = (id: string) => {
@@ -516,6 +582,12 @@ export function PlaceDetails() {
               </button>
             </div>
 
+            {issuesMessage && (
+              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                {issuesMessage}
+              </div>
+            )}
+
             {issues.length === 0 ? (
               <Card className="bg-green-50 border-green-200">
                 <CardContent className="pt-4 text-center">
@@ -541,10 +613,19 @@ export function PlaceDetails() {
                             {issue.description && <p className="text-sm text-gray-700 mb-2">{issue.description}</p>}
                             <button
                               onClick={() => handleUpvote(issue.id)}
-                              className="flex items-center gap-1 text-xs text-gray-600 hover:text-[#4F46E5]"
+                              disabled={issue.hasConfirmed || confirmingIssueIds.includes(issue.id)}
+                              className={`flex items-center gap-1 text-xs ${
+                                issue.hasConfirmed
+                                  ? "text-[#4F46E5]"
+                                  : "text-gray-600 hover:text-[#4F46E5]"
+                              } disabled:cursor-default`}
                             >
-                              <ThumbsUp className="size-3" />
-                              <span>{issue.upvotes} personas confirman</span>
+                              <ThumbsUp className={`size-3 ${issue.hasConfirmed ? "fill-[#4F46E5]" : ""}`} />
+                              <span>
+                                {confirmingIssueIds.includes(issue.id)
+                                  ? "Confirmando..."
+                                  : `${issue.upvotes} personas confirman`}
+                              </span>
                             </button>
                           </div>
                         </div>

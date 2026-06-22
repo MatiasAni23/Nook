@@ -6,6 +6,7 @@
 -- Eliminar tablas si existen (orden inverso por dependencias)
 DROP TABLE IF EXISTS support_ticket_messages CASCADE;
 DROP TABLE IF EXISTS support_tickets CASCADE;
+DROP TABLE IF EXISTS place_report_confirmations CASCADE;
 DROP TABLE IF EXISTS place_reports CASCADE;
 DROP TABLE IF EXISTS reservations CASCADE;
 DROP TABLE IF EXISTS notifications CASCADE;
@@ -400,6 +401,22 @@ CREATE INDEX idx_place_reports_user ON place_reports(user_id);
 CREATE INDEX idx_place_reports_place ON place_reports(place_id);
 CREATE INDEX idx_place_reports_status ON place_reports(status);
 CREATE INDEX idx_place_reports_type ON place_reports(type);
+
+-- =============================================
+-- TABLA: place_report_confirmations
+-- Confirmaciones unicas por usuario para reportes de lugar
+-- =============================================
+CREATE TABLE place_report_confirmations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id UUID REFERENCES place_reports(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(report_id, user_id)
+);
+
+CREATE INDEX idx_place_report_confirmations_report ON place_report_confirmations(report_id);
+CREATE INDEX idx_place_report_confirmations_user ON place_report_confirmations(user_id);
 
 -- =============================================
 -- TABLA: place_issues

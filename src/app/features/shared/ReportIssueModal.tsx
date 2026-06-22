@@ -8,12 +8,14 @@ import { type IssueType, getIssueLabel, getIssueIcon } from "../../data/mockData
 interface ReportIssueModalProps {
   placeName: string;
   onClose: () => void;
-  onReport: (type: IssueType, description: string) => void;
+  onReport: (type: IssueType, description: string) => Promise<void> | void;
 }
 
 export function ReportIssueModal({ placeName, onClose, onReport }: ReportIssueModalProps) {
   const [selectedType, setSelectedType] = useState<IssueType | null>(null);
   const [description, setDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const issueTypes: IssueType[] = [
     'no_wifi',
@@ -26,13 +28,23 @@ export function ReportIssueModal({ placeName, onClose, onReport }: ReportIssueMo
     'other',
   ];
 
-  const handleReport = () => {
+  const handleReport = async () => {
     if (!selectedType) {
-      alert('Por favor selecciona un tipo de problema');
+      setErrorMessage("Selecciona un tipo de problema.");
       return;
     }
-    onReport(selectedType, description);
-    onClose();
+
+    setIsSaving(true);
+    setErrorMessage("");
+
+    try {
+      await onReport(selectedType, description);
+      onClose();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo enviar el reporte.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -88,20 +100,27 @@ export function ReportIssueModal({ placeName, onClose, onReport }: ReportIssueMo
             </div>
           )}
 
+          {errorMessage && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-2">
             <Button
               variant="outline"
               onClick={onClose}
+              disabled={isSaving}
               className="flex-1"
             >
               Cancelar
             </Button>
             <Button
               onClick={handleReport}
-              disabled={!selectedType}
+              disabled={!selectedType || isSaving}
               className="flex-1 bg-[#4F46E5] hover:bg-[#4338CA]"
             >
-              Reportar
+              {isSaving ? "Enviando..." : "Reportar"}
             </Button>
           </div>
         </CardContent>
