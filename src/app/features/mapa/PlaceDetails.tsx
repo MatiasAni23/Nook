@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import {
   AlertTriangle,
@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Briefcase,
+  Clock,
   Coffee,
   DollarSign,
   ExternalLink,
@@ -53,6 +54,72 @@ const fallbackAmenities = [
   { key: "screen", name: "Pantalla disponible" },
   { key: "lockers", name: "Lockers disponibles" },
 ];
+
+type DisplayScheduleDay = {
+  label: string;
+  shortLabel: string;
+  time: string;
+  isOpen: boolean;
+};
+
+const weekDays = [
+  { label: "Lunes", shortLabel: "Lun", aliases: ["Lun", "Lunes"] },
+  { label: "Martes", shortLabel: "Mar", aliases: ["Mar", "Martes"] },
+  { label: "Miercoles", shortLabel: "Mie", aliases: ["Mie", "Miercoles", "Miércoles"] },
+  { label: "Jueves", shortLabel: "Jue", aliases: ["Jue", "Jueves"] },
+  { label: "Viernes", shortLabel: "Vie", aliases: ["Vie", "Viernes"] },
+  { label: "Sabado", shortLabel: "Sab", aliases: ["Sab", "Sabado", "Sábado"] },
+  { label: "Domingo", shortLabel: "Dom", aliases: ["Dom", "Domingo"] },
+];
+
+function normalizeSchedule(hours?: string | null): DisplayScheduleDay[] {
+  const scheduleText = String(hours ?? "").trim();
+  const singleRange = scheduleText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+  const hasDayLabels = weekDays.some((day) =>
+    day.aliases.some((alias) => new RegExp(`\\b${alias}\\b\\s*:`, "i").test(scheduleText)),
+  );
+
+  return weekDays.map((day) => {
+    const dayPattern = new RegExp(
+      `(?:^|[;,])\\s*(?:${day.aliases.join("|")})\\s*:\\s*(Cerrado|\\d{1,2}:\\d{2}\\s*-\\s*\\d{1,2}:\\d{2})?`,
+      "i",
+    );
+    const match = scheduleText.match(dayPattern);
+    const rawTime = match?.[1]?.trim();
+
+    if (rawTime) {
+      const isOpen = rawTime.toLowerCase() !== "cerrado";
+      return { label: day.label, shortLabel: day.shortLabel, time: isOpen ? rawTime : "Cerrado", isOpen };
+    }
+
+    if (!hasDayLabels && singleRange) {
+      return { label: day.label, shortLabel: day.shortLabel, time: `${singleRange[1]} - ${singleRange[2]}`, isOpen: true };
+    }
+
+    return { label: day.label, shortLabel: day.shortLabel, time: "Cerrado", isOpen: false };
+  });
+}
+
+function getScheduleSummary(schedule: DisplayScheduleDay[]) {
+  const groups: Array<{ start: DisplayScheduleDay; end: DisplayScheduleDay; time: string; isOpen: boolean }> = [];
+
+  schedule.forEach((day) => {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.time === day.time && lastGroup.isOpen === day.isOpen) {
+      lastGroup.end = day;
+      return;
+    }
+
+    groups.push({ start: day, end: day, time: day.time, isOpen: day.isOpen });
+  });
+
+  return groups.map((group) => {
+    const days = group.start === group.end
+      ? group.start.shortLabel
+      : `${group.start.shortLabel} - ${group.end.shortLabel}`;
+    return `${days}: ${group.time}`;
+  });
+}
 
 export function PlaceDetails() {
   const { placeId } = useParams();
@@ -334,6 +401,9 @@ export function PlaceDetails() {
     );
   };
 
+  const schedule = useMemo(() => normalizeSchedule(place?.hours), [place?.hours]);
+  const scheduleSummary = useMemo(() => getScheduleSummary(schedule), [schedule]);
+
   if (isLoadingPlace) {
     return (
       <div className="p-4">
@@ -390,6 +460,8 @@ export function PlaceDetails() {
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
   const priceText = hasValidPrice ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
   const canReservePlace = hasValidPrice && (userRole === "worker" || place.type !== "coworking");
+  const weekdaySchedule = schedule.slice(0, 5);
+  const weekendSchedule = schedule.slice(5);
 
   return (
     <div className="size-full flex flex-col bg-white">
@@ -474,7 +546,11 @@ export function PlaceDetails() {
               <CardContent className="pt-4 pb-3 px-3 text-center">
                 <Calendar className="size-6 text-[#4F46E5] mx-auto mb-2" />
                 <p className="text-xs font-semibold mb-1">Horario</p>
-                <p className="text-xs text-gray-600 leading-tight">{place.hours}</p>
+                <div className="space-y-0.5 text-xs text-gray-600 leading-tight">
+                  {scheduleSummary.map((summary) => (
+                    <p key={summary}>{summary}</p>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
@@ -637,15 +713,75 @@ export function PlaceDetails() {
             )}
           </div>
 
-          <div>
-            <h3 className="text-lg mb-3" style={{ fontWeight: 700 }}>Horarios disponibles</h3>
-            <div className="space-y-2">
-              {["Lunes", "Martes", "Miercoles", "Jueves", "Viernes"].map((day) => (
-                <div key={day} className="flex items-center justify-between py-2 border-b">
-                  <span className="text-sm font-medium">{day}</span>
-                  <span className="text-sm text-gray-600">{place.hours}</span>
+          <div className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-blue-50 p-4 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-white shadow-sm">
+                <Calendar className="size-5" />
+              </div>
+              <div>
+                <h3 className="text-lg leading-tight" style={{ fontWeight: 700 }}>Horarios disponibles</h3>
+                <p className="text-xs text-gray-500">{schedule.filter((day) => day.isOpen).length} dias abiertos</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_0.72fr]">
+              <div className="rounded-lg border border-purple-100 bg-white p-3 shadow-sm">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4F46E5]">Lunes a viernes</p>
+                <div className="divide-y divide-gray-100">
+                  {weekdaySchedule.map((day) => (
+                    <div key={day.shortLabel} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{day.label}</p>
+                        <div className={`mt-0.5 flex items-center gap-1.5 text-xs ${day.isOpen ? "text-gray-500" : "text-gray-400"}`}>
+                          <Clock className="size-3.5 shrink-0" />
+                          <span>{day.time}</span>
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          day.isOpen
+                            ? "bg-purple-100 text-[#4F46E5]"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {day.isOpen ? "Abierto" : "Cerrado"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+
+              <div className="rounded-lg border border-purple-100 bg-white p-3 shadow-sm">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4F46E5]">Fin de semana</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                  {weekendSchedule.map((day) => (
+                    <div
+                      key={day.shortLabel}
+                      className={`rounded-lg border px-3 py-3 ${
+                        day.isOpen
+                          ? "border-purple-100 bg-purple-50/70"
+                          : "border-gray-100 bg-gray-50"
+                      }`}
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-gray-900">{day.label}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            day.isOpen
+                              ? "bg-white text-[#4F46E5]"
+                              : "bg-white text-gray-500"
+                          }`}
+                        >
+                          {day.isOpen ? "Abierto" : "Cerrado"}
+                        </span>
+                      </div>
+                      <div className={`flex items-center gap-2 text-sm ${day.isOpen ? "text-gray-700" : "text-gray-400"}`}>
+                        <Clock className="size-4 shrink-0" />
+                        <span className="font-medium">{day.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

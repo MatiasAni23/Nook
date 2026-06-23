@@ -50,7 +50,7 @@ export async function listPlaceReports(placeId: string): Promise<Issue[]> {
     .from("place_reports")
     .select("id, user_id, place_id, type, description, upvotes_count, created_at")
     .eq("place_id", placeId)
-    .in("status", ["pending", "reviewing", "resolved"])
+    .in("status", ["pending", "reviewing"])
     .order("created_at", { ascending: false });
 
   if (error) throw error;

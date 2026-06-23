@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { APIProvider, AdvancedMarker, Map, Pin } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import {
   Briefcase,
   Check,
@@ -61,6 +61,7 @@ type DaySchedule = {
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 const defaultPosition = { lat: -33.4569, lng: -70.6483 };
+const coordinateDecimals = 10;
 type Coordinates = typeof defaultPosition;
 type ParsedCoordinates =
   | { position: Coordinates; error?: never }
@@ -103,6 +104,47 @@ const typeOptions: Record<PlaceCategory, Array<{ value: PlaceType; label: string
     { value: "private_office", label: "Oficina privada" },
   ],
 };
+
+function formatCoordinate(value: number) {
+  return value.toFixed(coordinateDecimals);
+}
+
+function RecenterAdminMap({ center }: { center: Coordinates }) {
+  const map = useMap();
+
+  useEffect(() => {
+    map?.panTo(center);
+  }, [center.lat, center.lng, map]);
+
+  return null;
+}
+
+function CenterMapPin() {
+  return (
+    <svg
+      viewBox="0 0 72 88"
+      className="h-12 w-10 drop-shadow-lg"
+      aria-hidden="true"
+    >
+      <path
+        d="M36 84C28.5 71.5 8 48 8 31C8 14.2 20.2 3 36 3S64 14.2 64 31C64 48 43.5 71.5 36 84Z"
+        fill="#EF1F2D"
+        stroke="#FFFFFF"
+        strokeWidth="3.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 32C18 18.4 28.8 10 43 11"
+        fill="none"
+        stroke="#F65A61"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <circle cx="36" cy="31" r="12.5" fill="#FFFFFF" />
+      <path d="M36 84C43.5 71.5 64 48 64 31C64 45 51.5 60 36 75V84Z" fill="#C91524" opacity="0.35" />
+    </svg>
+  );
+}
 
 function getInitialCategory(place: Partial<AppPlace>): PlaceCategory {
   if (place.category) return place.category;
@@ -168,8 +210,9 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
   const [quietness, setQuietness] = useState([place.quietness ?? 3]);
   const [lighting, setLighting] = useState([place.lighting ?? 4]);
   const [pinPosition, setPinPosition] = useState(initialPosition);
-  const [latitudeInput, setLatitudeInput] = useState(initialPosition.lat.toFixed(6));
-  const [longitudeInput, setLongitudeInput] = useState(initialPosition.lng.toFixed(6));
+  const [mapCenterRequest, setMapCenterRequest] = useState(initialPosition);
+  const [latitudeInput, setLatitudeInput] = useState(formatCoordinate(initialPosition.lat));
+  const [longitudeInput, setLongitudeInput] = useState(formatCoordinate(initialPosition.lng));
   const [selectedAmenityKeys, setSelectedAmenityKeys] = useState<string[]>(initialAmenityKeys);
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>(place.images ?? []);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -198,10 +241,11 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
       .join("; ");
   }, [dailySchedule]);
 
-  const setPinCoordinates = (position: Coordinates) => {
+  const setPinCoordinates = (position: Coordinates, shouldRecenterMap = true) => {
     setPinPosition(position);
-    setLatitudeInput(position.lat.toFixed(6));
-    setLongitudeInput(position.lng.toFixed(6));
+    setLatitudeInput(formatCoordinate(position.lat));
+    setLongitudeInput(formatCoordinate(position.lng));
+    if (shouldRecenterMap) setMapCenterRequest(position);
   };
 
   const updateScheduleDay = (dayKey: string, changes: Partial<DaySchedule>) => {
@@ -229,8 +273,8 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
     const parsed = getParsedCoordinates();
     if (parsed.error) {
       setErrorMessage(parsed.error);
-      setLatitudeInput(pinPosition.lat.toFixed(6));
-      setLongitudeInput(pinPosition.lng.toFixed(6));
+      setLatitudeInput(formatCoordinate(pinPosition.lat));
+      setLongitudeInput(formatCoordinate(pinPosition.lng));
       return;
     }
 
@@ -252,6 +296,12 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
     const latLng = event.detail?.latLng;
     if (!latLng) return;
     setPinCoordinates({ lat: latLng.lat, lng: latLng.lng });
+  };
+
+  const handleGoogleCameraChanged = (event: MapCameraChangedEvent) => {
+    const center = event.detail.center;
+    if (!Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return;
+    setPinCoordinates({ lat: center.lat, lng: center.lng }, false);
   };
 
   const handleCategoryChange = (value: string) => {
@@ -391,17 +441,15 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
                   <APIProvider apiKey={googleMapsApiKey}>
                     <Map
                       defaultCenter={pinPosition}
-                      center={pinPosition}
                       defaultZoom={14}
                       mapId="nook-admin-edit-place-map"
                       gestureHandling="greedy"
                       disableDefaultUI
                       onClick={handleGoogleMapClick}
+                      onCameraChanged={handleGoogleCameraChanged}
                       className="absolute inset-0"
                     >
-                      <AdvancedMarker position={pinPosition}>
-                        <Pin background="#ef4444" borderColor="#ffffff" glyphColor="#ffffff" />
-                      </AdvancedMarker>
+                      <RecenterAdminMap center={mapCenterRequest} />
                     </Map>
                   </APIProvider>
                 ) : (
@@ -422,12 +470,17 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
                   </div>
                 )}
 
+                {googleMapsApiKey && (
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-full">
+                    <CenterMapPin />
+                  </div>
+                )}
                 <p className="absolute top-3 left-3 rounded-lg bg-white/90 px-3 py-2 text-sm shadow-md">
-                  Haz clic para posicionar el pin
+                  {googleMapsApiKey ? "Mueve el mapa para posicionar el pin" : "Haz clic para posicionar el pin"}
                 </p>
                 <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-white/90 px-3 py-2 text-xs shadow-md">
-                  <p><span className="font-semibold">Lat:</span> {pinPosition.lat.toFixed(6)}</p>
-                  <p><span className="font-semibold">Lng:</span> {pinPosition.lng.toFixed(6)}</p>
+                  <p><span className="font-semibold">Lat:</span> {formatCoordinate(pinPosition.lat)}</p>
+                  <p><span className="font-semibold">Lng:</span> {formatCoordinate(pinPosition.lng)}</p>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">

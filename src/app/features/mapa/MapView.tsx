@@ -222,12 +222,11 @@ export function MapView() {
     };
   }, []);
 
-  const mockPlaces = userRole === 'worker'
-    ? workPlaces.map((place) => ({ ...place, category: "work" as const, images: [] }))
-    : studyPlaces.map((place) => ({ ...place, category: "study" as const, images: [] }));
-  const basePlaces = isSupabaseConfigured
-    ? dbPlaces.filter((place) => (userRole === 'worker' ? place.category === 'work' : place.category === 'study'))
-    : mockPlaces;
+  const mockPlaces = [
+    ...studyPlaces.map((place) => ({ ...place, category: "study" as const, images: [] })),
+    ...workPlaces.map((place) => ({ ...place, category: "work" as const, images: [] })),
+  ];
+  const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
   const places = basePlaces.filter((place) => {
     return placeMatchesSearch(place, searchTerm) && placeMatchesTab(place, activeTab);
   });

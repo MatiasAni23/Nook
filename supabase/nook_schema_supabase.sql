@@ -841,6 +841,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+CREATE OR REPLACE FUNCTION is_current_user_delegate_for_place(target_place_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM delegates
+        JOIN delegate_places ON delegate_places.delegate_id = delegates.id
+        WHERE delegates.user_id = auth.uid()
+        AND delegates.status = 'active'
+        AND delegate_places.place_id = target_place_id
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION is_current_user_delegate_for_place(UUID) TO authenticated;
+
 CREATE OR REPLACE FUNCTION is_current_user_place_manager()
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -914,15 +930,28 @@ CREATE POLICY reviews_delete_own ON reviews
     FOR DELETE USING (auth.uid() = user_id);
 
 -- Reportes de lugares.
-CREATE POLICY place_reports_select_own_or_public_pending ON place_reports
-    FOR SELECT USING (auth.uid() = user_id OR status IN ('pending', 'reviewing', 'resolved'));
+CREATE POLICY place_reports_select_own_public_or_manager ON place_reports
+    FOR SELECT USING (
+        auth.uid() = user_id
+        OR status IN ('pending', 'reviewing')
+        OR is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+    );
 
 CREATE POLICY place_reports_insert_own ON place_reports
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY place_reports_update_own_pending ON place_reports
-    FOR UPDATE USING (auth.uid() = user_id AND status = 'pending')
-    WITH CHECK (auth.uid() = user_id);
+CREATE POLICY place_reports_update_manager ON place_reports
+    FOR UPDATE USING (
+        is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+        OR (auth.uid() = user_id AND status = 'pending')
+    )
+    WITH CHECK (
+        is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+        OR auth.uid() = user_id
+    );
 
 CREATE POLICY place_report_confirmations_select_own_or_public_reports ON place_report_confirmations
     FOR SELECT USING (
