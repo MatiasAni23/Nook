@@ -55,6 +55,11 @@ const fallbackAmenities = [
   { key: "lockers", name: "Lockers disponibles" },
 ];
 
+function getAmenityLabel(key?: string, name?: string) {
+  if (key === "coffee_tea") return "Alimentos";
+  return name ?? key ?? "Servicio";
+}
+
 type DisplayScheduleDay = {
   label: string;
   shortLabel: string;
@@ -635,12 +640,13 @@ export function PlaceDetails() {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
               {uniqueIncludedAmenities.map((amenity: any, amenityIndex) => {
                 const AmenityIcon = getAmenityIcon(amenity.key);
+                const amenityLabel = getAmenityLabel(amenity.key, amenity.name);
                 return (
                   <div key={`${amenity.key ?? amenity.name}-${amenityIndex}`} className="flex flex-col items-center">
                     <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
                       <AmenityIcon className="size-6 text-gray-700" />
                     </div>
-                    <p className="text-xs text-center text-gray-700 leading-tight">{amenity.name}</p>
+                    <p className="text-xs text-center text-gray-700 leading-tight">{amenityLabel}</p>
                   </div>
                 );
               })}

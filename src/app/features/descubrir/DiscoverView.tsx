@@ -21,6 +21,11 @@ import {
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
 
+function getAmenityLabel(key?: string, name?: string) {
+  if (key === "coffee_tea") return "Alimentos";
+  return name ?? key ?? "Servicio";
+}
+
 const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
 
 const getUserRole = (): "student" | "worker" | "admin" | "delegate" => {
@@ -273,7 +278,7 @@ export function DiscoverView() {
               ...(place.outlets ? [{ key: "outlets", label: "Enchufes", variant: "outline" as const }] : []),
               ...availableAmenities.map((amenity: any) => ({
                 key: amenity.key,
-                label: amenity.name,
+                label: getAmenityLabel(amenity.key, amenity.name),
                 variant: "outline" as const,
               })),
             ].filter((badge, index, badges) => {
