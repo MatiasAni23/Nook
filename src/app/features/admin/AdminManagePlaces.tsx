@@ -209,9 +209,14 @@ export function AdminManagePlaces() {
         <div className="flex-1 overflow-hidden">
           <AdminAddPlace onCreated={handlePlaceCreated} />
         </div>
-        <div className="absolute top-4 left-4 z-10">
-          <Button variant="outline" size="sm" onClick={() => setView("list")} className="bg-white">
-            Volver a listado
+        <div className="absolute top-4 left-4 z-50">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setView("list")} 
+            className="bg-white border-2 border-gray-300 hover:bg-gray-100 hover:border-[#4F46E5] text-gray-800 font-semibold shadow-md hover:shadow-lg transition-all"
+          >
+            ← Volver a listado
           </Button>
         </div>
         <Dialog open={successDialog !== null} onOpenChange={(open) => {
@@ -247,7 +252,7 @@ export function AdminManagePlaces() {
         <div className="flex-1 overflow-hidden">
           <AdminEditPlace place={editingPlace} onSave={handleSaveComplete} />
         </div>
-        <div className="absolute top-4 left-4 z-10">
+        <div className="absolute top-4 left-4 z-50">
           <Button
             variant="outline"
             size="sm"
@@ -255,9 +260,9 @@ export function AdminManagePlaces() {
               setView("list");
               setEditingPlace(null);
             }}
-            className="bg-white"
+            className="bg-white border-2 border-gray-300 hover:bg-gray-100 hover:border-[#4F46E5] text-gray-800 font-semibold shadow-md hover:shadow-lg transition-all"
           >
-            Volver a listado
+            ← Volver a listado
           </Button>
         </div>
       </div>

@@ -1,16 +1,62 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MapPin, TrendingUp, Users, Star } from "lucide-react";
+import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { Card, CardContent } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { studyPlaces } from "../../data/mockData";
-import { mockPlaceStats, mockZoneStats } from "../../data/adminData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+
+const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+const createSvgMarkerUrl = (svg: string) => {
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 export function AdminHome() {
   const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
-  const [selectedPlace, setSelectedPlace] = useState<typeof studyPlaces[0] | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<AppPlace | null>(null);
+  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
-  const totalVisits = mockPlaceStats.reduce((sum, place) => sum + place.visits, 0);
-  const averageRating = (mockPlaceStats.reduce((sum, place) => sum + place.averageRating, 0) / mockPlaceStats.length).toFixed(1);
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    let isMounted = true;
+    const cachedPlaces = getCachedPlaces();
+    if (cachedPlaces) setDbPlaces(cachedPlaces);
+    setIsLoadingPlaces(!cachedPlaces);
+
+    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
+      .then((places) => {
+        if (isMounted) setDbPlaces(places);
+      })
+      .catch(() => {
+        if (isMounted) setDbPlaces([]);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingPlaces(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Calcular estadísticas dinámicamente desde lugares reales
+  const calculateZoneStats = () => {
+    const zoneMap: any = {};
+
+    dbPlaces.forEach((place) => {
+      const zone = place.zone || "Sin zona";
+      if (!zoneMap[zone]) {
+        zoneMap[zone] = { zone, totalPlaces: 0, totalVisits: 0, averageRating: 0 };
+      }
+      zoneMap[zone].totalPlaces += 1;
+    });
+
+    return Object.values(zoneMap).sort((a: any, b: any) => b.totalPlaces - a.totalPlaces);
+  };
+
+  const zoneStats = calculateZoneStats() as any;
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
@@ -18,8 +64,31 @@ export function AdminHome() {
       case 'cafe': return '☕';
       case 'coworking': return '💼';
       case 'park': return '🌳';
+      case 'office': return '🏢';
+      case 'meeting_room': return '👥';
+      case 'private_office': return '🚪';
       default: return '📍';
     }
+  };
+
+  const getPlaceMarkerIcon = (type: string) => {
+    const glyph = getPlaceIcon(type);
+    return createSvgMarkerUrl(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="45" height="52" viewBox="0 0 52 58">
+        <defs>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#111827" flood-opacity="0.26"/>
+          </filter>
+        </defs>
+        <path
+          d="M26 55C20.8 47.7 11 36.9 11 24.5C11 16.2 17.7 9.5 26 9.5C34.3 9.5 41 16.2 41 24.5C41 36.9 31.2 47.7 26 55Z"
+          fill="#4F46E5"
+          filter="url(#shadow)"
+        />
+        <circle cx="26" cy="24.5" r="13" fill="#ffffff"/>
+        <text x="26" y="25" text-anchor="middle" dominant-baseline="middle" font-size="14" font-family="Arial, sans-serif">${glyph}</text>
+      </svg>
+    `);
   };
 
   return (
@@ -41,7 +110,7 @@ export function AdminHome() {
                     <MapPin className="size-5 text-[#4F46E5]" />
                   </div>
                   <div>
-                    <p className="text-2xl">{studyPlaces.length}</p>
+                    <p className="text-2xl">{dbPlaces.length}</p>
                     <p className="text-xs text-gray-600">Lugares</p>
                   </div>
                 </div>
@@ -55,8 +124,8 @@ export function AdminHome() {
                     <TrendingUp className="size-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-2xl">{totalVisits.toLocaleString('es-CL')}</p>
-                    <p className="text-xs text-gray-600">Visitas</p>
+                    <p className="text-2xl">{dbPlaces.length}</p>
+                    <p className="text-xs text-gray-600">Activos</p>
                   </div>
                 </div>
               </CardContent>
@@ -66,46 +135,40 @@ export function AdminHome() {
           {/* Map */}
           <Card>
             <CardContent className="p-0">
-              <div className="relative h-80 bg-gradient-to-br from-blue-100 to-green-100 rounded-lg overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="relative w-full h-full">
-                    {/* User location marker */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                      <div className="relative">
-                        <div className="size-5 bg-blue-600 rounded-full border-3 border-white shadow-lg" />
-                        <div className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-75" />
-                      </div>
-                    </div>
+              <div className="relative h-80 bg-gray-100 rounded-lg overflow-hidden">
+                {googleMapsApiKey ? (
+                  <APIProvider apiKey={googleMapsApiKey}>
+                    <Map
+                      defaultCenter={userLocation}
+                      defaultZoom={13}
+                      disableDefaultUI
+                      clickableIcons={false}
+                      gestureHandling="greedy"
+                      className="absolute inset-0"
+                    >
+                      {/* User location marker */}
+                      <Marker position={userLocation} title="Tu ubicación" />
 
-                    {/* Place markers */}
-                    {studyPlaces.map((place) => {
-                      const offsetX = (place.lng - userLocation.lng) * 3000;
-                      const offsetY = (userLocation.lat - place.lat) * 3000;
-                      const isSelected = selectedPlace?.id === place.id;
-
-                      return (
-                        <button
+                      {/* Place markers */}
+                      {dbPlaces.map((place) => (
+                        <Marker
                           key={place.id}
-                          className={`absolute transition-all duration-200 ${
-                            isSelected ? 'z-30 scale-125' : 'z-20 hover:scale-110'
-                          }`}
-                          style={{
-                            left: `calc(50% + ${offsetX}px)`,
-                            top: `calc(50% + ${offsetY}px)`,
-                            transform: 'translate(-50%, -100%)',
-                          }}
+                          position={{ lat: place.lat, lng: place.lng }}
+                          title={place.name}
+                          icon={getPlaceMarkerIcon(place.type)}
                           onClick={() => setSelectedPlace(place)}
-                        >
-                          <div className={`bg-white rounded-full p-2 shadow-lg border-2 ${
-                            isSelected ? 'border-[#4F46E5]' : 'border-white'
-                          }`}>
-                            <span className="text-2xl">{getPlaceIcon(place.type)}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                        />
+                      ))}
+                    </Map>
+                  </APIProvider>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-100 to-green-100">
+                    <div className="text-center">
+                      <MapPin className="size-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-600">Google Maps no configurado</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Selected place info */}
                 {selectedPlace && (
@@ -113,16 +176,10 @@ export function AdminHome() {
                     <h3 className="font-semibold mb-1">{selectedPlace.name}</h3>
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <div className="flex items-center gap-1">
-                        <Star className="size-3 fill-yellow-400 text-yellow-400" />
-                        <span>{selectedPlace.rating}</span>
+                        <span>{selectedPlace.type}</span>
                       </div>
                       <span>•</span>
-                      <span>{selectedPlace.reviews} reseñas</span>
-                      {selectedPlace.openNow ? (
-                        <Badge className="bg-green-500 text-xs ml-auto">Abierto</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs ml-auto">Cerrado</Badge>
-                      )}
+                      <span>{selectedPlace.address}</span>
                     </div>
                   </div>
                 )}
@@ -135,28 +192,28 @@ export function AdminHome() {
             <CardContent className="pt-4 pb-4">
               <h3 className="text-lg mb-3">Zonas Principales</h3>
               <div className="space-y-3">
-                {mockZoneStats.slice(0, 3).map((zone, index) => (
-                  <div key={zone.zone} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`size-8 rounded-full flex items-center justify-center text-white text-sm ${
-                        index === 0 ? 'bg-[#4F46E5]' : index === 1 ? 'bg-[#6366F1]' : 'bg-[#818CF8]'
-                      }`}>
-                        {index + 1}
+                {zoneStats.length > 0 ? (
+                  zoneStats.slice(0, 3).map((zone: any, index: number) => (
+                    <div key={zone.zone} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`size-8 rounded-full flex items-center justify-center text-white text-sm ${
+                          index === 0 ? 'bg-[#4F46E5]' : index === 1 ? 'bg-[#6366F1]' : 'bg-[#818CF8]'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-semibold">{zone.zone}</p>
+                          <p className="text-xs text-gray-600">{zone.totalPlaces} lugares</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold">{zone.zone}</p>
-                        <p className="text-xs text-gray-600">{zone.totalPlaces} lugares</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm">{zone.totalVisits.toLocaleString('es-CL')}</p>
-                      <div className="flex items-center gap-1">
-                        <Star className="size-3 fill-yellow-400 text-yellow-400" />
-                        <p className="text-xs text-gray-600">{zone.averageRating}</p>
+                      <div className="text-right">
+                        <p className="text-sm">{zone.totalPlaces}</p>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No hay zonas registradas</p>
+                )}
               </div>
             </CardContent>
           </Card>

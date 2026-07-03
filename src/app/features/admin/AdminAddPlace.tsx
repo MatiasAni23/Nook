@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { APIProvider, Map, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import {
+  ArrowLeft,
+  ArrowRight,
   Briefcase,
   Check,
   Clock,
@@ -14,6 +16,7 @@ import {
   ParkingCircle,
   Plug,
   Presentation,
+  Star,
   Upload,
   Users,
   Volume2,
@@ -63,8 +66,8 @@ type DaySchedule = {
 
 type Coordinates = typeof defaultPosition;
 type ParsedCoordinates =
-  | { position: Coordinates; error?: never }
-  | { position?: never; error: string };
+  | { position: Coordinates }
+  | { error: string };
 
 const weekDays: DaySchedule[] = [
   { key: "monday", label: "Lunes", shortLabel: "Lun", isOpen: true, openTime: "08:00", closeTime: "22:00" },
@@ -78,7 +81,7 @@ const weekDays: DaySchedule[] = [
 
 const amenityOptions: AmenityOption[] = [
   { key: "wifi", name: "WiFi de alta velocidad", Icon: Wifi },
-  { key: "coffee_tea", name: "Cafe y te ilimitados", Icon: Coffee },
+  { key: "coffee_tea", name: "Alimentos", Icon: Coffee },
   { key: "meeting_room", name: "Sala de reunion", Icon: Users },
   { key: "screen", name: "Pantalla disponible", Icon: Monitor },
   { key: "lockers", name: "Lockers disponibles", Icon: Lock },
@@ -157,9 +160,6 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const [capacityMax, setCapacityMax] = useState("20");
   const [accessType, setAccessType] = useState<"free" | "reservation">("free");
   const [pricePerHour, setPricePerHour] = useState("");
-  const [wifi, setWifi] = useState(true);
-  const [outlets, setOutlets] = useState(true);
-  const [parking, setParking] = useState(false);
   const [quietness, setQuietness] = useState([3]);
   const [lighting, setLighting] = useState([4]);
   const [pinPosition, setPinPosition] = useState(defaultPosition);
@@ -174,6 +174,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const previews = imageFiles.map((file) => URL.createObjectURL(file));
@@ -193,6 +194,9 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
       isAvailable: selectedAmenityKeys.includes(amenity.key),
     }));
   }, [selectedAmenityKeys]);
+  const hasWifi = selectedAmenityKeys.includes("wifi");
+  const hasOutlets = selectedAmenityKeys.includes("outlets");
+  const hasParking = selectedAmenityKeys.includes("parking");
 
   const hours = useMemo(() => {
     return dailySchedule
@@ -230,7 +234,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
 
   const applyCoordinateInputs = () => {
     const parsed = getParsedCoordinates();
-    if (parsed.error) {
+    if ("error" in parsed) {
       setErrorMessage(parsed.error);
       setLatitudeInput(formatCoordinate(pinPosition.lat));
       setLongitudeInput(formatCoordinate(pinPosition.lng));
@@ -281,6 +285,56 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setImageFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
   };
 
+  const moveImage = (index: number, direction: -1 | 1) => {
+    setImageFiles((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const setCoverImage = (index: number) => {
+    setImageFiles((current) => {
+      if (index <= 0 || index >= current.length) return current;
+      const next = [...current];
+      const [cover] = next.splice(index, 1);
+      return [cover, ...next];
+    });
+  };
+
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    setImageFiles((current) => {
+      const next = [...current];
+      const [draggedItem] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, draggedItem);
+      return next;
+    });
+
+    setDraggedIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
   const resetForm = () => {
     setName("");
     setCategory("study");
@@ -293,9 +347,6 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setCapacityMax("20");
     setAccessType("free");
     setPricePerHour("");
-    setWifi(true);
-    setOutlets(true);
-    setParking(false);
     setQuietness([3]);
     setLighting([4]);
     setPinCoordinates(defaultPosition);
@@ -307,7 +358,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setErrorMessage("");
 
     const parsedCoordinates = getParsedCoordinates();
-    if (parsedCoordinates.error) {
+    if ("error" in parsedCoordinates) {
       setErrorMessage(parsedCoordinates.error);
       return;
     }
@@ -357,9 +408,9 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
         capacityMin: capacityMin ? Number(capacityMin) : null,
         capacityMax: capacityMax ? Number(capacityMax) : null,
         pricePerHour: accessType === "reservation" ? Number(pricePerHour) : null,
-        wifi,
-        outlets,
-        parking,
+        wifi: hasWifi,
+        outlets: hasOutlets,
+        parking: hasParking,
         quietnessLevel: quietness[0],
         lightingLevel: lighting[0],
         amenities: selectedAmenities,
@@ -654,33 +705,145 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Label
-                htmlFor="placeImages"
-                className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-4 py-5 text-center hover:border-[#4F46E5]"
-              >
-                <Upload className="size-6 text-[#4F46E5]" />
-                <span className="text-sm font-medium">Seleccionar imagenes</span>
-                <span className="text-xs text-gray-500">Hasta 8 imagenes JPG, PNG o WebP</span>
-              </Label>
-              <Input id="placeImages" type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
-
-              {imagePreviews.length > 0 && (
+              {/* Contenedor relativo para superponer el upload */}
+              <div className="relative">
+                {/* Grid de imágenes - Fondo */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {imagePreviews.map((preview, index) => (
-                    <div key={preview} className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-gray-100">
-                      <img src={preview} alt={`Lugar ${index + 1}`} className="size-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white text-gray-700 shadow"
-                        aria-label="Quitar imagen"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
-                  ))}
+                  {/* Portada */}
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+                    {imagePreviews.length > 0 ? (
+                      <>
+                        <img src={imagePreviews[0]} alt="Portada del lugar" className="size-full object-cover" />
+                        <div className="absolute top-2 left-2 flex size-8 items-center justify-center rounded-full bg-[#4F46E5] text-white font-bold text-sm shadow">
+                          1
+                        </div>
+                        <div className="absolute top-2 right-2 px-3 py-1 rounded-full bg-[#4F46E5] text-white text-xs font-semibold shadow">
+                          Portada
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeImage(0)}
+                          className="absolute right-2 bottom-12 flex size-7 items-center justify-center rounded-full bg-white text-gray-700 shadow hover:bg-gray-100"
+                          aria-label="Quitar imagen"
+                        >
+                          <X className="size-4" />
+                        </button>
+                        {imagePreviews.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => moveImage(0, 1)}
+                            className="absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow hover:bg-gray-100"
+                            aria-label="Mover portada a la derecha"
+                          >
+                            <ArrowRight className="size-4" />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center">
+                        <Star className="size-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-xs text-gray-400">Portada</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Demás imágenes */}
+                  {imagePreviews.length > 0 ? (
+                    imagePreviews.slice(1).map((preview, previewIndex) => {
+                      const index = previewIndex + 1;
+                      return (
+                        <div
+                          key={preview}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={`relative aspect-[4/3] overflow-hidden rounded-lg border cursor-move transition-all ${
+                            draggedIndex === index ? "opacity-50 bg-blue-50" : "bg-gray-100"
+                          }`}
+                        >
+                          <img src={preview} alt={`Lugar ${index}`} className="size-full object-cover" />
+                          <div className="absolute top-2 left-2 flex size-8 items-center justify-center rounded-full bg-[#4F46E5] text-white font-bold text-sm shadow">
+                            {index + 1}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white text-gray-700 shadow hover:bg-gray-100"
+                            aria-label="Quitar imagen"
+                          >
+                            <X className="size-4" />
+                          </button>
+                          <div className="absolute bottom-2 left-2 right-2 flex justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => moveImage(index, -1)}
+                              className="flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow hover:bg-gray-100"
+                              aria-label="Mover imagen a la izquierda"
+                            >
+                              <ArrowLeft className="size-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCoverImage(index)}
+                              className="flex size-8 items-center justify-center rounded-full bg-white text-[#4F46E5] shadow hover:bg-purple-50"
+                              aria-label="Definir como portada"
+                            >
+                              <Star className="size-4" />
+                            </button>
+                            {index < imagePreviews.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => moveImage(index, 1)}
+                                className="flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow hover:bg-gray-100"
+                                aria-label="Mover imagen a la derecha"
+                              >
+                                <ArrowRight className="size-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                          <p className="text-lg text-gray-300 font-semibold">2</p>
+                          <p className="text-xs text-gray-400">Imagen</p>
+                        </div>
+                      </div>
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                          <p className="text-lg text-gray-300 font-semibold">3</p>
+                          <p className="text-xs text-gray-400">Imagen</p>
+                        </div>
+                      </div>
+                      <div className="relative aspect-[4/3] overflow-hidden rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                          <p className="text-lg text-gray-300 font-semibold">4</p>
+                          <p className="text-xs text-gray-400">Imagen</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              )}
+
+                {/* Overlay de upload - Encima del grid */}
+                {imagePreviews.length === 0 && (
+                  <Label
+                    htmlFor="placeImages"
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-white/90 backdrop-blur-sm px-4 py-5 text-center cursor-pointer hover:bg-white hover:border-[#4F46E5] transition-all z-10"
+                  >
+                    <Upload className="size-6 text-[#4F46E5]" />
+                    <span className="text-sm font-medium">Seleccionar imagenes</span>
+                    <span className="text-xs text-gray-500">Hasta 8 imagenes JPG, PNG o WebP</span>
+                  </Label>
+                )}
+              </div>
+
+              <Input id="placeImages" type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
             </CardContent>
           </Card>
 
@@ -709,21 +872,6 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                     </button>
                   );
                 })}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-3">
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="wifi" className="cursor-pointer">WiFi</Label>
-                  <Switch id="wifi" checked={wifi} onCheckedChange={setWifi} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="outlets" className="cursor-pointer">Enchufes</Label>
-                  <Switch id="outlets" checked={outlets} onCheckedChange={setOutlets} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="parking" className="cursor-pointer">Estacionamiento</Label>
-                  <Switch id="parking" checked={parking} onCheckedChange={setParking} />
-                </div>
               </div>
             </CardContent>
           </Card>

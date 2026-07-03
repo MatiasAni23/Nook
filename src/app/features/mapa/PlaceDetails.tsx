@@ -49,7 +49,7 @@ const getUserRole = (): "student" | "worker" | "admin" => {
 const fallbackAmenities = [
   { key: "wifi", name: "WiFi de alta velocidad" },
   { key: "outlets", name: "Enchufes disponibles" },
-  { key: "coffee_tea", name: "Cafe y te ilimitados" },
+  { key: "coffee_tea", name: "Alimentos" },
   { key: "meeting_room", name: "Sala de reunion" },
   { key: "screen", name: "Pantalla disponible" },
   { key: "lockers", name: "Lockers disponibles" },

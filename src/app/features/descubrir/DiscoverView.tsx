@@ -45,7 +45,7 @@ export function DiscoverView() {
 
   const tabs = [
     { id: "todos", label: "Todos" },
-    ...(isWorker ? [{ id: "cowork", label: "Cowork" }] : []),
+    { id: "cowork", label: "Cowork" },
     { id: "estudios", label: "Estudios" },
     { id: "reuniones", label: "Reuniones" },
     { id: "parques", label: "Parques" },
@@ -155,7 +155,6 @@ export function DiscoverView() {
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
   const filteredPlaces = basePlaces.filter(
     (place) =>
-      (isWorker || place.type !== "coworking") &&
       placeMatchesTab(place, activeTab) &&
       placeMatchesSearch(place, searchTerm),
   );

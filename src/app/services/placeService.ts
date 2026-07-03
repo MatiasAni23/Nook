@@ -67,9 +67,21 @@ export interface CreatePlaceInput {
   imageFiles: File[];
 }
 
-export interface UpdatePlaceInput extends CreatePlaceInput {
+type ExistingPlaceImageInput = {
+  type: "existing";
+  url: string;
+};
+
+type NewPlaceImageInput = {
+  type: "new";
+  file: File;
+};
+
+export type PlaceImageInput = ExistingPlaceImageInput | NewPlaceImageInput;
+
+export interface UpdatePlaceInput extends Omit<CreatePlaceInput, "imageFiles"> {
   id: string;
-  existingImageUrls: string[];
+  images: PlaceImageInput[];
 }
 
 const PLACE_IMAGES_BUCKET = "place-images";
@@ -401,8 +413,17 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
 
 export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
   const client = requireSupabase();
-  const uploadedImageUrls = input.imageFiles.length > 0 ? await uploadPlaceImages(input.id, input.imageFiles) : [];
-  const imageUrls = [...input.existingImageUrls, ...uploadedImageUrls];
+  const newImageFiles = input.images
+    .filter((image): image is NewPlaceImageInput => image.type === "new")
+    .map((image) => image.file);
+  const uploadedImageUrls = newImageFiles.length > 0 ? await uploadPlaceImages(input.id, newImageFiles) : [];
+  let uploadedImageIndex = 0;
+  const imageUrls = input.images.map((image) => {
+    if (image.type === "existing") return image.url;
+    const uploadedUrl = uploadedImageUrls[uploadedImageIndex];
+    uploadedImageIndex += 1;
+    return uploadedUrl;
+  }).filter(Boolean);
 
   const { data, error } = await client
     .from("places")

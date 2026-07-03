@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { APIProvider, Map, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import {
+  ArrowLeft,
+  ArrowRight,
   Briefcase,
   Check,
   Clock,
@@ -15,6 +17,7 @@ import {
   Plug,
   Presentation,
   Save,
+  Star,
   Upload,
   Users,
   Volume2,
@@ -34,6 +37,7 @@ import { isSupabaseConfigured } from "../../lib/supabase";
 import {
   updatePlace,
   type AppPlace,
+  type PlaceImageInput,
   type PlaceAmenity,
   type PlaceCategory,
   type PlaceType,
@@ -64,8 +68,12 @@ const defaultPosition = { lat: -33.4569, lng: -70.6483 };
 const coordinateDecimals = 10;
 type Coordinates = typeof defaultPosition;
 type ParsedCoordinates =
-  | { position: Coordinates; error?: never }
-  | { position?: never; error: string };
+  | { position: Coordinates }
+  | { error: string };
+
+type EditableImage =
+  | { id: string; type: "existing"; url: string }
+  | { id: string; type: "new"; file: File; url: string };
 
 const weekDays: DaySchedule[] = [
   { key: "monday", label: "Lunes", shortLabel: "Lun", isOpen: true, openTime: "08:00", closeTime: "22:00" },
@@ -79,7 +87,7 @@ const weekDays: DaySchedule[] = [
 
 const amenityOptions: AmenityOption[] = [
   { key: "wifi", name: "WiFi de alta velocidad", Icon: Wifi },
-  { key: "coffee_tea", name: "Cafe y te ilimitados", Icon: Coffee },
+  { key: "coffee_tea", name: "Alimentos", Icon: Coffee },
   { key: "meeting_room", name: "Sala de reunion", Icon: Users },
   { key: "screen", name: "Pantalla disponible", Icon: Monitor },
   { key: "lockers", name: "Lockers disponibles", Icon: Lock },
@@ -182,16 +190,18 @@ function parseHours(hours?: string): DaySchedule[] {
 }
 
 export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
+  const objectUrlsRef = useRef<string[]>([]);
   const initialCategory = getInitialCategory(place);
   const initialPosition = {
     lat: Number.isFinite(place.lat) ? Number(place.lat) : defaultPosition.lat,
     lng: Number.isFinite(place.lng) ? Number(place.lng) : defaultPosition.lng,
   };
-  const initialAmenityKeys = place.amenities?.filter((amenity) => amenity.isAvailable).map((amenity) => amenity.key) ?? [
+  const initialAmenityKeys = Array.from(new Set([
+    ...(place.amenities?.filter((amenity) => amenity.isAvailable).map((amenity) => amenity.key) ?? []),
     ...(place.wifi ? ["wifi"] : []),
     ...(place.outlets ? ["outlets"] : []),
     ...(place.parking ? ["parking"] : []),
-  ];
+  ]));
 
   const [name, setName] = useState(place.name ?? "");
   const [category, setCategory] = useState<PlaceCategory>(initialCategory);
@@ -204,9 +214,6 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
   const [capacityMax, setCapacityMax] = useState(place.capacityMax == null ? "" : String(place.capacityMax));
   const [accessType, setAccessType] = useState<"free" | "reservation">(place.pricePerHour ? "reservation" : "free");
   const [pricePerHour, setPricePerHour] = useState(place.pricePerHour == null ? "" : String(place.pricePerHour));
-  const [wifi, setWifi] = useState(place.wifi ?? true);
-  const [outlets, setOutlets] = useState(place.outlets ?? true);
-  const [parking, setParking] = useState(place.parking ?? false);
   const [quietness, setQuietness] = useState([place.quietness ?? 3]);
   const [lighting, setLighting] = useState([place.lighting ?? 4]);
   const [pinPosition, setPinPosition] = useState(initialPosition);
@@ -214,18 +221,17 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
   const [latitudeInput, setLatitudeInput] = useState(formatCoordinate(initialPosition.lat));
   const [longitudeInput, setLongitudeInput] = useState(formatCoordinate(initialPosition.lng));
   const [selectedAmenityKeys, setSelectedAmenityKeys] = useState<string[]>(initialAmenityKeys);
-  const [existingImageUrls, setExistingImageUrls] = useState<string[]>(place.images ?? []);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [images, setImages] = useState<EditableImage[]>(
+    (place.images ?? []).map((url) => ({ id: `existing-${url}`, type: "existing", url })),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const previews = imageFiles.map((file) => URL.createObjectURL(file));
-    setImagePreviews(previews);
-
-    return () => previews.forEach((preview) => URL.revokeObjectURL(preview));
-  }, [imageFiles]);
+    return () => {
+      objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const selectedAmenities = useMemo<PlaceAmenity[]>(() => {
     return amenityOptions.map((amenity) => ({
@@ -234,6 +240,9 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
       isAvailable: selectedAmenityKeys.includes(amenity.key),
     }));
   }, [selectedAmenityKeys]);
+  const hasWifi = selectedAmenityKeys.includes("wifi");
+  const hasOutlets = selectedAmenityKeys.includes("outlets");
+  const hasParking = selectedAmenityKeys.includes("parking");
 
   const hours = useMemo(() => {
     return dailySchedule
@@ -271,7 +280,7 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
 
   const applyCoordinateInputs = () => {
     const parsed = getParsedCoordinates();
-    if (parsed.error) {
+    if ("error" in parsed) {
       setErrorMessage(parsed.error);
       setLatitudeInput(formatCoordinate(pinPosition.lat));
       setLongitudeInput(formatCoordinate(pinPosition.lng));
@@ -320,24 +329,55 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
-    const remainingSlots = Math.max(0, 8 - existingImageUrls.length);
-    setImageFiles((current) => [...current, ...files].slice(0, remainingSlots));
+    setImages((current) => {
+      const remainingSlots = Math.max(0, 8 - current.length);
+      const newImages = files.slice(0, remainingSlots).map((file) => ({
+        id: `new-${crypto.randomUUID()}`,
+        type: "new" as const,
+        file,
+        url: URL.createObjectURL(file),
+      }));
+      objectUrlsRef.current = [...objectUrlsRef.current, ...newImages.map((image) => image.url)];
+      return [...current, ...newImages];
+    });
     event.target.value = "";
   };
 
-  const removeExistingImage = (index: number) => {
-    setExistingImageUrls((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  const removeImage = (index: number) => {
+    setImages((current) => {
+      const image = current[index];
+      if (image?.type === "new") {
+        URL.revokeObjectURL(image.url);
+        objectUrlsRef.current = objectUrlsRef.current.filter((url) => url !== image.url);
+      }
+      return current.filter((_, currentIndex) => currentIndex !== index);
+    });
   };
 
-  const removeNewImage = (index: number) => {
-    setImageFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  const moveImage = (index: number, direction: -1 | 1) => {
+    setImages((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const setCoverImage = (index: number) => {
+    setImages((current) => {
+      if (index <= 0 || index >= current.length) return current;
+      const next = [...current];
+      const [cover] = next.splice(index, 1);
+      return [cover, ...next];
+    });
   };
 
   const handleSubmit = async () => {
     setErrorMessage("");
 
     const parsedCoordinates = getParsedCoordinates();
-    if (parsedCoordinates.error) {
+    if ("error" in parsedCoordinates) {
       setErrorMessage(parsedCoordinates.error);
       return;
     }
@@ -388,14 +428,17 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
         capacityMin: capacityMin ? Number(capacityMin) : null,
         capacityMax: capacityMax ? Number(capacityMax) : null,
         pricePerHour: accessType === "reservation" ? Number(pricePerHour) : null,
-        wifi,
-        outlets,
-        parking,
+        wifi: hasWifi,
+        outlets: hasOutlets,
+        parking: hasParking,
         quietnessLevel: quietness[0],
         lightingLevel: lighting[0],
         amenities: selectedAmenities,
-        existingImageUrls,
-        imageFiles,
+        images: images.map<PlaceImageInput>((image) => (
+          image.type === "existing"
+            ? { type: "existing", url: image.url }
+            : { type: "new", file: image.file }
+        )),
       });
 
       onSave(updatedPlace);
@@ -408,11 +451,6 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
 
   const fallbackOffsetX = (pinPosition.lng - defaultPosition.lng) * 3000;
   const fallbackOffsetY = (defaultPosition.lat - pinPosition.lat) * 3000;
-  const allImagePreviews = [
-    ...existingImageUrls.map((url) => ({ type: "existing" as const, url })),
-    ...imagePreviews.map((url) => ({ type: "new" as const, url })),
-  ];
-
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto p-4 pb-32">
@@ -695,27 +733,87 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
               </Label>
               <Input id="editPlaceImages" type="file" accept="image/*" multiple className="hidden" onChange={handleImageChange} />
 
-              {allImagePreviews.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {allImagePreviews.map((preview, index) => (
-                    <div key={`${preview.type}-${preview.url}`} className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-gray-100">
-                      <img src={preview.url} alt={`Lugar ${index + 1}`} className="size-full object-cover" />
+              {images.length > 0 && (
+                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <Star className="size-4 fill-[#4F46E5] text-[#4F46E5]" />
+                      Portada
+                    </div>
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-[#4F46E5] bg-gray-100">
+                      <img src={images[0].url} alt="Portada del lugar" className="size-full object-cover" />
                       <button
                         type="button"
-                        onClick={() => {
-                          if (preview.type === "existing") {
-                            removeExistingImage(index);
-                            return;
-                          }
-                          removeNewImage(index - existingImageUrls.length);
-                        }}
+                        onClick={() => removeImage(0)}
                         className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white text-gray-700 shadow"
                         aria-label="Quitar imagen"
                       >
                         <X className="size-4" />
                       </button>
+                      {images.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => moveImage(0, 1)}
+                          className="absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow"
+                          aria-label="Mover portada a la derecha"
+                        >
+                          <ArrowRight className="size-4" />
+                        </button>
+                      )}
                     </div>
-                  ))}
+                  </div>
+
+                  {images.length > 1 && (
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold text-gray-800">Demas imagenes</div>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {images.slice(1).map((image, imageIndex) => {
+                          const index = imageIndex + 1;
+                          return (
+                            <div key={image.id} className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-gray-100">
+                              <img src={image.url} alt={`Lugar ${index + 1}`} className="size-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removeImage(index)}
+                                className="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full bg-white text-gray-700 shadow"
+                                aria-label="Quitar imagen"
+                              >
+                                <X className="size-4" />
+                              </button>
+                              <div className="absolute bottom-2 left-2 right-2 flex justify-between gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => moveImage(index, -1)}
+                                  className="flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow"
+                                  aria-label="Mover imagen a la izquierda"
+                                >
+                                  <ArrowLeft className="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCoverImage(index)}
+                                  className="flex size-8 items-center justify-center rounded-full bg-white text-[#4F46E5] shadow"
+                                  aria-label="Definir como portada"
+                                >
+                                  <Star className="size-4" />
+                                </button>
+                                {index < images.length - 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveImage(index, 1)}
+                                    className="flex size-8 items-center justify-center rounded-full bg-white text-gray-700 shadow"
+                                    aria-label="Mover imagen a la derecha"
+                                  >
+                                    <ArrowRight className="size-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -746,21 +844,6 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
                     </button>
                   );
                 })}
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-3">
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="editWifi" className="cursor-pointer">WiFi</Label>
-                  <Switch id="editWifi" checked={wifi} onCheckedChange={setWifi} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="editOutlets" className="cursor-pointer">Enchufes</Label>
-                  <Switch id="editOutlets" checked={outlets} onCheckedChange={setOutlets} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                  <Label htmlFor="editParking" className="cursor-pointer">Estacionamiento</Label>
-                  <Switch id="editParking" checked={parking} onCheckedChange={setParking} />
-                </div>
               </div>
             </CardContent>
           </Card>
