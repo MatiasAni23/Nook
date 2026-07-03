@@ -377,9 +377,12 @@ export function PlaceDetails() {
   };
 
   const handleOpenDirections = () => {
-    const destination = typeof place?.lat === "number" && typeof place?.lng === "number"
-      ? `${place.lat},${place.lng}`
-      : place?.address ?? "";
+    const address = place?.address?.trim();
+    const destination = address && address.length > 0 && address !== `${place?.lat},${place?.lng}`
+      ? address
+      : typeof place?.lat === "number" && typeof place?.lng === "number"
+        ? `${place.lat},${place.lng}`
+        : address ?? "";
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
     window.open(mapsUrl, "_blank", "noopener,noreferrer");
   };
@@ -429,7 +432,7 @@ export function PlaceDetails() {
   }
 
   const isWorkPlace = place.category === "work" || !!workPlace;
-  const placeImages = Array.isArray(place.images) ? place.images : [];
+  const placeImages: string[] = Array.isArray(place.images) ? place.images : [];
   const selectedImage = placeImages[activeImageIndex];
   const explicitAmenities = [
     { key: "wifi", name: "WiFi disponible", isAvailable: Boolean(place.wifi) },
