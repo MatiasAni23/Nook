@@ -149,12 +149,12 @@ export function RecoverPasswordView() {
 
   const updatePassword = async () => {
     if (passwordScore < 3) {
-      setErrorMessage("La contrasena debe tener al menos 8 caracteres y combinar letras con numeros.");
+      setErrorMessage("La contraseña debe tener al menos 8 caracteres y combinar letras con numeros.");
       return;
     }
 
     if (password !== passwordConfirm) {
-      setErrorMessage("Las contrasenas no coinciden.");
+      setErrorMessage("Las contraseñas no coinciden.");
       return;
     }
 
@@ -185,9 +185,9 @@ export function RecoverPasswordView() {
             <ArrowLeft className="size-4" />
             Volver
           </button>
-          <CardTitle className="text-2xl">Recuperar contrasena</CardTitle>
+          <CardTitle className="text-2xl">Recuperar contraseña</CardTitle>
           <p className="text-sm text-gray-600">
-            Sigue los pasos para crear una nueva contrasena para tu cuenta.
+            Sigue los pasos para crear una nueva contraseña para tu cuenta.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -230,7 +230,7 @@ export function RecoverPasswordView() {
           {step === "code" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="recover-code">Codigo de recuperacion</Label>
+                <Label htmlFor="recover-code">Codigo de recuperación</Label>
                 <Input
                   id="recover-code"
                   inputMode="numeric"
@@ -264,7 +264,7 @@ export function RecoverPasswordView() {
           {step === "password" && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="new-password">Nueva contrasena</Label>
+                <Label htmlFor="new-password">Nueva contraseña</Label>
                 <div className="relative">
                   <Input
                     id="new-password"
@@ -277,7 +277,7 @@ export function RecoverPasswordView() {
                   <PasswordVisibilityButton
                     isVisible={showPassword}
                     onClick={() => setShowPassword((value) => !value)}
-                    label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                   />
                 </div>
                 <div className="space-y-1">
@@ -294,7 +294,7 @@ export function RecoverPasswordView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="new-password-confirm">Confirmar contrasena</Label>
+                <Label htmlFor="new-password-confirm">Confirmar contraseña</Label>
                 <div className="relative">
                   <Input
                     id="new-password-confirm"
@@ -308,11 +308,11 @@ export function RecoverPasswordView() {
                   <PasswordVisibilityButton
                     isVisible={showPasswordConfirm}
                     onClick={() => setShowPasswordConfirm((value) => !value)}
-                    label={showPasswordConfirm ? "Ocultar contrasena" : "Mostrar contrasena"}
+                    label={showPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
                   />
                 </div>
                 {passwordsMismatch && (
-                  <p className="text-xs text-red-600">Las contrasenas no coinciden.</p>
+                  <p className="text-xs text-red-600">Las contraseñas no coinciden.</p>
                 )}
               </div>
 
@@ -321,7 +321,7 @@ export function RecoverPasswordView() {
                 disabled={isSubmitting}
                 className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
               >
-                {isSubmitting ? "Guardando..." : "Guardar nueva contrasena"}
+                {isSubmitting ? "Guardando..." : "Guardar nueva contraseña"}
               </Button>
             </>
           )}
@@ -332,9 +332,9 @@ export function RecoverPasswordView() {
                 <CheckCircle2 className="size-7" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold">Contrasena actualizada</h2>
+                <h2 className="text-lg font-semibold">Contraseña actualizada</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Ya puedes iniciar sesion con tu nueva contrasena.
+                  Ya puedes iniciar sesion con tu nueva contraseña.
                 </p>
               </div>
               <Button

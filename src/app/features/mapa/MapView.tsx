@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import { LocateFixed, Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
@@ -20,6 +20,17 @@ const googleGeolocationUrl = "https://www.googleapis.com/geolocation/v1/geolocat
 const defaultMapCenter = { lat: -33.4569, lng: -70.6483 };
 
 type UserLocationSource = "browser" | "google";
+type Coordinates = typeof defaultMapCenter;
+type SavedMapCamera = {
+  center: Coordinates;
+  zoom: number;
+};
+type RecenterRequest = {
+  center: Coordinates;
+  id: number;
+};
+
+let savedMapCamera: SavedMapCamera | null = null;
 
 const cleanMapStyles: google.maps.MapTypeStyle[] = [
   {
@@ -51,13 +62,13 @@ const createSvgMarkerUrl = (svg: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
-function RecenterMap({ center }: { center: { lat: number; lng: number } | null }) {
+function RecenterMap({ request }: { request: RecenterRequest | null }) {
   const map = useMap();
 
   useEffect(() => {
-    if (!center) return;
-    map?.panTo(center);
-  }, [center?.lat, center?.lng, map]);
+    if (!request) return;
+    map?.panTo(request.center);
+  }, [request?.id, map]);
 
   return null;
 }
@@ -77,18 +88,32 @@ export function MapView() {
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
+  const [userRecenterRequest, setUserRecenterRequest] = useState<RecenterRequest | null>(null);
+  const [fallbackMapCenter, setFallbackMapCenter] = useState<Coordinates>(
+    savedMapCamera?.center ?? defaultMapCenter,
+  );
   const sheetRef = useRef<HTMLDivElement>(null);
   const hasRequestedGoogleFallbackRef = useRef(false);
+  const isDraggingSheetRef = useRef(false);
 
-  const applyUserCoordinates = (coords: { lat: number; lng: number }, source: UserLocationSource) => {
+  const applyUserCoordinates = (coords: Coordinates, source: UserLocationSource, shouldCenterMap = false) => {
     setUserLocation(coords);
     setUserLocationSource(source);
     setHasResolvedUserLocation(true);
     setLocationError("");
     setIsLocatingUser(false);
+
+    if (shouldCenterMap) {
+      savedMapCamera = {
+        center: coords,
+        zoom: savedMapCamera?.zoom ?? 15,
+      };
+      setFallbackMapCenter(coords);
+      setUserRecenterRequest({ center: coords, id: Date.now() });
+    }
   };
 
-  const applyUserPosition = (position: GeolocationPosition) => {
+  const applyUserPosition = (position: GeolocationPosition, shouldCenterMap = false) => {
     hasRequestedGoogleFallbackRef.current = false;
     applyUserCoordinates(
       {
@@ -96,10 +121,11 @@ export function MapView() {
         lng: position.coords.longitude,
       },
       "browser",
+      shouldCenterMap,
     );
   };
 
-  const requestGoogleApproximateLocation = async () => {
+  const requestGoogleApproximateLocation = async (shouldCenterMap = false) => {
     if (!googleMapsApiKey) {
       setLocationError("No se pudo obtener tu ubicacion.");
       setIsLocatingUser(false);
@@ -125,7 +151,7 @@ export function MapView() {
         throw new Error("Google Geolocation no devolvio coordenadas.");
       }
 
-      applyUserCoordinates({ lat, lng }, "google");
+      applyUserCoordinates({ lat, lng }, "google", shouldCenterMap);
     } catch {
       setHasResolvedUserLocation(false);
       setUserLocationSource(null);
@@ -134,10 +160,14 @@ export function MapView() {
     }
   };
 
-  const handleLocationError = (error?: GeolocationPositionError, allowGoogleFallback = true) => {
+  const handleLocationError = (
+    error?: GeolocationPositionError,
+    allowGoogleFallback = true,
+    shouldCenterFallback = false,
+  ) => {
     if (allowGoogleFallback && !hasRequestedGoogleFallbackRef.current) {
       hasRequestedGoogleFallbackRef.current = true;
-      requestGoogleApproximateLocation();
+      requestGoogleApproximateLocation(shouldCenterFallback);
       return;
     }
 
@@ -158,16 +188,20 @@ export function MapView() {
 
     if (!navigator.geolocation) {
       setIsLocatingUser(true);
-      requestGoogleApproximateLocation();
+      requestGoogleApproximateLocation(true);
       return;
     }
 
     setIsLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(applyUserPosition, (error) => handleLocationError(error), {
-      enableHighAccuracy: true,
-      maximumAge: 30_000,
-      timeout: 12_000,
-    });
+    navigator.geolocation.getCurrentPosition(
+      (position) => applyUserPosition(position, true),
+      (error) => handleLocationError(error, true, true),
+      {
+        enableHighAccuracy: true,
+        maximumAge: 30_000,
+        timeout: 12_000,
+      },
+    );
   };
 
   useEffect(() => {
@@ -323,6 +357,7 @@ export function MapView() {
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY);
+    isDraggingSheetRef.current = false;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -330,13 +365,41 @@ export function MapView() {
     const diff = currentY - startY;
 
     if (diff > 50 && isBottomSheetExpanded) {
+      isDraggingSheetRef.current = true;
       setIsBottomSheetExpanded(false);
     } else if (diff < -50 && !isBottomSheetExpanded) {
+      isDraggingSheetRef.current = true;
       setIsBottomSheetExpanded(true);
     }
   };
 
-  const mapCenter = userLocation ?? defaultMapCenter;
+  const handleSheetHeaderClick = () => {
+    if (isDraggingSheetRef.current) {
+      isDraggingSheetRef.current = false;
+      return;
+    }
+
+    setIsBottomSheetExpanded((expanded) => !expanded);
+  };
+
+  const handleGoogleCameraChanged = (event: MapCameraChangedEvent) => {
+    const { center, zoom } = event.detail;
+
+    if (!Number.isFinite(center.lat) || !Number.isFinite(center.lng) || !Number.isFinite(zoom)) {
+      return;
+    }
+
+    savedMapCamera = {
+      center: {
+        lat: center.lat,
+        lng: center.lng,
+      },
+      zoom,
+    };
+  };
+
+  const initialMapCenter = savedMapCamera?.center ?? defaultMapCenter;
+  const initialMapZoom = savedMapCamera?.zoom ?? 13;
 
   return (
     <div className="size-full flex flex-col bg-gray-50">
@@ -383,19 +446,25 @@ export function MapView() {
       </div>
 
       {/* Map */}
-      <div className="flex-1 relative bg-gradient-to-br from-blue-50 to-purple-50">
+      <div
+        className="relative flex-1 bg-gradient-to-br from-blue-50 to-purple-50 transition-[margin] duration-300"
+        style={{
+          marginBottom: isBottomSheetExpanded ? "18rem" : "8.5rem",
+        }}
+      >
         {googleMapsApiKey ? (
           <APIProvider apiKey={googleMapsApiKey}>
             <Map
-              defaultCenter={mapCenter}
-              defaultZoom={13}
+              defaultCenter={initialMapCenter}
+              defaultZoom={initialMapZoom}
               disableDefaultUI
               clickableIcons={false}
               gestureHandling="greedy"
               styles={cleanMapStyles}
               className="absolute inset-0"
+              onCameraChanged={handleGoogleCameraChanged}
             >
-              <RecenterMap center={userLocation} />
+              <RecenterMap request={userRecenterRequest} />
               {userLocation && (
                 <Marker position={userLocation} icon={getUserMarkerIcon()} zIndex={30} />
               )}
@@ -453,8 +522,8 @@ export function MapView() {
 
             {/* Place markers with icons only */}
             {places.map((place) => {
-              const offsetX = (place.lng - mapCenter.lng) * 3000;
-              const offsetY = (mapCenter.lat - place.lat) * 3000;
+              const offsetX = (place.lng - fallbackMapCenter.lng) * 3000;
+              const offsetY = (fallbackMapCenter.lat - place.lat) * 3000;
               const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
 
               return (
@@ -481,18 +550,20 @@ export function MapView() {
       {/* Bottom section - Cerca de ti (collapsible) */}
       <div
         ref={sheetRef}
-        className={`absolute bottom-0 left-0 right-0 bg-white border-t transition-all duration-300 z-30 ${
+        className={`absolute left-0 right-0 rounded-t-[1.75rem] border-t border-gray-100 bg-white shadow-[0_-16px_34px_rgba(15,23,42,0.16)] transition-all duration-300 z-30 ${
           isBottomSheetExpanded ? 'pb-24' : 'pb-24'
         }`}
         style={{
+          bottom: isBottomSheetExpanded ? "0px" : "5.75rem",
           transform: isBottomSheetExpanded ? 'translateY(0)' : 'translateY(calc(100% - 48px))',
         }}
       >
         {/* Handle bar */}
         <div
-          className="px-4 pt-2 pb-2 cursor-pointer"
+          className="px-4 pt-3 pb-2 cursor-pointer"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
+          onClick={handleSheetHeaderClick}
         >
           <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-2" />
           <div className="flex items-center justify-between">
@@ -509,7 +580,7 @@ export function MapView() {
         <div className="px-4 pb-4 overflow-hidden">
           <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-2">
             {isLoadingPlaces && (
-              <Card className="w-40 shrink-0">
+              <Card className="w-40 shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)]">
                 <CardContent className="p-3 text-sm text-gray-600">
                   Cargando lugares...
                 </CardContent>
@@ -517,7 +588,7 @@ export function MapView() {
             )}
 
             {!isLoadingPlaces && places.length === 0 && (
-              <Card className="w-52 shrink-0">
+              <Card className="w-52 shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)]">
                 <CardContent className="p-3 text-sm text-gray-600">
                   No hay lugares para este filtro.
                 </CardContent>
@@ -531,20 +602,20 @@ export function MapView() {
               return (
                 <Card
                   key={place.id}
-                  className={`hover:shadow-lg transition-all shrink-0 ${userRole === 'worker' && placeHasPrice ? 'w-36' : 'w-32'}`}
+                  className={`shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.12)] ${userRole === 'worker' && placeHasPrice ? 'w-36' : 'w-32'}`}
                 >
                   <CardContent className="p-0">
                     {/* Image */}
                     {place.images?.[0] ? (
                       <button
-                        className="h-20 w-full overflow-hidden rounded-t-lg bg-gray-100"
+                        className="h-20 w-full overflow-hidden rounded-t-2xl bg-gray-100"
                         onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                       >
                         <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
                       </button>
                     ) : (
                       <div
-                        className={`h-20 bg-gradient-to-br ${getPlaceImage(place.id)} rounded-t-lg flex items-center justify-center cursor-pointer`}
+                        className={`h-20 bg-gradient-to-br ${getPlaceImage(place.id)} rounded-t-2xl flex items-center justify-center cursor-pointer`}
                         onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                       >
                         <span className="text-2xl">{getPlaceIcon(place.type)}</span>

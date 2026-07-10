@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
+import { motion } from "motion/react";
 import { Map, User, Users, MessageCircle, Search } from "lucide-react";
 import { MessageNotificationBanner } from "./MessageNotificationBanner";
 
@@ -44,10 +45,13 @@ export function Layout() {
       <MessageNotificationBanner />
 
       {/* Gradient overlay for navigation */}
-      <div className="fixed bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/70 to-transparent pointer-events-none z-40" />
+      <div className="fixed bottom-0 left-0 right-0 h-28 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none z-40" />
 
       {/* Floating circular navigation */}
-      <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
+      <nav
+        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#D9D1FF] bg-white px-2 py-2 shadow-[0_12px_28px_rgba(79,70,229,0.16)] sm:gap-1.5 sm:px-2.5"
+        aria-label="Navegacion principal"
+      >
         {navItems.map(({ path, icon: Icon, label }) => {
           const isActive =
             (location.pathname === path) ||
@@ -55,18 +59,51 @@ export function Layout() {
             (path === "/app/chat" && location.pathname.startsWith("/app/chat"));
 
           return (
-            <button
+            <motion.button
               key={path}
-              className={`size-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isActive
-                  ? 'bg-[#4F46E5] text-white scale-105'
-                  : 'bg-white text-gray-600 hover:bg-purple-50'
-              }`}
+              type="button"
+              className="group flex w-[3.75rem] flex-col items-center gap-1 outline-none"
               onClick={() => navigate(path)}
               aria-label={label}
+              aria-current={isActive ? "page" : undefined}
+              whileTap={{ scale: 0.9, y: 3 }}
+              whileHover={{ y: -2 }}
+              transition={{ type: "spring", stiffness: 520, damping: 28 }}
             >
-              <Icon className="size-5" />
-            </button>
+              <motion.span
+                className={`relative grid size-[2.625rem] place-items-center rounded-full border transition-colors duration-300 ${
+                  isActive
+                    ? 'border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.34)]'
+                    : 'border-[#E3DCFF] bg-white text-[#6D5DD3] shadow-[0_6px_14px_rgba(79,70,229,0.14)] group-hover:border-[#C9BFFF] group-hover:bg-[#F3F0FF] group-hover:text-[#4F46E5]'
+                }`}
+                animate={{
+                  scale: isActive ? 1.08 : 1,
+                  y: isActive ? -3 : 0,
+                }}
+                transition={{ type: "spring", stiffness: 420, damping: 24 }}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="active-tab-glow"
+                    className="absolute inset-0 rounded-full bg-[#6B5AF0]"
+                    transition={{ type: "spring", stiffness: 360, damping: 30 }}
+                  />
+                )}
+                <motion.span
+                  animate={{ scale: isActive ? 1.08 : 1 }}
+                  transition={{ type: "spring", stiffness: 460, damping: 26 }}
+                >
+                  <Icon className="relative z-10 size-[1.125rem]" strokeWidth={isActive ? 2.6 : 2.2} />
+                </motion.span>
+              </motion.span>
+              <span
+                className={`w-full truncate text-center text-[10px] font-semibold leading-none transition-colors duration-300 ${
+                  isActive ? 'text-[#4F46E5]' : 'text-[#7C70C9] group-hover:text-[#4F46E5]'
+                }`}
+              >
+                {label}
+              </span>
+            </motion.button>
           );
         })}
       </nav>
