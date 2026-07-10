@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { Eye, EyeOff, LogIn, UserPlus } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { AnimatePresence, motion } from "motion/react";
+import { Eye, EyeOff, Lock, LogIn, Mail, MapPin, Phone, User, UserPlus } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import type { RegisterResult } from "../../services/authService";
 
 interface LoginViewProps {
@@ -104,7 +104,7 @@ function PasswordVisibilityButton({
     <button
       type="button"
       onClick={onClick}
-      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+      className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-[#7C83E8] transition hover:bg-[#EEF2FF] hover:text-[#4F46E5]"
       aria-label={label}
       title={label}
     >
@@ -113,8 +113,93 @@ function PasswordVisibilityButton({
   );
 }
 
+function AuthField({
+  id,
+  label,
+  icon: Icon,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: typeof Mail;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label
+        htmlFor={id}
+        className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#4F46E5]"
+      >
+        {label}
+      </Label>
+      <div className="group relative flex min-h-12 items-center rounded-2xl border border-[#E0E7FF] bg-white px-4 shadow-[0_6px_16px_rgba(79,70,229,0.04)] transition focus-within:border-[#4F46E5] focus-within:bg-[#F8FAFF] focus-within:shadow-[0_10px_22px_rgba(79,70,229,0.09)]">
+        <Icon className="mr-3 size-4 shrink-0 text-[#8B93F5] transition group-focus-within:text-[#4F46E5]" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function AuthInput(props: ComponentProps<typeof Input>) {
+  return (
+    <Input
+      {...props}
+      className={`h-11 border-0 bg-transparent px-0 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0 ${
+        props.className ?? ""
+      }`}
+    />
+  );
+}
+
+function PrimaryAuthButton({
+  children,
+  className = "",
+  ...props
+}: ComponentProps<typeof Button>) {
+  return (
+    <Button
+      {...props}
+      className={`h-12 w-full rounded-2xl bg-[#4F46E5] font-black text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:bg-[#4338CA] hover:shadow-[0_18px_30px_rgba(79,70,229,0.28)] active:translate-y-0 ${className}`}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function HeroDecor() {
+  return (
+    <>
+      <motion.div
+        className="absolute -right-20 -top-16 size-52 rounded-full border border-white/10 bg-white/[0.07] lg:-right-16 lg:size-72"
+        animate={{ scale: [1, 1.06, 1], rotate: [0, 8, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        className="absolute right-6 top-8 grid size-9 place-items-center rounded-full border border-white/25 bg-white/10 text-white lg:right-[18%] lg:top-[30%]"
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <MapPin className="size-4" />
+      </motion.div>
+      <motion.div
+        className="absolute right-20 top-16 grid size-7 place-items-center rounded-full border border-white/15 bg-white/[0.07] text-white/70 lg:right-[42%] lg:top-[26%]"
+        animate={{ y: [0, 5, 0] }}
+        transition={{ duration: 4.3, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
+      >
+        <MapPin className="size-3" />
+      </motion.div>
+      <motion.div
+        className="absolute left-8 top-11 size-2 rounded-full border border-white/20 lg:left-[12%] lg:top-[46%]"
+        animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.25, 1] }}
+        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+      />
+    </>
+  );
+}
+
 export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
@@ -152,6 +237,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   };
 
   const handleTabChange = (value: string) => {
+    setActiveTab(value);
     setErrorMessage("");
     setIsSubmitting(false);
 
@@ -245,175 +331,296 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   };
 
   return (
-    <div className="size-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl mb-2">Nook</CardTitle>
-          <p className="text-sm text-gray-600">Plataforma de gestion de espacios de estudio</p>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="login" onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Iniciar Sesion</TabsTrigger>
-              <TabsTrigger value="register">Registrarse</TabsTrigger>
-            </TabsList>
-
-            {errorMessage && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            )}
-
-            <TabsContent value="login" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  placeholder="tu@email.cl"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={showLoginPassword ? "text" : "password"}
-                    placeholder="********"
-                    value={loginPassword}
-                    className="pr-10"
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  />
-                  <PasswordVisibilityButton
-                    isVisible={showLoginPassword}
-                    onClick={() => setShowLoginPassword((value) => !value)}
-                    label={showLoginPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  />
-                </div>
-              </div>
-              <Button
-                className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
-                onClick={handleLogin}
-                disabled={isSubmitting}
+    <div className="size-full overflow-y-auto bg-white lg:overflow-hidden">
+      <div className="relative mx-auto flex min-h-full w-full max-w-[30rem] flex-col overflow-hidden bg-white shadow-[0_0_60px_rgba(15,23,42,0.10)] lg:max-w-none lg:flex-row lg:shadow-none">
+        <section className="relative min-h-[15.5rem] overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA] px-7 pb-14 pt-12 text-white lg:flex lg:min-h-screen lg:w-[45%] lg:items-center lg:justify-center lg:px-14 lg:py-16">
+          <HeroDecor />
+          <div className="relative z-10 lg:max-w-md lg:text-center">
+            <div className="mb-7 flex items-center gap-3 lg:mb-24 lg:justify-center">
+              <motion.div
+                className="grid size-11 place-items-center rounded-2xl bg-white/14 shadow-[0_10px_20px_rgba(49,46,129,0.16)]"
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
               >
-                <LogIn className="size-4 mr-2" />
-                {isSubmitting ? "Ingresando..." : "Iniciar Sesion"}
-              </Button>
-              <button
-                type="button"
-                onClick={() => navigate("/recover-password")}
-                className="w-full rounded-lg px-3 py-2 text-sm font-medium text-[#4F46E5] transition-colors hover:bg-purple-50 hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
+                <MapPin className="size-5" />
+              </motion.div>
+              <span className="text-xl font-black">Nook</span>
+            </div>
+            <div className="hidden lg:mb-16 lg:block">
+              <motion.div
+                className="relative mx-auto grid size-24 place-items-center rounded-full bg-white text-[#4F46E5] shadow-[0_18px_38px_rgba(49,46,129,0.20)]"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
               >
-                Olvide mi contraseña
-              </button>
-            </TabsContent>
+                <MapPin className="size-12" />
+                <span className="absolute -left-24 top-0 h-px w-24 rotate-45 border-t border-dashed border-white/20" />
+                <span className="absolute -right-20 top-4 h-px w-24 -rotate-45 border-t border-dashed border-white/20" />
+              </motion.div>
+            </div>
+            <h1 className="max-w-[18rem] text-3xl font-black leading-tight tracking-normal lg:mx-auto lg:max-w-[24rem]">
+              <span className="lg:hidden">Encuentra tu espacio perfecto</span>
+              <span className="hidden lg:inline">Tu proximo lugar favorito esta a un clic</span>
+            </h1>
+            <p className="mt-2 text-sm font-medium text-white/78 lg:mx-auto lg:mt-4 lg:max-w-xs">
+              Descubre cafes, bibliotecas y espacios de coworking en Chile
+            </p>
+          </div>
+        </section>
 
-            <TabsContent value="register" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-name">Nombre completo</Label>
-                <Input
-                  id="register-name"
-                  placeholder="Tu nombre"
-                  value={registerName}
-                  onChange={(e) => setRegisterName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email</Label>
-                <Input
-                  id="register-email"
-                  type="email"
-                  placeholder="tu@email.cl"
-                  value={registerEmail}
-                  onChange={(e) => setRegisterEmail(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-phone">Telefono</Label>
-                <div className="flex min-h-10 overflow-hidden rounded-md border border-gray-200 bg-white focus-within:ring-2 focus-within:ring-purple-200">
-                  <div className="flex w-20 shrink-0 items-center justify-center whitespace-nowrap border-r border-gray-200 bg-gray-50 px-3 text-sm text-gray-600">
-                    +56 9
+        <section className="relative z-10 -mt-10 flex-1 rounded-t-[2rem] bg-white px-5 pb-8 pt-6 lg:mt-0 lg:flex lg:min-h-screen lg:w-[55%] lg:items-center lg:justify-center lg:rounded-none lg:px-12 lg:py-16">
+          <motion.div
+            className="mx-auto mb-6 h-1 w-9 rounded-full bg-[#E0E7FF] lg:hidden"
+            animate={{ opacity: [0.45, 1, 0.45] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+          />
+
+          <motion.div
+            className="rounded-[1.65rem] bg-white p-1 shadow-[0_18px_42px_rgba(79,70,229,0.12)] lg:w-full lg:max-w-md lg:shadow-none"
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <div className="rounded-[1.5rem] bg-white px-4 pb-5 pt-1 sm:px-5">
+              <div className="mb-5 lg:mb-8">
+                <div className="mb-4 hidden items-center gap-3 lg:flex">
+                  <div className="grid size-10 place-items-center rounded-xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
+                    <MapPin className="size-5" />
                   </div>
-                  <Input
-                    id="register-phone"
-                    type="tel"
-                    inputMode="numeric"
-                    placeholder="1234 5678"
-                    value={registerPhone}
-                    maxLength={8}
-                    className="border-0 shadow-none focus-visible:ring-0"
-                    onChange={(e) => setRegisterPhone(getPhoneInputDigits(e.target.value))}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      setRegisterPhone(getPhoneInputDigits(e.clipboardData.getData("text")));
-                    }}
-                  />
+                  <span className="text-2xl font-black text-[#1E1B4B]">Nook</span>
                 </div>
+                <h2 className="text-2xl font-black tracking-normal text-[#1E1B4B] lg:text-3xl">
+                  <span className="lg:hidden">Hola de nuevo!</span>
+                  <span className="hidden lg:inline">Bienvenido de vuelta</span>
+                </h2>
+                <p className="mt-1 text-sm font-medium text-slate-400">
+                  <span className="lg:hidden">Ingresa para continuar explorando</span>
+                  <span className="hidden lg:inline">Ingresa tus datos para continuar</span>
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password">Contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="register-password"
-                    type={showRegisterPassword ? "text" : "password"}
-                    placeholder="********"
-                    value={registerPassword}
-                    className="pr-10"
-                    onChange={(e) => setRegisterPassword(e.target.value)}
-                  />
-                  <PasswordVisibilityButton
-                    isVisible={showRegisterPassword}
-                    onClick={() => setShowRegisterPassword((value) => !value)}
-                    label={showRegisterPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className={`h-full rounded-full transition-all ${passwordStrength.color}`}
-                      style={{ width: registerPassword ? passwordStrength.width : "0%" }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500">Seguridad: {registerPassword ? passwordStrength.label : "Sin datos"}</p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password-confirm">Confirmar contraseña</Label>
-                <div className="relative">
-                  <Input
-                    id="register-password-confirm"
-                    type={showRegisterPasswordConfirm ? "text" : "password"}
-                    placeholder="********"
-                    value={registerPasswordConfirm}
-                    className="pr-10"
-                    onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleRegister()}
-                  />
-                  <PasswordVisibilityButton
-                    isVisible={showRegisterPasswordConfirm}
-                    onClick={() => setShowRegisterPasswordConfirm((value) => !value)}
-                    label={showRegisterPasswordConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  />
-                </div>
-                {passwordsMatch && <p className="text-xs text-green-600">Las contraseñas coinciden.</p>}
-                {passwordsMismatch && <p className="text-xs text-red-600">Las contraseñas no coinciden.</p>}
-              </div>
-              <Button
-                className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
-                onClick={handleRegister}
-                disabled={isSubmitting}
-              >
-                <UserPlus className="size-4 mr-2" />
-                {isSubmitting ? "Creando..." : "Crear Cuenta"}
-              </Button>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-0">
+                <TabsList className="relative mb-6 grid h-[3.25rem] w-full grid-cols-2 rounded-2xl bg-[#EEF2FF] p-1">
+                  {["login", "register"].map((tab) => (
+                    <TabsTrigger
+                      key={tab}
+                      value={tab}
+                      className="relative z-10 rounded-[0.9rem] bg-transparent text-sm font-black text-[#7C83E8] transition data-[state=active]:text-white data-[state=active]:shadow-none"
+                    >
+                      {activeTab === tab && (
+                        <motion.span
+                          layoutId="auth-tab-pill"
+                          className="absolute inset-0 -z-10 rounded-[0.9rem] bg-[#4F46E5] shadow-[0_10px_18px_rgba(79,70,229,0.22)]"
+                          transition={{ type: "spring", stiffness: 430, damping: 34 }}
+                        />
+                      )}
+                      {tab === "login" ? (
+                        <>
+                          <LogIn className="size-4" />
+                          Iniciar sesion
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="size-4" />
+                          Registrarse
+                        </>
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                <AnimatePresence mode="wait">
+                  {errorMessage && (
+                    <motion.div
+                      className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
+                      initial={{ opacity: 0, y: -8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                    >
+                      {errorMessage}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <AnimatePresence mode="wait">
+                  {activeTab === "login" ? (
+                    <motion.div
+                      key="login"
+                      className="space-y-5"
+                      initial={{ opacity: 0, x: -18 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 18 }}
+                      transition={{ duration: 0.22 }}
+                    >
+                      <AuthField id="login-email" label="Correo electronico" icon={Mail}>
+                        <AuthInput
+                          id="login-email"
+                          type="email"
+                          placeholder="tu@email.cl"
+                          value={loginEmail}
+                          onChange={(e) => setLoginEmail(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                        />
+                      </AuthField>
+                      <AuthField id="login-password" label="Contraseña" icon={Lock}>
+                        <div className="relative w-full">
+                          <AuthInput
+                            id="login-password"
+                            type={showLoginPassword ? "text" : "password"}
+                            placeholder="********"
+                            value={loginPassword}
+                            className="pr-10"
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                          />
+                          <PasswordVisibilityButton
+                            isVisible={showLoginPassword}
+                            onClick={() => setShowLoginPassword((value) => !value)}
+                            label={showLoginPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                          />
+                        </div>
+                      </AuthField>
+                      <PrimaryAuthButton
+                        onClick={handleLogin}
+                        disabled={isSubmitting}
+                        className="mt-3"
+                      >
+                        <LogIn className="size-4" />
+                        {isSubmitting ? "Ingresando..." : "Iniciar sesion"}
+                      </PrimaryAuthButton>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/recover-password")}
+                        className="w-full rounded-xl px-3 py-2 text-xs font-black text-slate-400 transition hover:bg-[#EEF2FF] hover:text-[#4F46E5]"
+                      >
+                        Olvide mi contraseña
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="register"
+                      className="space-y-4"
+                      initial={{ opacity: 0, x: 18 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -18 }}
+                      transition={{ duration: 0.22 }}
+                    >
+                      <AuthField id="register-name" label="Nombre completo" icon={User}>
+                        <AuthInput
+                          id="register-name"
+                          placeholder="Tu nombre"
+                          value={registerName}
+                          onChange={(e) => setRegisterName(e.target.value)}
+                        />
+                      </AuthField>
+                      <AuthField id="register-email" label="Correo electronico" icon={Mail}>
+                        <AuthInput
+                          id="register-email"
+                          type="email"
+                          placeholder="tu@email.cl"
+                          value={registerEmail}
+                          onChange={(e) => setRegisterEmail(e.target.value)}
+                        />
+                      </AuthField>
+                      <AuthField id="register-phone" label="Telefono" icon={Phone}>
+                        <div className="flex w-full items-center">
+                          <span className="mr-2 whitespace-nowrap text-sm font-black text-[#7C83E8]">
+                            +56 9
+                          </span>
+                          <AuthInput
+                            id="register-phone"
+                            type="tel"
+                            inputMode="numeric"
+                            placeholder="1234 5678"
+                            value={registerPhone}
+                            maxLength={8}
+                            onChange={(e) => setRegisterPhone(getPhoneInputDigits(e.target.value))}
+                            onPaste={(e) => {
+                              e.preventDefault();
+                              setRegisterPhone(getPhoneInputDigits(e.clipboardData.getData("text")));
+                            }}
+                          />
+                        </div>
+                      </AuthField>
+                      <AuthField id="register-password" label="Contraseña" icon={Lock}>
+                        <div className="relative w-full">
+                          <AuthInput
+                            id="register-password"
+                            type={showRegisterPassword ? "text" : "password"}
+                            placeholder="********"
+                            value={registerPassword}
+                            className="pr-10"
+                            onChange={(e) => setRegisterPassword(e.target.value)}
+                          />
+                          <PasswordVisibilityButton
+                            isVisible={showRegisterPassword}
+                            onClick={() => setShowRegisterPassword((value) => !value)}
+                            label={
+                              showRegisterPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                            }
+                          />
+                        </div>
+                      </AuthField>
+                      <div className="space-y-1.5">
+                        <div className="h-2 overflow-hidden rounded-full bg-[#EEF2FF]">
+                          <motion.div
+                            className={`h-full rounded-full ${passwordStrength.color}`}
+                            animate={{ width: registerPassword ? passwordStrength.width : "0%" }}
+                            transition={{ duration: 0.3 }}
+                          />
+                        </div>
+                        <p className="text-xs font-medium text-slate-400">
+                          Seguridad: {registerPassword ? passwordStrength.label : "Sin datos"}
+                        </p>
+                      </div>
+                      <AuthField id="register-password-confirm" label="Confirmar contraseña" icon={Lock}>
+                        <div className="relative w-full">
+                          <AuthInput
+                            id="register-password-confirm"
+                            type={showRegisterPasswordConfirm ? "text" : "password"}
+                            placeholder="********"
+                            value={registerPasswordConfirm}
+                            className="pr-10"
+                            onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+                          />
+                          <PasswordVisibilityButton
+                            isVisible={showRegisterPasswordConfirm}
+                            onClick={() => setShowRegisterPasswordConfirm((value) => !value)}
+                            label={
+                              showRegisterPasswordConfirm
+                                ? "Ocultar contraseña"
+                                : "Mostrar contraseña"
+                            }
+                          />
+                        </div>
+                      </AuthField>
+                      {passwordsMatch && (
+                        <p className="text-xs font-medium text-green-600">
+                          Las contraseñas coinciden.
+                        </p>
+                      )}
+                      {passwordsMismatch && (
+                        <p className="text-xs font-medium text-red-600">
+                          Las contraseñas no coinciden.
+                        </p>
+                      )}
+                      <PrimaryAuthButton onClick={handleRegister} disabled={isSubmitting}>
+                        <UserPlus className="size-4" />
+                        {isSubmitting ? "Creando..." : "Crear cuenta"}
+                      </PrimaryAuthButton>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Tabs>
+              <p className="mt-6 hidden text-center text-xs font-medium text-slate-300 lg:block">
+                Al continuar aceptas los{" "}
+                <span className="font-black text-[#4F46E5]">Terminos</span> y la{" "}
+                <span className="font-black text-[#4F46E5]">Privacidad</span>
+              </p>
+            </div>
+          </motion.div>
+        </section>
+      </div>
     </div>
   );
 }
