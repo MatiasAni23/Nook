@@ -26,7 +26,9 @@ export type NotificationType =
   | 'reservation_confirmed'
   | 'new_message'
   | 'place_update'
-  | 'favorite_issue';
+  | 'favorite_issue'
+  | 'review_response'
+  | 'system';
 
 export interface Notification {
   id: string;
@@ -37,6 +39,7 @@ export interface Notification {
   read: boolean;
   placeId?: string;
   placeName?: string;
+  actionPath?: string | null;
 }
 
 export interface StudyPlace {

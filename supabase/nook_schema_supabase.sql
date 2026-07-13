@@ -547,6 +547,9 @@ CREATE INDEX idx_notifications_place ON notifications(place_id) WHERE place_id I
 CREATE INDEX idx_notifications_entity ON notifications(entity_type, entity_id) WHERE entity_id IS NOT NULL;
 CREATE INDEX idx_notifications_user_created_active ON notifications(user_id, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_notifications_user_unread_active ON notifications(user_id, created_at DESC) WHERE read = FALSE AND deleted_at IS NULL;
+CREATE UNIQUE INDEX notifications_unique_active_entity_user_idx
+ON notifications(user_id, type, entity_type, entity_id)
+WHERE entity_id IS NOT NULL AND deleted_at IS NULL;
 
 -- =============================================
 -- TABLA: support_tickets
@@ -1081,6 +1084,224 @@ CREATE POLICY notifications_select_own ON notifications
 
 CREATE POLICY notifications_update_own ON notifications
     FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Crea o actualiza una notificacion accionable para un usuario.
+CREATE OR REPLACE FUNCTION create_user_notification(
+    target_user_id UUID,
+    notification_type VARCHAR,
+    notification_title VARCHAR,
+    notification_message TEXT,
+    related_place_id UUID DEFAULT NULL,
+    related_reservation_id UUID DEFAULT NULL,
+    related_message_id UUID DEFAULT NULL,
+    related_entity_type VARCHAR DEFAULT NULL,
+    related_entity_id UUID DEFAULT NULL,
+    actor_id UUID DEFAULT NULL,
+    notification_metadata JSONB DEFAULT '{}'::JSONB,
+    notification_action_path TEXT DEFAULT NULL,
+    notification_expires_at TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS UUID AS $$
+DECLARE
+    next_notification_id UUID;
+BEGIN
+    IF target_user_id IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    INSERT INTO notifications (
+        user_id,
+        type,
+        title,
+        message,
+        place_id,
+        reservation_id,
+        message_id,
+        entity_type,
+        entity_id,
+        actor_user_id,
+        metadata,
+        action_path,
+        expires_at
+    ) VALUES (
+        target_user_id,
+        notification_type,
+        notification_title,
+        notification_message,
+        related_place_id,
+        related_reservation_id,
+        related_message_id,
+        related_entity_type,
+        related_entity_id,
+        actor_id,
+        COALESCE(notification_metadata, '{}'::JSONB),
+        notification_action_path,
+        notification_expires_at
+    )
+    ON CONFLICT (user_id, type, entity_type, entity_id)
+    WHERE entity_id IS NOT NULL AND deleted_at IS NULL
+    DO UPDATE SET
+        title = EXCLUDED.title,
+        message = EXCLUDED.message,
+        metadata = EXCLUDED.metadata,
+        action_path = EXCLUDED.action_path,
+        read = FALSE,
+        read_at = NULL,
+        created_at = NOW(),
+        deleted_at = NULL
+    RETURNING id INTO next_notification_id;
+
+    RETURN next_notification_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Notifica a usuarios que tienen como favorito un lugar con nuevo reporte.
+CREATE OR REPLACE FUNCTION notify_favorite_place_report()
+RETURNS TRIGGER AS $$
+DECLARE
+    place_name TEXT;
+BEGIN
+    SELECT name INTO place_name
+    FROM places
+    WHERE id = NEW.place_id;
+
+    INSERT INTO notifications (
+        user_id,
+        type,
+        title,
+        message,
+        place_id,
+        entity_type,
+        entity_id,
+        actor_user_id,
+        metadata,
+        action_path
+    )
+    SELECT
+        favorites.user_id,
+        'favorite_issue',
+        'Problema en lugar favorito',
+        COALESCE(place_name, 'Un lugar favorito') || ' recibio un nuevo reporte.',
+        NEW.place_id,
+        'place_report',
+        NEW.id,
+        NEW.user_id,
+        jsonb_build_object(
+            'place_name', place_name,
+            'report_type', NEW.type,
+            'report_description', NEW.description
+        ),
+        '/app/place/' || NEW.place_id
+    FROM favorites
+    WHERE favorites.place_id = NEW.place_id
+    AND favorites.user_id <> NEW.user_id
+    ON CONFLICT (user_id, type, entity_type, entity_id)
+    WHERE entity_id IS NOT NULL AND deleted_at IS NULL
+    DO NOTHING;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER notify_favorite_place_report_on_insert
+AFTER INSERT ON place_reports
+FOR EACH ROW EXECUTE FUNCTION notify_favorite_place_report();
+
+-- Notifica al receptor cuando llega un nuevo mensaje.
+CREATE OR REPLACE FUNCTION notify_new_message()
+RETURNS TRIGGER AS $$
+DECLARE
+    sender_name TEXT;
+BEGIN
+    SELECT name INTO sender_name
+    FROM users
+    WHERE id = NEW.sender_id;
+
+    PERFORM create_user_notification(
+        NEW.receiver_id,
+        'new_message',
+        'Nuevo mensaje',
+        COALESCE(sender_name, 'Un usuario') || ' te envio un mensaje.',
+        NULL,
+        NULL,
+        NEW.id,
+        'message',
+        NEW.id,
+        NEW.sender_id,
+        jsonb_build_object('sender_name', sender_name),
+        '/app/chat/' || NEW.sender_id,
+        NULL
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER notify_new_message_on_insert
+AFTER INSERT ON messages
+FOR EACH ROW EXECUTE FUNCTION notify_new_message();
+
+-- Notifica al usuario cuando una reserva pasa a confirmada.
+CREATE OR REPLACE FUNCTION notify_reservation_confirmed()
+RETURNS TRIGGER AS $$
+DECLARE
+    place_name TEXT;
+BEGIN
+    IF NEW.status <> 'confirmed' THEN
+        RETURN NEW;
+    END IF;
+
+    IF TG_OP = 'UPDATE' AND OLD.status = NEW.status THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT name INTO place_name
+    FROM places
+    WHERE id = NEW.place_id;
+
+    PERFORM create_user_notification(
+        NEW.user_id,
+        'reservation_confirmed',
+        'Reserva confirmada',
+        'Tu reserva en ' || COALESCE(place_name, 'un lugar') || ' fue confirmada.',
+        NEW.place_id,
+        NEW.id,
+        NULL,
+        'reservation',
+        NEW.id,
+        NULL,
+        jsonb_build_object('place_name', place_name),
+        '/app/place/' || NEW.place_id,
+        NULL
+    );
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+CREATE TRIGGER notify_reservation_confirmed_on_change
+AFTER INSERT OR UPDATE OF status ON reservations
+FOR EACH ROW EXECUTE FUNCTION notify_reservation_confirmed();
+
+REVOKE ALL ON FUNCTION create_user_notification(
+    UUID,
+    VARCHAR,
+    VARCHAR,
+    TEXT,
+    UUID,
+    UUID,
+    UUID,
+    VARCHAR,
+    UUID,
+    UUID,
+    JSONB,
+    TEXT,
+    TIMESTAMPTZ
+) FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON FUNCTION notify_favorite_place_report() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION notify_new_message() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION notify_reservation_confirmed() FROM PUBLIC, anon, authenticated;
 
 -- Tickets de soporte propios.
 CREATE POLICY support_tickets_select_own ON support_tickets

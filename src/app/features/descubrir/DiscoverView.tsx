@@ -7,10 +7,11 @@ import { Input } from "../../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
 import { CachedImage } from "../../components/ui/cached-image";
 import { NotificationsPanel } from "../shared/NotificationsPanel";
-import { currentUser, currentWorker, notifications, placeIssues, studyPlaces, workPlaces } from "../../data/mockData";
+import { currentUser, currentWorker, notifications as mockNotifications, placeIssues, studyPlaces, workPlaces } from "../../data/mockData";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getFirstName, getInitials } from "../../services/currentUserService";
 import { isSupabaseConfigured } from "../../lib/supabase";
+import { getUnreadNotificationCount, subscribeToNotifications } from "../../services/notificationService";
 import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import {
   getPlaceTypeLabel,
@@ -42,6 +43,9 @@ export function DiscoverView() {
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
+  const [unreadCount, setUnreadCount] = useState(
+    isSupabaseConfigured ? 0 : mockNotifications.filter((notification) => !notification.read).length,
+  );
 
   // Datos del usuario actual con fallback a mockData para desarrollo local.
   const { currentUser: cachedUser, isLoadingCurrentUser } = useCurrentUser();
@@ -49,8 +53,6 @@ export function DiscoverView() {
   const isWorker = userRole === "worker";
   const displayName = cachedUser?.name ?? (isWorker ? currentWorker.name : currentUser.name);
   const profileImageUrl = cachedUser?.profile?.profile_image_url ?? null;
-
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
 
   // Carga lugares desde Supabase cuando esta configurado; si no, la vista usa mockData.
   useEffect(() => {
@@ -80,6 +82,30 @@ export function DiscoverView() {
       isMounted = false;
     };
   }, []);
+
+  // Mantiene actualizado el contador del boton de notificaciones.
+  useEffect(() => {
+    if (!isSupabaseConfigured || !cachedUser?.id) return;
+
+    let isMounted = true;
+    const refreshUnreadCount = () => {
+      getUnreadNotificationCount()
+        .then((count) => {
+          if (isMounted) setUnreadCount(count);
+        })
+        .catch(() => {
+          if (isMounted) setUnreadCount(0);
+        });
+    };
+
+    refreshUnreadCount();
+    const unsubscribe = subscribeToNotifications(cachedUser.id, refreshUnreadCount);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [cachedUser?.id]);
 
   // Gradiente estable para lugares sin imagen principal.
   const getPlaceImage = (id: string) => {
@@ -368,7 +394,12 @@ export function DiscoverView() {
         </div>
       </div>
 
-      {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
+      {showNotifications && (
+        <NotificationsPanel
+          onClose={() => setShowNotifications(false)}
+          onUnreadCountChange={setUnreadCount}
+        />
+      )}
     </div>
   );
 }

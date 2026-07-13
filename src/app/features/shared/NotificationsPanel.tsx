@@ -1,23 +1,60 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { X, Bell, AlertTriangle, MessageCircle, Calendar, Info } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { type Notification, notifications as initialNotifications } from "../../data/mockData";
+import { notifications as initialNotifications } from "../../data/mockData";
+import { isSupabaseConfigured } from "../../lib/supabase";
+import {
+  type AppNotification,
+  listUserNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from "../../services/notificationService";
 import { getDetailNavigationState } from "../mapa/navigationState";
 
 interface NotificationsPanelProps {
   onClose: () => void;
+  onUnreadCountChange?: (count: number) => void;
 }
 
-export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
+export function NotificationsPanel({ onClose, onUnreadCountChange }: NotificationsPanelProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [notifications, setNotifications] = useState(initialNotifications);
+  const [notifications, setNotifications] = useState<AppNotification[]>(
+    isSupabaseConfigured ? [] : initialNotifications,
+  );
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const getNotificationIcon = (type: Notification['type']) => {
+  useEffect(() => {
+    onUnreadCountChange?.(unreadCount);
+  }, [onUnreadCountChange, unreadCount]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    let isMounted = true;
+    setIsLoading(true);
+
+    listUserNotifications()
+      .then((nextNotifications) => {
+        if (isMounted) setNotifications(nextNotifications);
+      })
+      .catch(() => {
+        if (isMounted) setNotifications(initialNotifications);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const getNotificationIcon = (type: AppNotification['type']) => {
     switch (type) {
       case 'issue_report':
       case 'favorite_issue':
@@ -27,18 +64,25 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
       case 'new_message':
         return <MessageCircle className="size-5 text-blue-500" />;
       case 'place_update':
+      case 'review_response':
+      case 'system':
         return <Info className="size-5 text-purple-500" />;
     }
   };
 
-  const handleNotificationClick = (notification: Notification) => {
-    // Mark as read
+  const handleNotificationClick = (notification: AppNotification) => {
     setNotifications(notifications.map(n =>
       n.id === notification.id ? { ...n, read: true } : n
     ));
 
-    // Navigate if there's a place
-    if (notification.placeId) {
+    if (isSupabaseConfigured) {
+      markNotificationAsRead(notification.id).catch(() => undefined);
+    }
+
+    if (notification.actionPath) {
+      navigate(notification.actionPath);
+      onClose();
+    } else if (notification.placeId) {
       const isWorkplace = notification.placeId.startsWith('w');
       navigate(
         isWorkplace ? `/app/workplace/${notification.placeId}` : `/app/place/${notification.placeId}`,
@@ -53,6 +97,9 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
+    if (isSupabaseConfigured) {
+      markAllNotificationsAsRead().catch(() => undefined);
+    }
   };
 
   const getTimeAgo = (date: Date) => {
@@ -69,7 +116,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4 px-4">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center bg-black/50 px-4 pt-4">
       <Card className="w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex-none border-b p-4">
@@ -102,7 +149,12 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps) {
 
         {/* Notifications List */}
         <div className="flex-1 overflow-auto">
-          {notifications.length === 0 ? (
+          {isLoading ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+              <Bell className="mb-3 size-12 text-gray-300" />
+              <p className="text-gray-500">Cargando notificaciones...</p>
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-8 text-center">
               <Bell className="size-12 text-gray-300 mb-3" />
               <p className="text-gray-500">No tienes notificaciones</p>
