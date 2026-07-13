@@ -49,7 +49,7 @@ export function Layout() {
 
       {/* Floating circular navigation */}
       <nav
-        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#D9D1FF] bg-white px-2 py-2 shadow-[0_12px_28px_rgba(79,70,229,0.16)] sm:gap-1.5 sm:px-2.5"
+        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#D9D1FF] bg-white px-2 py-2 sm:gap-1.5 sm:px-2.5"
         aria-label="Navegacion principal"
       >
         {navItems.map(({ path, icon: Icon, label }) => {

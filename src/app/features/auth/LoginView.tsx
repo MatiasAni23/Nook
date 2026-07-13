@@ -331,12 +331,12 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   };
 
   return (
-    <div className="size-full overflow-y-auto bg-white lg:overflow-hidden">
-      <div className="relative mx-auto flex min-h-full w-full max-w-[30rem] flex-col overflow-hidden bg-white shadow-[0_0_60px_rgba(15,23,42,0.10)] lg:max-w-none lg:flex-row lg:shadow-none">
-        <section className="relative min-h-[15.5rem] overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA] px-7 pb-14 pt-12 text-white lg:flex lg:min-h-screen lg:w-[45%] lg:items-center lg:justify-center lg:px-14 lg:py-16">
+    <div className="size-full overflow-y-auto bg-white md:bg-[#F8FAFF] lg:overflow-hidden">
+      <div className="relative mx-auto flex min-h-full w-full max-w-[30rem] flex-col overflow-hidden bg-white shadow-[0_0_60px_rgba(15,23,42,0.10)] md:max-w-none md:flex-row md:shadow-none">
+        <section className="relative min-h-[15.5rem] overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA] px-7 pb-14 pt-12 text-white md:flex md:min-h-screen md:w-[42%] md:items-center md:justify-center md:px-8 md:py-10 lg:w-[45%] lg:px-14 lg:py-16">
           <HeroDecor />
-          <div className="relative z-10 lg:max-w-md lg:text-center">
-            <div className="mb-7 flex items-center gap-3 lg:mb-24 lg:justify-center">
+          <div className="relative z-10 md:max-w-[18rem] lg:max-w-md lg:text-center">
+            <div className="mb-7 flex items-center gap-3 md:mb-12 lg:mb-24 lg:justify-center">
               <motion.div
                 className="grid size-11 place-items-center rounded-2xl bg-white/14 shadow-[0_10px_20px_rgba(49,46,129,0.16)]"
                 animate={{ y: [0, -3, 0] }}
@@ -357,25 +357,25 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                 <span className="absolute -right-20 top-4 h-px w-24 -rotate-45 border-t border-dashed border-white/20" />
               </motion.div>
             </div>
-            <h1 className="max-w-[18rem] text-3xl font-black leading-tight tracking-normal lg:mx-auto lg:max-w-[24rem]">
+            <h1 className="max-w-[18rem] text-3xl font-black leading-tight tracking-normal md:text-[2rem] lg:mx-auto lg:max-w-[24rem]">
               <span className="lg:hidden">Encuentra tu espacio perfecto</span>
               <span className="hidden lg:inline">Tu proximo lugar favorito esta a un clic</span>
             </h1>
-            <p className="mt-2 text-sm font-medium text-white/78 lg:mx-auto lg:mt-4 lg:max-w-xs">
+            <p className="mt-2 max-w-[18rem] text-sm font-medium text-white/78 lg:mx-auto lg:mt-4 lg:max-w-xs">
               Descubre cafes, bibliotecas y espacios de coworking en Chile
             </p>
           </div>
         </section>
 
-        <section className="relative z-10 -mt-10 flex-1 rounded-t-[2rem] bg-white px-5 pb-8 pt-6 lg:mt-0 lg:flex lg:min-h-screen lg:w-[55%] lg:items-center lg:justify-center lg:rounded-none lg:px-12 lg:py-16">
+        <section className="relative z-10 -mt-10 flex-1 rounded-t-[2rem] bg-white px-5 pb-8 pt-6 md:mt-0 md:flex md:min-h-screen md:w-[58%] md:items-center md:justify-center md:rounded-none md:px-7 md:py-8 lg:w-[55%] lg:px-12 lg:py-16">
           <motion.div
-            className="mx-auto mb-6 h-1 w-9 rounded-full bg-[#E0E7FF] lg:hidden"
+            className="mx-auto mb-6 h-1 w-9 rounded-full bg-[#E0E7FF] md:hidden"
             animate={{ opacity: [0.45, 1, 0.45] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
           />
 
           <motion.div
-            className="rounded-[1.65rem] bg-white p-1 shadow-[0_18px_42px_rgba(79,70,229,0.12)] lg:w-full lg:max-w-md lg:shadow-none"
+            className="rounded-[1.65rem] bg-white p-1 shadow-[0_18px_42px_rgba(79,70,229,0.12)] md:w-full md:max-w-[26rem] md:shadow-[0_18px_42px_rgba(79,70,229,0.08)] lg:max-w-md lg:shadow-none"
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
