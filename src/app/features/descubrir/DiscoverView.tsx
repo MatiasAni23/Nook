@@ -16,11 +16,11 @@ import {
   getPlaceTypeLabel,
   hasValidPlacePrice,
   placeMatchesSearch,
-  placeMatchesTab,
 } from "../mapa/placeFilters";
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
 
+// Helpers de presentacion para normalizar datos antes de mostrarlos.
 function getAmenityLabel(key?: string, name?: string) {
   if (key === "coffee_tea") return "Alimentos";
   return name ?? key ?? "Servicio";
@@ -28,18 +28,22 @@ function getAmenityLabel(key?: string, name?: string) {
 
 const discoverImageUrl = new URL("../../../../assets/imagen_descubrir.png", import.meta.url).href;
 
+// Rol temporal usado por las rutas mock cuando no hay usuario cargado desde el contexto.
 const getUserRole = (): "student" | "worker" | "admin" | "delegate" => {
   return (window as any).__userRole || "student";
 };
 
 export function DiscoverView() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("todos");
+
+  // Estado de busqueda, notificaciones y carga de lugares.
   const [searchTerm, setSearchTerm] = useState("");
   const [showNotifications, setShowNotifications] = useState(false);
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
+
+  // Datos del usuario actual con fallback a mockData para desarrollo local.
   const { currentUser: cachedUser, isLoadingCurrentUser } = useCurrentUser();
   const userRole = cachedUser?.role ?? getUserRole();
   const isWorker = userRole === "worker";
@@ -48,15 +52,7 @@ export function DiscoverView() {
 
   const unreadCount = notifications.filter((notification) => !notification.read).length;
 
-  const tabs = [
-    { id: "todos", label: "Todos" },
-    { id: "cowork", label: "Cowork" },
-    { id: "estudios", label: "Estudios" },
-    { id: "reuniones", label: "Reuniones" },
-    { id: "parques", label: "Parques" },
-    { id: "premium", label: "Reserva" },
-  ];
-
+  // Carga lugares desde Supabase cuando esta configurado; si no, la vista usa mockData.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -85,6 +81,7 @@ export function DiscoverView() {
     };
   }, []);
 
+  // Gradiente estable para lugares sin imagen principal.
   const getPlaceImage = (id: string) => {
     const gradients = [
       "from-gray-400 to-gray-600",
@@ -100,6 +97,7 @@ export function DiscoverView() {
     return gradients[index];
   };
 
+  // Icono fallback para lugares sin imagen. Se usa solo en datos mock o lugares incompletos.
   const getPlaceIcon = (type: string) => {
     switch (type) {
       case "library":
@@ -119,6 +117,7 @@ export function DiscoverView() {
     }
   };
 
+  // Distancia aproximada desde una ubicacion base en Santiago.
   const calculateDistance = (lat: number, lng: number) => {
     const userLat = -33.4569;
     const userLng = -70.6483;
@@ -135,6 +134,7 @@ export function DiscoverView() {
     return (R * c).toFixed(1);
   };
 
+  // Formato de precios en pesos chilenos para lugares con reserva pagada.
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
@@ -143,6 +143,7 @@ export function DiscoverView() {
     }).format(price);
   };
 
+  // Dataset local usado cuando Supabase no esta disponible.
   const mockPlaces = [
     ...studyPlaces.map((place) => ({
       ...place,
@@ -158,11 +159,9 @@ export function DiscoverView() {
     })),
   ];
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
-  const filteredPlaces = basePlaces.filter(
-    (place) =>
-      placeMatchesTab(place, activeTab) &&
-      placeMatchesSearch(place, searchTerm),
-  );
+
+  // La seccion Descubrir actualmente filtra solo por el texto del buscador.
+  const filteredPlaces = basePlaces.filter((place) => placeMatchesSearch(place, searchTerm));
 
   if ((isLoadingCurrentUser && !cachedUser) || isLoadingPlaces) {
     return <DiscoverSkeleton />;
@@ -171,67 +170,74 @@ export function DiscoverView() {
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
-        <div className="px-4 pt-8 pb-4 bg-white">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-3xl text-[#4F46E5]" style={{ fontWeight: 800 }}>
-              Nook
-            </h1>
-            <div className="flex items-center gap-3">
-              <button className="relative" onClick={() => setShowNotifications(true)}>
-                <Bell className="size-6 text-orange-400" />
-                {unreadCount > 0 && <div className="absolute -top-1 -right-1 size-2 bg-red-500 rounded-full" />}
-              </button>
-              <button type="button" onClick={() => navigate("/app/profile")} aria-label="Ir al perfil">
-                <Avatar className="size-10">
-                  {profileImageUrl && <AvatarImage src={profileImageUrl} alt={displayName} className="object-cover" />}
-                  <AvatarFallback className="bg-[#4F46E5] text-white">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
-              </button>
+        {/* Bloque superior: marca, acceso a notificaciones/perfil y saludo del usuario. */}
+        <div className="bg-white pb-4">
+          <div className="relative overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-[#7C3AED] via-[#5B4AEE] to-[#4F46E5] px-4 pb-16 pt-12 text-white shadow-[0_18px_38px_rgba(79,70,229,0.20)] sm:px-6 md:px-8 lg:px-10">
+            <div className="pointer-events-none absolute -right-20 -top-24 size-60 rounded-full border border-white/[0.07] bg-white/[0.025]" />
+            <div className="pointer-events-none absolute right-10 top-11 size-28 rounded-full border border-white/[0.06] bg-white/[0.025]" />
+            <div className="pointer-events-none absolute left-28 bottom-3 size-28 rounded-full border border-white/[0.04]" />
+
+            <div className="relative z-10 mb-7 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="grid size-9 place-items-center rounded-xl bg-white/14 text-sm font-black shadow-[0_10px_20px_rgba(49,46,129,0.12)]">
+                  N
+                </div>
+                <h1 className="text-lg font-black">Nook</h1>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="relative grid size-9 place-items-center rounded-xl bg-white/14 text-white shadow-[0_8px_18px_rgba(49,46,129,0.14)] transition hover:bg-white/20"
+                  onClick={() => setShowNotifications(true)}
+                  aria-label="Ver notificaciones"
+                >
+                  <Bell className="size-4" />
+                  {unreadCount > 0 && (
+                    <div className="absolute right-2 top-2 size-2 rounded-full border border-white bg-red-500" />
+                  )}
+                </button>
+                <button type="button" onClick={() => navigate("/app/profile")} aria-label="Ir al perfil">
+                  <Avatar className="size-10 border border-white/20 shadow-[0_8px_18px_rgba(49,46,129,0.16)]">
+                    {profileImageUrl && <AvatarImage src={profileImageUrl} alt={displayName} className="object-cover" />}
+                    <AvatarFallback className="bg-white/18 text-xs font-black text-white">
+                      {getInitials(displayName)}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <h2 className="text-2xl font-black leading-tight">
+                Hola, {getFirstName(displayName)}
+              </h2>
+              <p className="mt-1 text-sm font-bold text-white/80">
+                {isWorker ? "Donde quieres trabajar hoy?" : "Donde quieres estudiar hoy?"}
+              </p>
             </div>
           </div>
 
-          <div className="mb-4">
-            <h2 className="text-xl mb-1" style={{ fontWeight: 700 }}>
-              Hola, {getFirstName(displayName)} 👋
-            </h2>
-            <p className="text-gray-600 text-sm">
-              {isWorker ? "Donde quieres trabajar hoy?" : "Donde quieres estudiar hoy?"}
-            </p>
-          </div>
-
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
-            <Input
-              placeholder="Busca espacios, zonas o servicios"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              className="pl-10 h-12 rounded-lg bg-gray-50 border-0 text-sm"
-            />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-2 rounded-full whitespace-nowrap transition-all text-sm font-medium ${
-                  activeTab === tab.id ? "bg-[#4F46E5] text-white" : "bg-gray-200 text-gray-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          {/* Buscador principal de lugares, zonas y servicios. */}
+          <div className="relative z-10 -mt-7 px-4">
+            <div className="relative rounded-[1.15rem] bg-white p-2 shadow-[0_12px_28px_rgba(79,70,229,0.14)]">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 size-4 text-[#8B93F5]" />
+              <Input
+                placeholder="Busca espacios, zonas o servicios..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="h-12 rounded-[0.85rem] border-0 bg-[#F4F3FF] pl-10 pr-4 text-sm text-[#1E1B4B] shadow-none placeholder:text-[#8C8AAE] focus-visible:ring-2 focus-visible:ring-[#C7D2FE]"
+              />
+            </div>
           </div>
 
           {placesError && (
-            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
               {placesError}
             </div>
           )}
         </div>
 
+        {/* Banner editorial destacado de la pantalla Descubrir. */}
         <div className="px-4 py-4">
           <div className="relative h-44 rounded-3xl overflow-hidden shadow-lg">
             <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-[#4F46E5] p-6 flex flex-col justify-center">
@@ -248,10 +254,11 @@ export function DiscoverView() {
           </div>
         </div>
 
+        {/* Encabezado de la lista de resultados. */}
         <div className="px-4 mb-3 flex items-center justify-between">
           <h3 className="text-lg" style={{ fontWeight: 700 }}>Cerca de ti</h3>
           <button
-            onClick={() => setActiveTab("todos")}
+            onClick={() => setSearchTerm("")}
             className="text-[#4F46E5] text-sm"
             style={{ fontWeight: 600 }}
           >
@@ -259,6 +266,7 @@ export function DiscoverView() {
           </button>
         </div>
 
+        {/* Listado de lugares cercanos filtrados por el buscador. */}
         <div className="px-4 space-y-3">
           {filteredPlaces.length === 0 && (
             <Card className="bg-white">
@@ -267,6 +275,7 @@ export function DiscoverView() {
           )}
 
           {filteredPlaces.map((place) => {
+            // Datos derivados para construir la tarjeta sin repetir logica en el JSX.
             const hasIssues = placeIssues.some((issue) => issue.placeId === place.id);
             const issueCount = placeIssues.filter((issue) => issue.placeId === place.id).length;
             const placeHasPrice = hasValidPlacePrice(place);
