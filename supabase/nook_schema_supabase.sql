@@ -18,6 +18,7 @@ DROP VIEW IF EXISTS places_with_stats CASCADE;
 -- Eliminar tablas si existen (orden inverso por dependencias)
 DROP TABLE IF EXISTS support_ticket_messages CASCADE;
 DROP TABLE IF EXISTS support_tickets CASCADE;
+DROP TABLE IF EXISTS delegate_invitations CASCADE;
 DROP TABLE IF EXISTS place_report_confirmations CASCADE;
 DROP TABLE IF EXISTS place_reports CASCADE;
 DROP TABLE IF EXISTS reservations CASCADE;
@@ -167,6 +168,34 @@ CREATE TABLE delegates (
 
 CREATE INDEX idx_delegates_user_id ON delegates(user_id);
 CREATE INDEX idx_delegates_status ON delegates(status);
+
+-- =============================================
+-- TABLA: delegate_invitations
+-- Invitaciones para convertir usuarios en delegados
+-- =============================================
+CREATE TABLE delegate_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token UUID NOT NULL DEFAULT gen_random_uuid(),
+    email TEXT NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired', 'revoked')),
+    assigned_place_ids UUID[] NOT NULL DEFAULT ARRAY[]::UUID[],
+    invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    accepted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days'),
+    accepted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    UNIQUE(token)
+);
+
+CREATE INDEX idx_delegate_invitations_token ON delegate_invitations(token);
+CREATE INDEX idx_delegate_invitations_email ON delegate_invitations(email);
+CREATE INDEX idx_delegate_invitations_status ON delegate_invitations(status);
+CREATE INDEX idx_delegate_invitations_invited_by ON delegate_invitations(invited_by);
+CREATE INDEX idx_delegate_invitations_accepted_by ON delegate_invitations(accepted_by);
 
 -- =============================================
 -- TABLA: places
@@ -495,16 +524,29 @@ CREATE TABLE notifications (
     reservation_id UUID REFERENCES reservations(id) ON DELETE SET NULL,
     message_id UUID REFERENCES messages(id) ON DELETE SET NULL,
 
+    -- Referencia generica para entidades nuevas sin agregar columnas por cada caso.
+    entity_type VARCHAR(80),
+    entity_id UUID,
+    actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    metadata JSONB NOT NULL DEFAULT '{}'::JSONB,
+    action_path TEXT,
+
     read BOOLEAN NOT NULL DEFAULT FALSE,
     read_at TIMESTAMPTZ,
 
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    deleted_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_unread ON notifications(user_id, read) WHERE read = FALSE;
 CREATE INDEX idx_notifications_type ON notifications(type);
 CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_place ON notifications(place_id) WHERE place_id IS NOT NULL;
+CREATE INDEX idx_notifications_entity ON notifications(entity_type, entity_id) WHERE entity_id IS NOT NULL;
+CREATE INDEX idx_notifications_user_created_active ON notifications(user_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_notifications_user_unread_active ON notifications(user_id, created_at DESC) WHERE read = FALSE AND deleted_at IS NULL;
 
 -- =============================================
 -- TABLA: support_tickets
@@ -660,6 +702,10 @@ CREATE TRIGGER update_place_reports_updated_at
 BEFORE UPDATE ON place_reports
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_delegate_invitations_updated_at
+BEFORE UPDATE ON delegate_invitations
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_support_tickets_updated_at
 BEFORE UPDATE ON support_tickets
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -773,6 +819,8 @@ COMMENT ON TABLE reviews IS 'Reseñas y valoraciones de lugares';
 COMMENT ON TABLE place_hours IS 'Horarios detallados por día de la semana';
 COMMENT ON TABLE place_amenities IS 'Servicios y comodidades disponibles por lugar';
 
+COMMENT ON TABLE delegate_invitations IS 'Invitaciones enviadas por administradores para crear delegados';
+
 -- =============================================
 -- SUPABASE AUTH Y ROW LEVEL SECURITY
 -- =============================================
@@ -782,6 +830,7 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE delegate_places ENABLE ROW LEVEL SECURITY;
 ALTER TABLE delegates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE delegate_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_amenities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
@@ -805,6 +854,7 @@ GRANT SELECT, INSERT ON place_report_confirmations TO authenticated;
 GRANT SELECT, UPDATE ON notifications TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON support_tickets, support_ticket_messages TO authenticated;
 GRANT SELECT ON delegates, delegate_places TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON delegate_invitations TO authenticated;
 
 -- Perfil publico del usuario autenticado.
 CREATE POLICY users_select_own ON users
@@ -1074,6 +1124,126 @@ CREATE POLICY delegate_places_select_own ON delegate_places
             AND delegates.user_id = auth.uid()
         )
     );
+
+-- Invitaciones de delegados: los admins las administran; los invitados las consultan por RPC.
+CREATE POLICY delegate_invitations_select_admin ON delegate_invitations
+    FOR SELECT USING (is_current_user_admin());
+
+CREATE POLICY delegate_invitations_insert_admin ON delegate_invitations
+    FOR INSERT WITH CHECK (is_current_user_admin());
+
+CREATE POLICY delegate_invitations_update_admin ON delegate_invitations
+    FOR UPDATE USING (is_current_user_admin()) WITH CHECK (is_current_user_admin());
+
+-- Devuelve una invitacion por token sin exponer la tabla completa al cliente anonimo.
+CREATE OR REPLACE FUNCTION get_delegate_invitation(invitation_token UUID)
+RETURNS TABLE (
+    id UUID,
+    token UUID,
+    email TEXT,
+    name TEXT,
+    phone TEXT,
+    status TEXT,
+    assigned_place_ids UUID[],
+    expires_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        di.id,
+        di.token,
+        di.email,
+        di.name,
+        di.phone,
+        CASE
+            WHEN di.status = 'pending' AND di.expires_at < NOW() THEN 'expired'
+            ELSE di.status
+        END AS status,
+        di.assigned_place_ids,
+        di.expires_at,
+        di.created_at
+    FROM delegate_invitations di
+    WHERE di.token = invitation_token
+    LIMIT 1;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Reclama una invitacion pendiente y asigna el rol/lugares al usuario autenticado.
+CREATE OR REPLACE FUNCTION claim_delegate_invitation(invitation_token UUID)
+RETURNS VOID AS $$
+DECLARE
+    invitation_record delegate_invitations%ROWTYPE;
+    next_delegate_id UUID;
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'not_authenticated';
+    END IF;
+
+    SELECT *
+    INTO invitation_record
+    FROM delegate_invitations
+    WHERE token = invitation_token
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'invalid_delegate_invitation';
+    END IF;
+
+    IF invitation_record.status <> 'pending' OR invitation_record.expires_at < NOW() THEN
+        IF invitation_record.status = 'pending' AND invitation_record.expires_at < NOW() THEN
+            UPDATE delegate_invitations
+            SET status = 'expired'
+            WHERE id = invitation_record.id;
+        END IF;
+
+        RAISE EXCEPTION 'invalid_delegate_invitation';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM users
+        WHERE id = auth.uid()
+        AND lower(email) = lower(invitation_record.email)
+    ) THEN
+        RAISE EXCEPTION 'delegate_invitation_email_mismatch';
+    END IF;
+
+    UPDATE users
+    SET
+        role = 'delegate',
+        status = 'active',
+        name = COALESCE(NULLIF(users.name, ''), invitation_record.name),
+        phone = COALESCE(users.phone, invitation_record.phone),
+        updated_at = NOW()
+    WHERE id = auth.uid();
+
+    INSERT INTO delegates (user_id, status, joined_date, last_active)
+    VALUES (auth.uid(), 'active', NOW(), NOW())
+    ON CONFLICT (user_id) DO UPDATE SET
+        status = 'active',
+        last_active = NOW()
+    RETURNING id INTO next_delegate_id;
+
+    DELETE FROM delegate_places
+    WHERE delegate_id = next_delegate_id;
+
+    INSERT INTO delegate_places (delegate_id, place_id)
+    SELECT next_delegate_id, assigned_place.place_id
+    FROM unnest(invitation_record.assigned_place_ids) AS assigned_place(place_id)
+    ON CONFLICT (delegate_id, place_id) DO NOTHING;
+
+    UPDATE delegate_invitations
+    SET
+        status = 'accepted',
+        accepted_by = auth.uid(),
+        accepted_at = NOW()
+    WHERE id = invitation_record.id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION get_delegate_invitation(UUID) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION claim_delegate_invitation(UUID) TO authenticated;
 
 -- Bucket publico para imagenes de lugares.
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
