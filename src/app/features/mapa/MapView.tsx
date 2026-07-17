@@ -11,6 +11,7 @@ import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/place
 import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./placeFilters";
 import { getDetailNavigationState } from "./navigationState";
 
+// Configuracion base del mapa y del rol activo.
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
   return (window as any).__userRole || 'student';
 };
@@ -32,6 +33,7 @@ type RecenterRequest = {
 
 let savedMapCamera: SavedMapCamera | null = null;
 
+// Estilo limpio para reducir ruido visual y destacar los lugares de Nook.
 const cleanMapStyles: google.maps.MapTypeStyle[] = [
   {
     featureType: "poi",
@@ -62,6 +64,7 @@ const createSvgMarkerUrl = (svg: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
+// Permite recentrar Google Maps desde cambios de estado en React.
 function RecenterMap({ request }: { request: RecenterRequest | null }) {
   const map = useMap();
 
@@ -76,26 +79,33 @@ function RecenterMap({ request }: { request: RecenterRequest | null }) {
 export function MapView() {
   const navigate = useNavigate();
   const userRole = getUserRole();
+
+  // Filtros, busqueda y datos de lugares.
   const [activeTab, setActiveTab] = useState('todos');
   const [searchTerm, setSearchTerm] = useState("");
+  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  const [placesError, setPlacesError] = useState("");
+
+  // Ubicacion del usuario y control de recentrado del mapa.
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [hasResolvedUserLocation, setHasResolvedUserLocation] = useState(false);
   const [userLocationSource, setUserLocationSource] = useState<UserLocationSource | null>(null);
   const [isLocatingUser, setIsLocatingUser] = useState(false);
   const [locationError, setLocationError] = useState("");
-  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
-  const [startY, setStartY] = useState(0);
-  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
-  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
-  const [placesError, setPlacesError] = useState("");
   const [userRecenterRequest, setUserRecenterRequest] = useState<RecenterRequest | null>(null);
   const [fallbackMapCenter, setFallbackMapCenter] = useState<Coordinates>(
     savedMapCamera?.center ?? defaultMapCenter,
   );
+
+  // Estado tactil del bottom sheet.
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
+  const [startY, setStartY] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const hasRequestedGoogleFallbackRef = useRef(false);
   const isDraggingSheetRef = useRef(false);
 
+  // Normaliza ubicaciones obtenidas por navegador o por Google Geolocation.
   const applyUserCoordinates = (coords: Coordinates, source: UserLocationSource, shouldCenterMap = false) => {
     setUserLocation(coords);
     setUserLocationSource(source);
@@ -125,6 +135,7 @@ export function MapView() {
     );
   };
 
+  // Fallback aproximado cuando el navegador no entrega ubicacion precisa.
   const requestGoogleApproximateLocation = async (shouldCenterMap = false) => {
     if (!googleMapsApiKey) {
       setLocationError("No se pudo obtener tu ubicacion.");
@@ -183,6 +194,7 @@ export function MapView() {
     setLocationError("No se pudo obtener tu ubicacion.");
   };
 
+  // Solicitud manual desde el boton de localizar.
   const requestUserLocation = () => {
     hasRequestedGoogleFallbackRef.current = false;
 
@@ -204,6 +216,7 @@ export function MapView() {
     );
   };
 
+  // Mantiene actualizada la ubicacion mientras la vista esta montada.
   useEffect(() => {
     if (!navigator.geolocation) {
       setIsLocatingUser(true);
@@ -228,6 +241,7 @@ export function MapView() {
     };
   }, []);
 
+  // Carga lugares reales desde Supabase; si no esta configurado, se usan mocks.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
 
@@ -265,6 +279,7 @@ export function MapView() {
     return placeMatchesSearch(place, searchTerm) && placeMatchesTab(place, activeTab);
   });
 
+  // Opciones visibles en el filtro horizontal.
   const tabs = [
     { id: 'todos', label: 'Todos' },
     { id: 'cowork', label: 'Cowork' },
@@ -288,14 +303,15 @@ export function MapView() {
     return gradients[index];
   };
 
+  // Helpers visuales compartidos por mapa, fallback y tarjetas.
   const getPlaceIcon = (type: string) => {
     switch (type) {
-      // Student places
+      // Lugares para estudiantes
       case 'library': return '📚';
       case 'cafe': return '☕';
       case 'coworking': return '💼';
       case 'park': return '🌳';
-      // Worker places
+      // Lugares para trabajadores
       case 'office': return '🏢';
       case 'meeting_room': return '👥';
       case 'private_office': return '🚪';
@@ -306,19 +322,19 @@ export function MapView() {
   const getPlaceMarkerIcon = (type: string) => {
     const glyph = getPlaceIcon(type);
     return createSvgMarkerUrl(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="52" height="58" viewBox="0 0 52 58">
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#111827" flood-opacity="0.26"/>
-          </filter>
+        <svg xmlns="http://www.w3.org/2000/svg" width="45" height="52" viewBox="0 0 52 58">
+          <defs>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#111827" flood-opacity="0.26"/>
+            </filter>
+          </defs>
           <path
             d="M26 55C20.8 47.7 11 36.9 11 24.5C11 16.2 17.7 9.5 26 9.5C34.3 9.5 41 16.2 41 24.5C41 36.9 31.2 47.7 26 55Z"
-            fill="#ffffff"
-            stroke="#4F46E5"
-            stroke-width="3"
+            fill="#4F46E5"
             filter="url(#shadow)"
           />
-          <circle cx="26" cy="24.5" r="11.5" fill="#EEF2FF"/>
-          <text x="26" y="31.5" text-anchor="middle" font-size="20" font-family="Arial, sans-serif">${glyph}</text>
+          <circle cx="26" cy="24.5" r="13" fill="#ffffff"/>
+          <text x="26" y="25" text-anchor="middle" dominant-baseline="middle" font-size="14" font-family="Arial, sans-serif">${glyph}</text>
         </svg>
       `);
   };
@@ -355,6 +371,7 @@ export function MapView() {
     return place.zone || place.address || getZoneName(place.name);
   };
 
+  // Gestos para expandir o colapsar la bandeja inferior.
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY);
     isDraggingSheetRef.current = false;
@@ -382,6 +399,7 @@ export function MapView() {
     setIsBottomSheetExpanded((expanded) => !expanded);
   };
 
+  // Guarda camara para volver al mapa sin perder posicion y zoom.
   const handleGoogleCameraChanged = (event: MapCameraChangedEvent) => {
     const { center, zoom } = event.detail;
 
@@ -403,9 +421,8 @@ export function MapView() {
 
   return (
     <div className="size-full flex flex-col bg-gray-50">
-      {/* Header */}
+      {/* Header: busqueda y filtros principales */}
       <div className="flex-none bg-white px-4 py-3 space-y-3">
-        {/* Search bar */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
@@ -427,7 +444,6 @@ export function MapView() {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {tabs.map(tab => (
             <button
@@ -445,7 +461,7 @@ export function MapView() {
         </div>
       </div>
 
-      {/* Map */}
+      {/* Mapa: Google Maps si hay API key, fallback visual si no */}
       <div
         className="relative flex-1 bg-gradient-to-br from-blue-50 to-purple-50 transition-[margin] duration-300"
         style={{
@@ -509,7 +525,7 @@ export function MapView() {
               Agrega VITE_GOOGLE_MAPS_API_KEY en .env para activar Google Maps.
             </div>
 
-            {/* User location */}
+            {/* Ubicacion del usuario en fallback */}
             {userLocation && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
                 <div className="relative">
@@ -520,7 +536,7 @@ export function MapView() {
               </div>
             )}
 
-            {/* Place markers with icons only */}
+            {/* Marcadores de lugares en fallback */}
             {places.map((place) => {
               const offsetX = (place.lng - fallbackMapCenter.lng) * 3000;
               const offsetY = (fallbackMapCenter.lat - place.lat) * 3000;
@@ -533,13 +549,16 @@ export function MapView() {
                   style={{
                     left: `calc(50% + ${offsetX}px)`,
                     top: `calc(50% + ${offsetY}px)`,
-                    transform: 'translate(-50%, -50%)',
+                    transform: 'translate(-50%, -100%)',
                   }}
                   onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
                 >
-                  <div className="bg-white rounded-full p-2.5 shadow-lg border-2 border-white">
-                    <span className="text-2xl">{getPlaceIcon(place.type)}</span>
-                  </div>
+                  <img
+                    src={getPlaceMarkerIcon(place.type)}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-[52px] w-[45px] max-w-none"
+                  />
                 </button>
               );
             })}
@@ -547,7 +566,7 @@ export function MapView() {
         )}
       </div>
 
-      {/* Bottom section - Cerca de ti (collapsible) */}
+      {/* Bottom sheet: lista horizontal de lugares cercanos */}
       <div
         ref={sheetRef}
         className={`absolute left-0 right-0 rounded-t-[1.75rem] border-t border-gray-100 bg-white shadow-[0_-16px_34px_rgba(15,23,42,0.16)] transition-all duration-300 z-30 ${
@@ -558,7 +577,7 @@ export function MapView() {
           transform: isBottomSheetExpanded ? 'translateY(0)' : 'translateY(calc(100% - 48px))',
         }}
       >
-        {/* Handle bar */}
+        {/* Handle para expandir o colapsar */}
         <div
           className="px-4 pt-3 pb-2 cursor-pointer"
           onTouchStart={handleTouchStart}
@@ -576,7 +595,7 @@ export function MapView() {
           </div>
         </div>
 
-        {/* Cards */}
+        {/* Tarjetas de lugares */}
         <div className="px-4 pb-4 overflow-hidden">
           <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-2">
             {isLoadingPlaces && (
@@ -605,7 +624,7 @@ export function MapView() {
                   className={`shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.12)] ${userRole === 'worker' && placeHasPrice ? 'w-36' : 'w-32'}`}
                 >
                   <CardContent className="p-0">
-                    {/* Image */}
+                    {/* Imagen o fondo generado del lugar */}
                     {place.images?.[0] ? (
                       <button
                         className="h-20 w-full overflow-hidden rounded-t-2xl bg-gray-100"
@@ -622,7 +641,7 @@ export function MapView() {
                       </div>
                     )}
 
-                    {/* Info */}
+                    {/* Informacion resumida del lugar */}
                     <div className="p-2">
                       <div onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })} className="cursor-pointer">
                         <h4 className="font-semibold text-xs line-clamp-1 mb-0.5">{place.name}</h4>
@@ -637,7 +656,7 @@ export function MapView() {
                         )}
                       </div>
 
-                      {/* Reserve button for workers */}
+                      {/* Accion de reserva para trabajadores */}
                       {userRole === 'worker' && placeHasPrice && (
                         <button
                           onClick={(e) => {
