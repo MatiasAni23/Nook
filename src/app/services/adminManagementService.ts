@@ -52,6 +52,7 @@ export interface DelegateAssignedPlace {
   reviews: number;
   hours: string;
   pricePerHour?: number;
+  websiteUrl?: string | null;
   capacityMin: number | null;
   capacityMax: number | null;
   wifi: boolean;
@@ -637,6 +638,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         capacity_max,
         hours,
         price_per_hour,
+        website_url,
         wifi,
         outlets,
         parking,
@@ -676,6 +678,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         reviews: Number(place.reviews_count ?? 0),
         hours: String(place.hours ?? "Horario no informado"),
         pricePerHour: place.price_per_hour == null ? undefined : Number(place.price_per_hour),
+        websiteUrl: place.website_url == null ? null : String(place.website_url),
         capacityMin: place.capacity_min == null ? null : Number(place.capacity_min),
         capacityMax: place.capacity_max == null ? null : Number(place.capacity_max),
         wifi: Boolean(place.wifi),

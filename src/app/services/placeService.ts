@@ -38,6 +38,7 @@ export interface AppPlace {
   hours: string;
   description: string;
   pricePerHour?: number;
+  websiteUrl?: string | null;
   capacity?: number;
   capacityMin?: number | null;
   capacityMax?: number | null;
@@ -58,6 +59,7 @@ export interface CreatePlaceInput {
   capacityMin?: number | null;
   capacityMax?: number | null;
   pricePerHour?: number | null;
+  websiteUrl?: string | null;
   wifi: boolean;
   outlets: boolean;
   parking: boolean;
@@ -106,6 +108,7 @@ type PlaceRow = {
   capacity_max: number | null;
   hours: string | null;
   price_per_hour: string | number | null;
+  website_url: string | null;
   wifi: boolean;
   outlets: boolean;
   parking: boolean;
@@ -137,6 +140,12 @@ function toNumber(value: string | number | null | undefined, fallback = 0) {
   return fallback;
 }
 
+function normalizeWebsiteUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function toAppPlace(row: PlaceRow): AppPlace {
   const capacityMax = row.capacity_max ?? null;
   const pricePerHour = row.price_per_hour == null ? undefined : toNumber(row.price_per_hour);
@@ -161,6 +170,7 @@ function toAppPlace(row: PlaceRow): AppPlace {
     hours: row.hours ?? "Horario no informado",
     description: row.description ?? "",
     pricePerHour,
+    websiteUrl: row.website_url,
     capacity: capacityMax ?? undefined,
     capacityMin: row.capacity_min,
     capacityMax,
@@ -195,6 +205,7 @@ async function fetchPlaces(): Promise<AppPlace[]> {
       capacity_max,
       hours,
       price_per_hour,
+      website_url,
       wifi,
       outlets,
       parking,
@@ -267,6 +278,7 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
       capacity_max,
       hours,
       price_per_hour,
+      website_url,
       wifi,
       outlets,
       parking,
@@ -345,6 +357,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
       capacity_max: input.capacityMax ?? null,
       hours: input.hours,
       price_per_hour: input.pricePerHour ?? null,
+      website_url: normalizeWebsiteUrl(input.websiteUrl),
       wifi: input.wifi,
       outlets: input.outlets,
       parking: input.parking,
@@ -372,6 +385,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
       capacity_max,
       hours,
       price_per_hour,
+      website_url,
       wifi,
       outlets,
       parking,
@@ -440,6 +454,7 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
       capacity_max: input.capacityMax ?? null,
       hours: input.hours,
       price_per_hour: input.pricePerHour ?? null,
+      website_url: normalizeWebsiteUrl(input.websiteUrl),
       wifi: input.wifi,
       outlets: input.outlets,
       parking: input.parking,
@@ -465,6 +480,7 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
       capacity_max,
       hours,
       price_per_hour,
+      website_url,
       wifi,
       outlets,
       parking,

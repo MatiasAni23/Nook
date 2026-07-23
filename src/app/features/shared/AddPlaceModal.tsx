@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, MapPin, Clock, Wifi, Zap, Volume2, Lightbulb } from "lucide-react";
+import { X, Wifi, Zap, Volume2, Lightbulb, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -18,6 +18,7 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
   const [type, setType] = useState<string>("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [hours, setHours] = useState("");
   const [wifi, setWifi] = useState(true);
   const [outlets, setOutlets] = useState(true);
@@ -98,6 +99,20 @@ export function AddPlaceModal({ onClose }: AddPlaceModalProps) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+                  <ExternalLink className="size-4 text-purple-600" />
+                  Pagina web
+                </Label>
+                <Input
+                  id="websiteUrl"
+                  type="url"
+                  placeholder="https://ejemplo.cl"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
                 />
               </div>
 

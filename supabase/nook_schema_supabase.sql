@@ -228,6 +228,7 @@ CREATE TABLE places (
     -- Precios
     price_per_hour DECIMAL(10, 2) CHECK (price_per_hour IS NULL OR price_per_hour >= 0),
     currency VARCHAR(3) NOT NULL DEFAULT 'CLP',
+    website_url TEXT CHECK (website_url IS NULL OR website_url ~* '^https?://'),
 
     -- Servicios y ambiente
     wifi BOOLEAN NOT NULL DEFAULT FALSE,
@@ -265,6 +266,7 @@ CREATE INDEX idx_places_location ON places(latitude, longitude);
 CREATE INDEX idx_places_rating ON places(rating DESC);
 CREATE INDEX idx_places_featured ON places(featured) WHERE featured = TRUE;
 CREATE INDEX idx_places_images ON places USING GIN(images);
+CREATE INDEX idx_places_website_url ON places(website_url) WHERE website_url IS NOT NULL;
 
 -- =============================================
 -- TABLA: delegate_places

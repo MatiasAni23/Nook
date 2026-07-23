@@ -8,6 +8,7 @@ import {
   Clock,
   Coffee,
   DollarSign,
+  ExternalLink,
   ImagePlus,
   Lightbulb,
   Lock,
@@ -111,6 +112,20 @@ function formatCoordinate(value: number) {
   return value.toFixed(coordinateDecimals);
 }
 
+function formatCurrencyInput(value: string) {
+  const amount = Number(value);
+  if (!value || !Number.isFinite(amount)) return "";
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    minimumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getCurrencyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function RecenterAdminMap({ center }: { center: Coordinates }) {
   const map = useMap();
 
@@ -155,6 +170,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [zone, setZone] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [dailySchedule, setDailySchedule] = useState<DaySchedule[]>(weekDays);
   const [capacityMin, setCapacityMin] = useState("1");
   const [capacityMax, setCapacityMax] = useState("20");
@@ -342,6 +358,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     setDescription("");
     setAddress("");
     setZone("");
+    setWebsiteUrl("");
     setDailySchedule(weekDays);
     setCapacityMin("1");
     setCapacityMax("20");
@@ -383,7 +400,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
     }
 
     if (accessType === "reservation" && (!pricePerHour || Number(pricePerHour) <= 0)) {
-      setErrorMessage("Ingresa un precio por hora valido para lugares con reserva.");
+      setErrorMessage("Ingresa un precio por hora valido para lugares de paga.");
       return;
     }
 
@@ -402,6 +419,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
         description,
         address,
         zone: zone || null,
+        websiteUrl,
         latitude: parsedCoordinates.position.lat,
         longitude: parsedCoordinates.position.lng,
         hours,
@@ -578,6 +596,20 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="websiteUrl" className="flex items-center gap-2">
+                  <ExternalLink className="size-4 text-[#4F46E5]" />
+                  Pagina web
+                </Label>
+                <Input
+                  id="websiteUrl"
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://ejemplo.cl"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="description">Descripcion *</Label>
                 <Textarea
                   id="description"
@@ -676,7 +708,7 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                         : "border-gray-200 text-gray-700"
                     }`}
                   >
-                    Con reserva
+                    De paga
                   </button>
                 </div>
               </div>
@@ -686,11 +718,11 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
                   <Label htmlFor="pricePerHour">Precio por hora *</Label>
                   <Input
                     id="pricePerHour"
-                    type="number"
-                    min="0"
-                    value={pricePerHour}
-                    onChange={(e) => setPricePerHour(e.target.value)}
-                    placeholder="Ej: 12000"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatCurrencyInput(pricePerHour)}
+                    onChange={(e) => setPricePerHour(getCurrencyDigits(e.target.value))}
+                    placeholder="$12.000"
                   />
                 </div>
               )}

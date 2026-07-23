@@ -8,6 +8,7 @@ import {
   Clock,
   Coffee,
   DollarSign,
+  ExternalLink,
   ImagePlus,
   Lightbulb,
   Lock,
@@ -117,6 +118,20 @@ function formatCoordinate(value: number) {
   return value.toFixed(coordinateDecimals);
 }
 
+function formatCurrencyInput(value: string) {
+  const amount = Number(value);
+  if (!value || !Number.isFinite(amount)) return "";
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    minimumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getCurrencyDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function RecenterAdminMap({ center }: { center: Coordinates }) {
   const map = useMap();
 
@@ -209,6 +224,7 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
   const [description, setDescription] = useState(place.description ?? "");
   const [address, setAddress] = useState(place.address ?? "");
   const [zone, setZone] = useState(place.zone ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(place.websiteUrl ?? "");
   const [dailySchedule, setDailySchedule] = useState<DaySchedule[]>(parseHours(place.hours));
   const [capacityMin, setCapacityMin] = useState(place.capacityMin == null ? "" : String(place.capacityMin));
   const [capacityMax, setCapacityMax] = useState(place.capacityMax == null ? "" : String(place.capacityMax));
@@ -402,7 +418,7 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
     }
 
     if (accessType === "reservation" && (!pricePerHour || Number(pricePerHour) <= 0)) {
-      setErrorMessage("Ingresa un precio por hora valido para lugares con reserva.");
+      setErrorMessage("Ingresa un precio por hora valido para lugares de paga.");
       return;
     }
 
@@ -422,6 +438,7 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
         description,
         address,
         zone: zone || null,
+        websiteUrl,
         latitude: parsedCoordinates.position.lat,
         longitude: parsedCoordinates.position.lng,
         hours,
@@ -598,6 +615,20 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="editWebsiteUrl" className="flex items-center gap-2">
+                  <ExternalLink className="size-4 text-[#4F46E5]" />
+                  Pagina web
+                </Label>
+                <Input
+                  id="editWebsiteUrl"
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://ejemplo.cl"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="editDescription">Descripcion *</Label>
                 <Textarea
                   id="editDescription"
@@ -695,7 +726,7 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
                         : "border-gray-200 text-gray-700"
                     }`}
                   >
-                    Con reserva
+                    De paga
                   </button>
                 </div>
               </div>
@@ -705,10 +736,11 @@ export function AdminEditPlace({ place, onSave }: AdminEditPlaceProps) {
                   <Label htmlFor="editPricePerHour">Precio por hora *</Label>
                   <Input
                     id="editPricePerHour"
-                    type="number"
-                    min="0"
-                    value={pricePerHour}
-                    onChange={(e) => setPricePerHour(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatCurrencyInput(pricePerHour)}
+                    onChange={(e) => setPricePerHour(getCurrencyDigits(e.target.value))}
+                    placeholder="$12.000"
                   />
                 </div>
               )}

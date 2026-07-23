@@ -621,7 +621,7 @@ export function MapView() {
               return (
                 <Card
                   key={place.id}
-                  className={`shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.12)] ${userRole === 'worker' && placeHasPrice ? 'w-36' : 'w-32'}`}
+                  className="w-32 shrink-0 rounded-2xl border-gray-100 shadow-[0_8px_22px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,0.12)]"
                 >
                   <CardContent className="p-0">
                     {/* Imagen o fondo generado del lugar */}
@@ -655,19 +655,6 @@ export function MapView() {
                           <p className="text-sm font-semibold text-[#4F46E5] mb-2">Gratis</p>
                         )}
                       </div>
-
-                      {/* Accion de reserva para trabajadores */}
-                      {userRole === 'worker' && placeHasPrice && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/app/checkout/${place.id}`);
-                          }}
-                          className="w-full py-1.5 rounded-md bg-[#4F46E5] text-white text-xs font-medium hover:bg-[#4338CA] transition-all"
-                        >
-                          Reservar
-                        </button>
-                      )}
                     </div>
                   </CardContent>
                 </Card>

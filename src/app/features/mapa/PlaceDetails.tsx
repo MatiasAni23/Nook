@@ -26,7 +26,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
-import { CachedImage } from "../../components/ui/cached-image";
+import { CachedImage, preloadCachedImage } from "../../components/ui/cached-image";
 import { ReportIssueModal } from "../shared/ReportIssueModal";
 import { getIssueIcon, getIssueLabel, placeIssues, studyPlaces, type IssueType, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
@@ -41,10 +41,6 @@ import {
   listPlaceReports,
 } from "../../services/placeReportService";
 import type { DetailNavigationState } from "./navigationState";
-
-const getUserRole = (): "student" | "worker" | "admin" => {
-  return (window as any).__userRole || "student";
-};
 
 const fallbackAmenities = [
   { key: "wifi", name: "WiFi de alta velocidad" },
@@ -132,7 +128,6 @@ export function PlaceDetails() {
   const location = useLocation();
   const navigationState = location.state as DetailNavigationState | null;
   const backPath = navigationState?.from ?? "/app/discover";
-  const userRole = getUserRole();
   const studyPlace = studyPlaces.find((item) => item.id === placeId);
   const workPlace = workPlaces.find((item) => item.id === placeId);
   const initialPlace = studyPlace || workPlace;
@@ -146,6 +141,13 @@ export function PlaceDetails() {
   const [issuesMessage, setIssuesMessage] = useState("");
   const [confirmingIssueIds, setConfirmingIssueIds] = useState<string[]>([]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [readyImageUrls, setReadyImageUrls] = useState<Set<string>>(new Set());
+  const [displayedImage, setDisplayedImage] = useState<string | undefined>();
+  const currentPlaceImages: string[] = useMemo(
+    () => Array.isArray(place?.images) ? place.images : [],
+    [place?.images],
+  );
+  const selectedImage = currentPlaceImages[activeImageIndex];
 
   useEffect(() => {
     if (initialPlace || !placeId || !isSupabaseConfigured) return;
@@ -218,14 +220,48 @@ export function PlaceDetails() {
 
   useEffect(() => {
     setActiveImageIndex(0);
+    setDisplayedImage(currentPlaceImages[0]);
   }, [place?.id]);
 
   useEffect(() => {
-    const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
+    const imageCount = currentPlaceImages.length;
     if (imageCount > 0 && activeImageIndex > imageCount - 1) {
       setActiveImageIndex(0);
     }
-  }, [activeImageIndex, place?.images]);
+  }, [activeImageIndex, currentPlaceImages]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setReadyImageUrls(new Set());
+    setDisplayedImage(currentPlaceImages[0]);
+
+    currentPlaceImages.forEach((imageUrl) => {
+      void preloadCachedImage(imageUrl).then(() => {
+        if (!isMounted) return;
+        setReadyImageUrls((current) => {
+          const nextReadyImageUrls = new Set(current);
+          nextReadyImageUrls.add(imageUrl);
+          return nextReadyImageUrls;
+        });
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [place?.id, currentPlaceImages]);
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setDisplayedImage(undefined);
+      return;
+    }
+
+    if (readyImageUrls.has(selectedImage) || !displayedImage) {
+      setDisplayedImage(selectedImage);
+    }
+  }, [displayedImage, readyImageUrls, selectedImage]);
 
   const handleToggleFavorite = async () => {
     const nextIsFavorite = !isFavorite;
@@ -437,8 +473,8 @@ export function PlaceDetails() {
   }
 
   const isWorkPlace = place.category === "work" || !!workPlace;
-  const placeImages: string[] = Array.isArray(place.images) ? place.images : [];
-  const selectedImage = placeImages[activeImageIndex];
+  const placeImages = currentPlaceImages;
+  const heroImage = displayedImage ?? selectedImage;
   const explicitAmenities = [
     { key: "wifi", name: "WiFi disponible", isAvailable: Boolean(place.wifi) },
     { key: "outlets", name: "Enchufes disponibles", isAvailable: Boolean(place.outlets) },
@@ -467,7 +503,7 @@ export function PlaceDetails() {
     : "1 - 20";
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
   const priceText = hasValidPrice ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
-  const canReservePlace = hasValidPrice && (userRole === "worker" || place.type !== "coworking");
+  const websiteUrl = typeof place.websiteUrl === "string" ? place.websiteUrl.trim() : "";
   const weekdaySchedule = schedule.slice(0, 5);
   const weekendSchedule = schedule.slice(5);
 
@@ -475,8 +511,8 @@ export function PlaceDetails() {
     <div className="size-full flex flex-col bg-white">
       <div className="flex-1 overflow-auto pb-28">
         <div className="relative h-72 bg-gradient-to-br from-gray-300 to-gray-500">
-          {selectedImage ? (
-            <CachedImage src={selectedImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
+          {heroImage ? (
+            <CachedImage src={heroImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
           ) : (
             <div className={`absolute inset-0 bg-gradient-to-br ${getPlaceImage(place.id)}`} />
           )}
@@ -537,10 +573,23 @@ export function PlaceDetails() {
           <div>
             <div className="flex items-start justify-between gap-2 mb-2">
               <h1 className="text-2xl" style={{ fontWeight: 700 }}>{place.name}</h1>
-              <div className="flex items-center gap-1 shrink-0">
-                <Star className="size-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold">{place.rating}</span>
-                <span className="text-sm text-gray-500">({place.reviews})</span>
+              <div className="flex shrink-0 items-center gap-2">
+                {websiteUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(websiteUrl, "_blank", "noopener,noreferrer")}
+                    className="flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-[#4F46E5] transition-all hover:border-[#4F46E5] hover:bg-white"
+                    aria-label="Abrir sitio web"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Web
+                  </button>
+                )}
+                <div className="flex items-center gap-1">
+                  <Star className="size-4 fill-yellow-400 text-yellow-400" />
+                  <span className="font-semibold">{place.rating}</span>
+                  <span className="text-sm text-gray-500">({place.reviews})</span>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1 text-sm text-gray-600">
@@ -793,17 +842,6 @@ export function PlaceDetails() {
               </div>
             </div>
           </div>
-
-          {canReservePlace && (
-            <div className="pb-4">
-              <button
-                onClick={() => navigate(`/app/checkout/${placeId}`)}
-                className="w-full py-4 rounded-xl bg-[#4F46E5] text-white font-semibold text-lg hover:bg-[#4338CA] transition-all shadow-lg"
-              >
-                Reservar horario
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

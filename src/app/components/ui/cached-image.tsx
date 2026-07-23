@@ -48,6 +48,36 @@ async function loadCachedImage(source: string) {
   return loadPromise;
 }
 
+function decodeImage(source: string) {
+  return new Promise<void>((resolve) => {
+    const image = new Image();
+
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+    image.src = source;
+
+    if (image.complete) {
+      resolve();
+      return;
+    }
+
+    if (image.decode) {
+      image.decode().then(() => resolve()).catch(() => resolve());
+    }
+  });
+}
+
+export async function preloadCachedImage(source: string) {
+  if (!source) return;
+  const cachedSource = await loadCachedImage(source);
+  await decodeImage(cachedSource);
+}
+
+export async function preloadCachedImages(sources: string[]) {
+  const uniqueSources = Array.from(new Set(sources.filter(Boolean)));
+  await Promise.all(uniqueSources.map((source) => preloadCachedImage(source)));
+}
+
 export function useCachedImageSrc(source?: string | null) {
   const [cachedSource, setCachedSource] = useState(source ?? "");
 
