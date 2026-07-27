@@ -4,12 +4,9 @@ import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { Card, CardContent } from "../../components/ui/card";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+import { getPlacePinAsset } from "../mapa/placePinAssets";
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-const createSvgMarkerUrl = (svg: string) => {
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
 
 export function AdminHome() {
   const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
@@ -71,24 +68,16 @@ export function AdminHome() {
     }
   };
 
-  const getPlaceMarkerIcon = (type: string) => {
-    const glyph = getPlaceIcon(type);
-    return createSvgMarkerUrl(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="45" height="52" viewBox="0 0 52 58">
-        <defs>
-          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#111827" flood-opacity="0.26"/>
-          </filter>
-        </defs>
-        <path
-          d="M26 55C20.8 47.7 11 36.9 11 24.5C11 16.2 17.7 9.5 26 9.5C34.3 9.5 41 16.2 41 24.5C41 36.9 31.2 47.7 26 55Z"
-          fill="#4F46E5"
-          filter="url(#shadow)"
-        />
-        <circle cx="26" cy="24.5" r="13" fill="#ffffff"/>
-        <text x="26" y="25" text-anchor="middle" dominant-baseline="middle" font-size="14" font-family="Arial, sans-serif">${glyph}</text>
-      </svg>
-    `);
+  const getPlaceMarkerIcon = (type: string): string | google.maps.Icon => {
+    const url = getPlacePinAsset(type);
+
+    if (typeof google === "undefined") return url;
+
+    return {
+      url,
+      scaledSize: new google.maps.Size(50, 50),
+      anchor: new google.maps.Point(25, 50),
+    };
   };
 
   return (
