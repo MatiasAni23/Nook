@@ -1358,6 +1358,18 @@ CREATE POLICY delegate_invitations_insert_admin ON delegate_invitations
 CREATE POLICY delegate_invitations_update_admin ON delegate_invitations
     FOR UPDATE USING (is_current_user_admin()) WITH CHECK (is_current_user_admin());
 
+-- Permite validar si un correo ya tiene cuenta sin exponer filas de users.
+CREATE OR REPLACE FUNCTION email_account_exists(lookup_email TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1
+        FROM users
+        WHERE lower(users.email) = lower(trim(lookup_email))
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- Devuelve una invitacion por token sin exponer la tabla completa al cliente anonimo.
 CREATE OR REPLACE FUNCTION get_delegate_invitation(invitation_token UUID)
 RETURNS TABLE (
@@ -1465,6 +1477,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+GRANT EXECUTE ON FUNCTION email_account_exists(TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_delegate_invitation(UUID) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION claim_delegate_invitation(UUID) TO authenticated;
 

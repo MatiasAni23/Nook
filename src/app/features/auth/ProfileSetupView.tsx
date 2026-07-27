@@ -1,8 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
-import { Briefcase, GraduationCap } from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
+import { motion } from "motion/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Briefcase,
+  Building2,
+  GraduationCap,
+  MapPin,
+  Plus,
+  Search,
+  School,
+  Sparkles,
+  UserRound,
+  X,
+} from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Textarea } from "../../components/ui/textarea";
@@ -20,14 +40,312 @@ interface ProfileSetupViewProps {
   onComplete: (role: "student" | "worker", profileData: any) => Promise<void> | void;
 }
 
+function ProfileSetupBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA]">
+      <svg
+        className="absolute inset-0 h-full w-full opacity-40 [mask-image:radial-gradient(circle_at_50%_50%,transparent_0%,transparent_26%,rgba(0,0,0,0.25)_38%,black_58%)]"
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <g fill="none" stroke="white" strokeLinecap="round">
+          <path d="M-80 190 C140 140 220 270 390 225 S690 95 860 185 1110 350 1520 235" strokeWidth="4" opacity="0.52" />
+          <path d="M-60 520 C190 450 330 560 520 500 S820 325 1010 420 1210 640 1510 560" strokeWidth="3" opacity="0.42" />
+          <path d="M110 940 C235 700 205 510 340 365 S520 190 520 -80" strokeWidth="4" opacity="0.42" />
+          <path d="M1030 950 C955 730 1005 545 1120 370 S1290 145 1260 -70" strokeWidth="4" opacity="0.38" />
+          <path d="M-120 720 L210 610 L470 700 L750 620 L1005 710 L1510 590" strokeWidth="2" opacity="0.35" />
+          <path d="M-80 355 L210 420 L455 335 L700 392 L940 310 L1510 390" strokeWidth="2" opacity="0.34" />
+        </g>
+      </svg>
+
+      <div className="absolute left-1/2 top-1/2 h-[42rem] w-[42rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.10] blur-3xl" />
+
+      <svg
+        className="absolute inset-0 h-full w-full opacity-70"
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="xMidYMid slice"
+        aria-hidden="true"
+      >
+        <g fill="white">
+          <circle cx="92" cy="86" r="1.8" opacity="0.45" />
+          <circle cx="188" cy="248" r="1.4" opacity="0.40" />
+          <circle cx="322" cy="118" r="2.1" opacity="0.34" />
+          <circle cx="485" cy="690" r="1.6" opacity="0.40" />
+          <circle cx="778" cy="82" r="2" opacity="0.38" />
+          <circle cx="1040" cy="192" r="2.2" opacity="0.42" />
+          <circle cx="1324" cy="118" r="2" opacity="0.46" />
+          <circle cx="262" cy="818" r="2.1" opacity="0.40" />
+          <circle cx="720" cy="822" r="1.9" opacity="0.38" />
+          <circle cx="1288" cy="548" r="1.9" opacity="0.38" />
+          <circle cx="300" cy="388" r="1.7" opacity="0.34" />
+          <circle cx="1092" cy="410" r="1.6" opacity="0.34" />
+        </g>
+      </svg>
+
+      <motion.div
+        className="absolute left-[14%] top-[22%] hidden size-12 place-items-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-[0_14px_28px_rgba(49,46,129,0.18)] md:grid"
+        animate={{ y: [0, -8, 0], rotate: [0, 4, 0] }}
+        transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <MapPin className="size-5" />
+      </motion.div>
+      <motion.div
+        className="absolute bottom-[20%] left-[23%] hidden size-12 place-items-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-[0_14px_28px_rgba(49,46,129,0.18)] md:grid"
+        animate={{ y: [0, 9, 0], scale: [1, 1.04, 1] }}
+        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+      >
+        <MapPin className="size-5" />
+      </motion.div>
+      <motion.div
+        className="absolute right-[16%] top-[24%] hidden size-10 place-items-center rounded-full border border-white/20 bg-white/10 text-white lg:grid"
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut", delay: 0.35 }}
+      >
+        <MapPin className="size-4" />
+      </motion.div>
+    </div>
+  );
+}
+
+function RoleChoiceCard({
+  title,
+  description,
+  Icon,
+  delay,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  Icon: typeof GraduationCap;
+  delay: number;
+  onClick: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      className="group relative w-full overflow-hidden rounded-2xl border border-[#E0E7FF] bg-white p-5 text-left shadow-[0_10px_26px_rgba(79,70,229,0.08)] transition-[border-color,box-shadow,background-color] duration-300 hover:border-[#B8C2FF] hover:shadow-[0_18px_36px_rgba(79,70,229,0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4F46E5] focus-visible:ring-offset-2"
+      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.35, delay, ease: "easeOut" }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-[#EEF2FF] via-white to-white opacity-0 transition group-hover:opacity-100" />
+      <div className="absolute -right-12 -top-12 size-28 rounded-full bg-[#4F46E5]/10 blur-2xl transition group-hover:bg-[#4F46E5]/20" />
+      <div className="relative flex items-center gap-4">
+        <motion.div
+          className="grid size-14 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)]"
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 3.4, repeat: Infinity, ease: "easeInOut", delay }}
+        >
+          <Icon className="size-7" />
+        </motion.div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-lg font-black tracking-normal text-[#1E1B4B]">{title}</h3>
+          <p className="mt-1 text-sm font-medium leading-5 text-slate-500">{description}</p>
+        </div>
+        <div className="grid size-9 shrink-0 place-items-center rounded-full bg-[#EEF2FF] text-[#4F46E5] transition group-hover:translate-x-1 group-hover:bg-[#4F46E5] group-hover:text-white">
+          <ArrowRight className="size-4" />
+        </div>
+      </div>
+    </motion.button>
+  );
+}
+
+type SearchableOption = {
+  id: string;
+  label: string;
+  meta?: string;
+};
+
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function getFilteredOptions(options: SearchableOption[], query: string) {
+  const normalizedQuery = normalizeSearchText(query);
+
+  if (!normalizedQuery) return options.slice(0, 6);
+
+  return options
+    .map((option) => {
+      const normalizedLabel = normalizeSearchText(option.label);
+      const normalizedMeta = normalizeSearchText(option.meta ?? "");
+      const startsWith = normalizedLabel.startsWith(normalizedQuery) ? 0 : 1;
+      const includes = normalizedLabel.includes(normalizedQuery) || normalizedMeta.includes(normalizedQuery) ? 0 : 1;
+      const index = normalizedLabel.indexOf(normalizedQuery);
+
+      return {
+        option,
+        score: includes * 100 + startsWith * 10 + (index >= 0 ? index : 50),
+      };
+    })
+    .filter(({ score }) => score < 100)
+    .sort((first, second) => first.score - second.score)
+    .slice(0, 6)
+    .map(({ option }) => option);
+}
+
+function SearchableSelect({
+  id,
+  label,
+  Icon,
+  options,
+  value,
+  query,
+  placeholder,
+  disabled,
+  emptyMessage,
+  onQueryChange,
+  onSelect,
+}: {
+  id: string;
+  label: string;
+  Icon: typeof GraduationCap;
+  options: SearchableOption[];
+  value: string;
+  query: string;
+  placeholder: string;
+  disabled?: boolean;
+  emptyMessage: string;
+  onQueryChange: (value: string) => void;
+  onSelect: (option: SearchableOption) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const filteredOptions = useMemo(() => getFilteredOptions(options, query), [options, query]);
+
+  return (
+    <div className="relative space-y-2">
+      <Label
+        htmlFor={id}
+        className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#4F46E5]"
+      >
+        {label}
+      </Label>
+      <div className="group relative flex min-h-12 items-center rounded-2xl border border-[#E0E7FF] bg-white px-4 shadow-[0_6px_16px_rgba(79,70,229,0.04)] transition focus-within:border-[#4F46E5] focus-within:bg-[#F8FAFF] focus-within:shadow-[0_10px_22px_rgba(79,70,229,0.09)]">
+        <Icon className="mr-3 size-4 shrink-0 text-[#8B93F5] transition group-focus-within:text-[#4F46E5]" />
+        <Input
+          id={id}
+          value={query}
+          disabled={disabled}
+          placeholder={placeholder}
+          autoComplete="off"
+          onFocus={() => setIsOpen(true)}
+          onBlur={() => window.setTimeout(() => setIsOpen(false), 120)}
+          onChange={(event) => {
+            onQueryChange(event.target.value);
+            setIsOpen(true);
+          }}
+          className="h-11 border-0 bg-transparent px-0 pr-8 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0"
+        />
+        <Search className="absolute right-4 size-4 text-[#8B93F5]" />
+      </div>
+      {isOpen && !disabled && (
+        <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-2xl border border-[#E0E7FF] bg-white p-1 shadow-[0_18px_36px_rgba(79,70,229,0.16)]">
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  onSelect(option);
+                  setIsOpen(false);
+                }}
+                className={`w-full rounded-xl px-3 py-2 text-left transition hover:bg-[#EEF2FF] ${
+                  value === option.id ? "bg-[#EEF2FF]" : ""
+                }`}
+              >
+                <span className="block text-sm font-black text-[#1E1B4B]">{option.label}</span>
+                {option.meta && (
+                  <span className="mt-0.5 block text-xs font-medium text-slate-400">{option.meta}</span>
+                )}
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-3 text-sm font-medium text-slate-400">{emptyMessage}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SetupField({
+  id,
+  label,
+  Icon,
+  children,
+  align = "center",
+}: {
+  id?: string;
+  label: string;
+  Icon: typeof GraduationCap;
+  children: ReactNode;
+  align?: "center" | "start";
+}) {
+  return (
+    <div className="space-y-2">
+      <Label
+        htmlFor={id}
+        className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#4F46E5]"
+      >
+        {label}
+      </Label>
+      <div
+        className={`group relative flex min-h-12 rounded-2xl border border-[#E0E7FF] bg-white px-4 shadow-[0_6px_16px_rgba(79,70,229,0.04)] transition focus-within:border-[#4F46E5] focus-within:bg-[#F8FAFF] focus-within:shadow-[0_10px_22px_rgba(79,70,229,0.09)] ${
+          align === "start" ? "items-start" : "items-center"
+        }`}
+      >
+        <Icon
+          className={`mr-3 size-4 shrink-0 text-[#8B93F5] transition group-focus-within:text-[#4F46E5] ${
+            align === "start" ? "mt-3.5" : ""
+          }`}
+        />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SetupInput(props: ComponentProps<typeof Input>) {
+  return (
+    <Input
+      {...props}
+      className={`h-11 border-0 bg-transparent px-0 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0 ${
+        props.className ?? ""
+      }`}
+    />
+  );
+}
+
+function SetupTextarea(props: ComponentProps<typeof Textarea>) {
+  return (
+    <Textarea
+      {...props}
+      className={`min-h-24 resize-none border-0 bg-transparent px-0 py-3 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0 ${
+        props.className ?? ""
+      }`}
+    />
+  );
+}
+
 export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps) {
   const [step, setStep] = useState<"role" | "details">("role");
   const [selectedRole, setSelectedRole] = useState<"student" | "worker" | null>(null);
 
   const [career, setCareer] = useState("");
   const [regionId, setRegionId] = useState("");
+  const [regionQuery, setRegionQuery] = useState("");
   const [cityId, setCityId] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
   const [institutionId, setInstitutionId] = useState("");
+  const [institutionQuery, setInstitutionQuery] = useState("");
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [cities, setCities] = useState<CityOption[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
@@ -48,6 +366,23 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
   const selectedInstitution = useMemo(
     () => institutions.find((institution) => institution.id === institutionId),
     [institutionId, institutions],
+  );
+  const regionOptions = useMemo(
+    () => regions.map((region) => ({ id: region.id, label: region.name })),
+    [regions],
+  );
+  const cityOptions = useMemo(
+    () => cities.map((city) => ({ id: city.id, label: city.name })),
+    [cities],
+  );
+  const institutionOptions = useMemo(
+    () =>
+      institutions.map((institution) => ({
+        id: institution.id,
+        label: institution.name,
+        meta: institution.type,
+      })),
+    [institutions],
   );
 
   useEffect(() => {
@@ -75,6 +410,8 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
     if (!regionId) {
       setCities([]);
       setCityId("");
+      setCityQuery("");
+      setInstitutionId("");
       return;
     }
 
@@ -83,6 +420,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
       .then((cityOptions) => {
         setCities(cityOptions);
         setCityId("");
+        setCityQuery("");
       })
       .catch((error) => {
         setCatalogError(
@@ -93,6 +431,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
 
   useEffect(() => {
     setInstitutionId("");
+    setInstitutionQuery("");
 
     getInstitutions(cityId || undefined)
       .then(setInstitutions)
@@ -184,277 +523,349 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
 
   if (step === "role") {
     return (
-      <div className="size-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl mb-2">Bienvenido, {userName.split(" ")[0]}</CardTitle>
-            <p className="text-sm text-gray-600">Como quieres usar Nook?</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <button
-              onClick={() => handleRoleSelect("student")}
-              className="w-full p-6 rounded-xl border-2 border-gray-300 hover:border-[#4F46E5] hover:bg-purple-50 transition-all text-left"
-            >
-              <div className="flex items-start gap-4">
-                <div className="size-12 rounded-full bg-[#4F46E5] flex items-center justify-center shrink-0">
-                  <GraduationCap className="size-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg mb-1">Soy estudiante</h3>
-                  <p className="text-sm text-gray-600">
-                    Busco lugares para estudiar y conectar con companeros de estudio
-                  </p>
-                </div>
-              </div>
-            </button>
+      <div className="relative min-h-screen w-full overflow-y-auto bg-[#4F46E5] px-4 py-8">
+        <ProfileSetupBackground />
 
-            <button
-              onClick={() => handleRoleSelect("worker")}
-              className="w-full p-6 rounded-xl border-2 border-gray-300 hover:border-[#4F46E5] hover:bg-purple-50 transition-all text-left"
-            >
-              <div className="flex items-start gap-4">
-                <div className="size-12 rounded-full bg-[#4F46E5] flex items-center justify-center shrink-0">
-                  <Briefcase className="size-6 text-white" />
+        <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center justify-center">
+          <motion.div
+            className="w-full max-w-lg overflow-hidden rounded-[1.65rem] border border-[#E0E7FF] bg-white p-1 shadow-[0_24px_60px_rgba(49,46,129,0.20)]"
+            initial={{ opacity: 0, y: 22, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+          >
+            <div className="rounded-[1.5rem] bg-white px-5 pb-6 pt-6 sm:px-6">
+              <div className="mb-6 flex items-center gap-3">
+                <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
+                  <MapPin className="size-5" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg mb-1">Soy trabajador</h3>
-                  <p className="text-sm text-gray-600">
-                    Busco espacios de trabajo profesionales para reservar por horas
-                  </p>
+                <div>
+                  <p className="text-xl font-black text-[#1E1B4B]">Nook</p>
+                  <p className="text-xs font-bold text-slate-400">Configuracion inicial</p>
                 </div>
               </div>
-            </button>
-          </CardContent>
-        </Card>
+
+              <div className="mb-6 text-center">
+                <div className="mx-auto mb-3 grid size-12 place-items-center rounded-2xl bg-[#EEF2FF] text-[#4F46E5]">
+                  <Sparkles className="size-6" />
+                </div>
+                <h1 className="text-2xl font-black tracking-normal text-[#1E1B4B]">
+                  Bienvenido, {userName.split(" ")[0]}
+                </h1>
+                <p className="mt-2 text-sm font-medium text-slate-500">Como quieres usar Nook?</p>
+              </div>
+
+              <div className="space-y-4">
+                <RoleChoiceCard
+                  title="Soy estudiante"
+                  description="Busco lugares para estudiar y conectar con companeros de estudio"
+                  Icon={GraduationCap}
+                  delay={0.08}
+                  onClick={() => handleRoleSelect("student")}
+                />
+                <RoleChoiceCard
+                  title="Soy trabajador"
+                  description="Busco espacios de trabajo profesionales para reservar por horas"
+                  Icon={Briefcase}
+                  delay={0.16}
+                  onClick={() => handleRoleSelect("worker")}
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="size-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4 overflow-auto">
-      <Card className="w-full max-w-md my-8">
-        <CardHeader>
-          <CardTitle className="text-2xl">Completa tu perfil</CardTitle>
-          <p className="text-sm text-gray-600">
-            {selectedRole === "student" ? "Cuentanos sobre tus estudios" : "Cuentanos sobre tu trabajo"}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {errorMessage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
+    <div className="relative min-h-screen w-full overflow-y-auto bg-[#4F46E5] px-4 py-8">
+      <ProfileSetupBackground />
+
+      <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center justify-center">
+        <motion.div
+          className="my-6 w-full max-w-2xl overflow-hidden rounded-[1.65rem] border border-[#E0E7FF] bg-white p-1 shadow-[0_24px_60px_rgba(49,46,129,0.20)]"
+          initial={{ opacity: 0, y: 22, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+        >
+          <div className="rounded-[1.5rem] bg-white px-5 pb-6 pt-6 sm:px-6">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
+                {selectedRole === "student" ? (
+                  <GraduationCap className="size-5" />
+                ) : (
+                  <Briefcase className="size-5" />
+                )}
+              </div>
+              <div>
+                <p className="text-xl font-black text-[#1E1B4B]">Completa tu perfil</p>
+                <p className="text-xs font-bold text-slate-400">
+                  {selectedRole === "student"
+                    ? "Cuentanos sobre tus estudios"
+                    : "Cuentanos sobre tu trabajo"}
+                </p>
+              </div>
             </div>
-          )}
 
-          {catalogError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {catalogError}
-            </div>
-          )}
-
-          {selectedRole === "student" ? (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="career">Carrera *</Label>
-                <Input
-                  id="career"
-                  placeholder="Ej: Ingenieria Civil en Computacion"
-                  value={career}
-                  onChange={(event) => setCareer(event.target.value)}
-                />
+            {(errorMessage || catalogError) && (
+              <div className="mb-5 space-y-3">
+                {errorMessage && (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {errorMessage}
+                  </div>
+                )}
+                {catalogError && (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                    {catalogError}
+                  </div>
+                )}
               </div>
+            )}
 
-              <div className="space-y-2">
-                <Label htmlFor="region">Region *</Label>
-                <select
-                  id="region"
-                  value={regionId}
-                  onChange={(event) => setRegionId(event.target.value)}
-                  disabled={isLoadingCatalogs}
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
-                >
-                  <option value="">
-                    {isLoadingCatalogs ? "Cargando regiones..." : "Selecciona tu region"}
-                  </option>
-                  {regions.map((region) => (
-                    <option key={region.id} value={region.id}>
-                      {region.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="space-y-5">
+              {selectedRole === "student" ? (
+                <>
+                  <SetupField id="career" label="Carrera *" Icon={GraduationCap}>
+                    <SetupInput
+                      id="career"
+                      placeholder="Ej: Ingenieria Civil en Computacion"
+                      value={career}
+                      onChange={(event) => setCareer(event.target.value)}
+                    />
+                  </SetupField>
 
-              <div className="space-y-2">
-                <Label htmlFor="city">Ciudad</Label>
-                <select
-                  id="city"
-                  value={cityId}
-                  onChange={(event) => setCityId(event.target.value)}
-                  disabled={!regionId || cities.length === 0}
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
-                >
-                  <option value="">
-                    {!regionId
-                      ? "Selecciona primero una region"
-                      : cities.length === 0
-                        ? "Sin ciudades cargadas para esta region"
-                        : "Selecciona tu ciudad"}
-                  </option>
-                  {cities.map((city) => (
-                    <option key={city.id} value={city.id}>
-                      {city.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <SearchableSelect
+                      id="region"
+                      label="Region *"
+                      Icon={MapPin}
+                      options={regionOptions}
+                      value={regionId}
+                      query={regionQuery}
+                      placeholder={isLoadingCatalogs ? "Cargando regiones..." : "Busca tu region"}
+                      disabled={isLoadingCatalogs}
+                      emptyMessage="No encontramos regiones parecidas."
+                      onQueryChange={(value) => {
+                        setRegionQuery(value);
+                        setRegionId("");
+                        setCityId("");
+                        setCityQuery("");
+                        setInstitutionId("");
+                        setInstitutionQuery("");
+                      }}
+                      onSelect={(option) => {
+                        setRegionId(option.id);
+                        setRegionQuery(option.label);
+                      }}
+                    />
 
-              <div className="space-y-2">
-                <Label htmlFor="institution">Institucion *</Label>
-                <select
-                  id="institution"
-                  value={institutionId}
-                  onChange={(event) => setInstitutionId(event.target.value)}
-                  disabled={isLoadingCatalogs}
-                  className="w-full px-3 py-2 border rounded-lg text-sm bg-input-background disabled:opacity-60"
-                >
-                  <option value="">
-                    {isLoadingCatalogs ? "Cargando instituciones..." : "Selecciona tu institucion"}
-                  </option>
-                  {institutions.map((institution) => (
-                    <option key={institution.id} value={institution.id}>
-                      {institution.name} - {institution.type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Materias o intereses</Label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {subjects.map((subject) => (
-                    <Badge key={subject} className="bg-[#4F46E5] text-white">
-                      {subject}
-                      <button
-                        className="ml-2 hover:text-red-200"
-                        onClick={() => removeSubject(subject)}
-                        type="button"
-                      >
-                        x
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Ej: Algoritmos, Calculo..."
-                    value={newSubject}
-                    onChange={(event) => setNewSubject(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        addSubject();
+                    <SearchableSelect
+                      id="city"
+                      label="Ciudad"
+                      Icon={MapPin}
+                      options={cityOptions}
+                      value={cityId}
+                      query={cityQuery}
+                      placeholder={
+                        !regionId
+                          ? "Selecciona primero una region"
+                          : cities.length === 0
+                            ? "Sin ciudades cargadas"
+                            : "Busca tu ciudad"
                       }
+                      disabled={!regionId || cities.length === 0}
+                      emptyMessage="No encontramos ciudades parecidas."
+                      onQueryChange={(value) => {
+                        setCityQuery(value);
+                        setCityId("");
+                        setInstitutionId("");
+                        setInstitutionQuery("");
+                      }}
+                      onSelect={(option) => {
+                        setCityId(option.id);
+                        setCityQuery(option.label);
+                      }}
+                    />
+                  </div>
+
+                  <SearchableSelect
+                    id="institution"
+                    label="Institucion *"
+                    Icon={School}
+                    options={institutionOptions}
+                    value={institutionId}
+                    query={institutionQuery}
+                    placeholder={
+                      isLoadingCatalogs ? "Cargando instituciones..." : "Busca tu institucion"
+                    }
+                    disabled={isLoadingCatalogs}
+                    emptyMessage="No encontramos instituciones parecidas."
+                    onQueryChange={(value) => {
+                      setInstitutionQuery(value);
+                      setInstitutionId("");
+                    }}
+                    onSelect={(option) => {
+                      setInstitutionId(option.id);
+                      setInstitutionQuery(option.label);
                     }}
                   />
-                  <Button onClick={addSubject} type="button">
-                    Agregar
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-3">
-                <Label>Eres independiente? *</Label>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsIndependent(true)}
-                    className={`flex-1 p-4 rounded-lg border-2 transition-all ${
-                      isIndependent === true
-                        ? "border-[#4F46E5] bg-purple-50"
-                        : "border-gray-300 hover:border-[#4F46E5]"
-                    }`}
-                  >
-                    <span className="font-semibold">Si</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsIndependent(false)}
-                    className={`flex-1 p-4 rounded-lg border-2 transition-all ${
-                      isIndependent === false
-                        ? "border-[#4F46E5] bg-purple-50"
-                        : "border-gray-300 hover:border-[#4F46E5]"
-                    }`}
-                  >
-                    <span className="font-semibold">No</span>
-                  </button>
-                </div>
-              </div>
 
-              {isIndependent === true && (
-                <div className="space-y-2">
-                  <Label htmlFor="industry">Rubro *</Label>
-                  <Input
-                    id="industry"
-                    placeholder="Ej: Diseno grafico, Desarrollo de software..."
-                    value={industry}
-                    onChange={(event) => setIndustry(event.target.value)}
-                  />
-                </div>
-              )}
-
-              {isIndependent === false && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Empresa *</Label>
-                    <Input
-                      id="company"
-                      placeholder="Ej: Tech Solutions SpA"
-                      value={company}
-                      onChange={(event) => setCompany(event.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="position">Cargo *</Label>
-                    <Input
-                      id="position"
-                      placeholder="Ej: Desarrollador Senior"
-                      value={position}
-                      onChange={(event) => setPosition(event.target.value)}
-                    />
+                  <div className="space-y-3 rounded-2xl border border-[#E0E7FF] bg-[#F8FAFF] p-4">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="size-4 text-[#4F46E5]" />
+                      <Label className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#4F46E5]">
+                        Materias o intereses
+                      </Label>
+                    </div>
+                    {subjects.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {subjects.map((subject) => (
+                          <Badge
+                            key={subject}
+                            className="rounded-full bg-[#4F46E5] px-3 py-1 text-white hover:bg-[#4338CA]"
+                          >
+                            {subject}
+                            <button
+                              className="ml-2 rounded-full text-white/80 transition hover:text-white"
+                              onClick={() => removeSubject(subject)}
+                              type="button"
+                              aria-label={`Quitar ${subject}`}
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <div className="flex min-h-12 flex-1 items-center rounded-2xl border border-[#E0E7FF] bg-white px-4">
+                        <SetupInput
+                          placeholder="Ej: Algoritmos, Calculo..."
+                          value={newSubject}
+                          onChange={(event) => setNewSubject(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              addSubject();
+                            }
+                          }}
+                        />
+                      </div>
+                      <Button
+                        onClick={addSubject}
+                        type="button"
+                        className="h-12 rounded-2xl bg-[#4F46E5] px-4 font-black text-white hover:bg-[#4338CA]"
+                      >
+                        <Plus className="size-4" />
+                        Agregar
+                      </Button>
+                    </div>
                   </div>
                 </>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <Label className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#4F46E5]">
+                      Eres independiente? *
+                    </Label>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsIndependent(true)}
+                        className={`rounded-2xl border p-4 text-left transition ${
+                          isIndependent === true
+                            ? "border-[#4F46E5] bg-[#EEF2FF] shadow-[0_12px_24px_rgba(79,70,229,0.14)]"
+                            : "border-[#E0E7FF] bg-white hover:border-[#B8C2FF] hover:bg-[#F8FAFF]"
+                        }`}
+                      >
+                        <span className="font-black text-[#1E1B4B]">Si, trabajo por cuenta propia</span>
+                        <span className="mt-1 block text-sm font-medium text-slate-500">
+                          Freelance, independiente o emprendimiento.
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsIndependent(false)}
+                        className={`rounded-2xl border p-4 text-left transition ${
+                          isIndependent === false
+                            ? "border-[#4F46E5] bg-[#EEF2FF] shadow-[0_12px_24px_rgba(79,70,229,0.14)]"
+                            : "border-[#E0E7FF] bg-white hover:border-[#B8C2FF] hover:bg-[#F8FAFF]"
+                        }`}
+                      >
+                        <span className="font-black text-[#1E1B4B]">No, trabajo en una empresa</span>
+                        <span className="mt-1 block text-sm font-medium text-slate-500">
+                          Reserva espacios para tu jornada laboral.
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {isIndependent === true && (
+                    <SetupField id="industry" label="Rubro *" Icon={Briefcase}>
+                      <SetupInput
+                        id="industry"
+                        placeholder="Ej: Diseno grafico, Desarrollo de software..."
+                        value={industry}
+                        onChange={(event) => setIndustry(event.target.value)}
+                      />
+                    </SetupField>
+                  )}
+
+                  {isIndependent === false && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <SetupField id="company" label="Empresa *" Icon={Building2}>
+                        <SetupInput
+                          id="company"
+                          placeholder="Ej: Tech Solutions SpA"
+                          value={company}
+                          onChange={(event) => setCompany(event.target.value)}
+                        />
+                      </SetupField>
+
+                      <SetupField id="position" label="Cargo *" Icon={UserRound}>
+                        <SetupInput
+                          id="position"
+                          placeholder="Ej: Desarrollador Senior"
+                          value={position}
+                          onChange={(event) => setPosition(event.target.value)}
+                        />
+                      </SetupField>
+                    </div>
+                  )}
+                </>
               )}
-            </>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="bio">Descripcion</Label>
-            <Textarea
-              id="bio"
-              placeholder="Cuentanos un poco sobre ti..."
-              value={bio}
-              onChange={(event) => setBio(event.target.value)}
-              rows={3}
-            />
-          </div>
+              <SetupField id="bio" label="Descripcion" Icon={Sparkles} align="start">
+                <SetupTextarea
+                  id="bio"
+                  placeholder="Cuentanos un poco sobre ti..."
+                  value={bio}
+                  onChange={(event) => setBio(event.target.value)}
+                  rows={3}
+                />
+              </SetupField>
 
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" onClick={() => setStep("role")} className="flex-1">
-              Volver
-            </Button>
-            <Button
-              onClick={handleComplete}
-              disabled={isSubmitting}
-              className="flex-1 bg-[#4F46E5] hover:bg-[#4338CA]"
-            >
-              {isSubmitting ? "Guardando..." : "Completar perfil"}
-            </Button>
+              <div className="grid gap-3 pt-2 sm:grid-cols-[0.75fr_1.25fr]">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep("role")}
+                  className="h-12 rounded-2xl border-[#E0E7FF] font-black text-[#4F46E5] hover:bg-[#EEF2FF]"
+                >
+                  <ArrowLeft className="size-4" />
+                  Volver
+                </Button>
+                <Button
+                  onClick={handleComplete}
+                  disabled={isSubmitting}
+                  className="h-12 rounded-2xl bg-[#4F46E5] font-black text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)] hover:bg-[#4338CA]"
+                >
+                  {isSubmitting ? "Guardando..." : "Completar perfil"}
+                </Button>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </motion.div>
+      </div>
     </div>
   );
 }

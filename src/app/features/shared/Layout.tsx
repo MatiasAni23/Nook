@@ -49,7 +49,7 @@ export function Layout() {
 
       {/* Floating circular navigation */}
       <nav
-        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#D9D1FF] bg-white px-2 py-2 sm:gap-1.5 sm:px-2.5"
+        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#E8EAF7] bg-white px-2 py-2 sm:gap-1.5 sm:px-2.5"
         aria-label="Navegacion principal"
       >
         {navItems.map(({ path, icon: Icon, label }) => {
@@ -73,8 +73,8 @@ export function Layout() {
               <motion.span
                 className={`relative grid size-[2.625rem] place-items-center rounded-full border transition-colors duration-300 ${
                   isActive
-                    ? 'border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.34)]'
-                    : 'border-[#E3DCFF] bg-white text-[#6D5DD3] shadow-[0_6px_14px_rgba(79,70,229,0.14)] group-hover:border-[#C9BFFF] group-hover:bg-[#F3F0FF] group-hover:text-[#4F46E5]'
+                    ? 'border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_10px_18px_rgba(79,70,229,0.26)]'
+                    : 'border-[#E8EAF7] bg-white text-[#6D5DD3] shadow-none group-hover:border-[#D7DBF5] group-hover:bg-white group-hover:text-[#4F46E5]'
                 }`}
                 animate={{
                   scale: isActive ? 1.08 : 1,
@@ -82,13 +82,6 @@ export function Layout() {
                 }}
                 transition={{ type: "spring", stiffness: 420, damping: 24 }}
               >
-                {isActive && (
-                  <motion.span
-                    layoutId="active-tab-glow"
-                    className="absolute inset-0 rounded-full bg-[#6B5AF0]"
-                    transition={{ type: "spring", stiffness: 360, damping: 30 }}
-                  />
-                )}
                 <motion.span
                   animate={{ scale: isActive ? 1.08 : 1 }}
                   transition={{ type: "spring", stiffness: 460, damping: 26 }}

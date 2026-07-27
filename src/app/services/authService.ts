@@ -28,6 +28,8 @@ export interface RegisterResult {
   needsEmailVerification: boolean;
 }
 
+const ACCOUNT_EXISTS_MESSAGE = "Este correo ya esta registrado. Intenta iniciar sesion.";
+
 function requireSupabase() {
   if (!supabase) {
     throw new Error("Faltan VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY en el archivo .env.");
@@ -69,10 +71,30 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
+export async function emailAccountExists(email: string) {
+  const client = requireSupabase();
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data, error } = await client.rpc("email_account_exists", {
+    lookup_email: normalizedEmail,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
+}
+
 export async function signUpWithEmail({ name, email, phone, password, role = "student", emailRedirectTo }: RegisterInput) {
   const client = requireSupabase();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (await emailAccountExists(normalizedEmail)) {
+    throw new Error(ACCOUNT_EXISTS_MESSAGE);
+  }
+
   const { data, error } = await client.auth.signUp({
-    email,
+    email: normalizedEmail,
     password,
     options: {
       emailRedirectTo,
