@@ -6,6 +6,16 @@ const IMAGE_CACHE_NAME = "nook-image-cache-v1";
 const objectUrlBySource = new Map<string, string>();
 const pendingSourceLoads = new Map<string, Promise<string>>();
 
+export async function clearCachedImages() {
+  objectUrlBySource.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+  objectUrlBySource.clear();
+  pendingSourceLoads.clear();
+
+  if ("caches" in window) {
+    await caches.delete(IMAGE_CACHE_NAME);
+  }
+}
+
 async function loadCachedImage(source: string) {
   if (!source || source.startsWith("data:") || source.startsWith("blob:")) {
     return source;

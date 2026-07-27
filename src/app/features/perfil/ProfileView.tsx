@@ -11,6 +11,7 @@ import { CachedImage } from "../../components/ui/cached-image";
 import { currentUser } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { signOut } from "../../services/authService";
+import { clearAppCaches } from "../../services/appCacheService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { ProfileSkeleton } from "./ProfileSkeleton";
@@ -200,6 +201,7 @@ export function ProfileView() {
         await signOut();
       }
     } finally {
+      await clearAppCaches();
       clearCurrentUser();
       window.location.replace("/");
     }

@@ -50,6 +50,12 @@ const chatMessagesCache = new Map<string, { timestamp: number; messages: ChatMes
 const chatMessagesRequests = new Map<string, Promise<ChatMessage[]>>();
 let chatSubscriptionId = 0;
 
+export function clearChatServiceCaches() {
+  chatUserCache.clear();
+  chatMessagesCache.clear();
+  chatMessagesRequests.clear();
+}
+
 function mapChatMessage(row: ChatMessageRow): ChatMessage {
   return {
     id: row.id,

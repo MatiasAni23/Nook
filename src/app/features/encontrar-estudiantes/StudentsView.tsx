@@ -21,7 +21,7 @@ interface StudentCard {
   bio: string;
 }
 
-const CACHE_KEY = "nook-students-cache-v1";
+const CACHE_KEY_PREFIX = "nook-students-cache-v1";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function StudentsView() {
@@ -36,6 +36,7 @@ export function StudentsView() {
   const referenceCareer = cachedUser?.profile?.career ?? "";
   const referenceUniversity = cachedUser?.profile?.university ?? "";
   const referenceSubjects = cachedUser?.profile?.subjects ?? [];
+  const cacheKey = `${CACHE_KEY_PREFIX}:${cachedUser?.id ?? "anon"}`;
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -45,7 +46,7 @@ export function StudentsView() {
     }
 
     try {
-      const cached = sessionStorage.getItem(CACHE_KEY);
+      const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached) as { timestamp: number; data: StudentCard[] };
         if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
@@ -55,7 +56,7 @@ export function StudentsView() {
         }
       }
     } catch {
-      sessionStorage.removeItem(CACHE_KEY);
+      sessionStorage.removeItem(cacheKey);
     }
 
     setIsLoadingPeople(true);
@@ -77,7 +78,7 @@ export function StudentsView() {
 
         setPeople(nextPeople);
         sessionStorage.setItem(
-          CACHE_KEY,
+          cacheKey,
           JSON.stringify({ timestamp: Date.now(), data: nextPeople }),
         );
       })
@@ -88,7 +89,7 @@ export function StudentsView() {
         setPeople([]);
       })
       .finally(() => setIsLoadingPeople(false));
-  }, [cachedUser?.id]);
+  }, [cacheKey, cachedUser?.id]);
 
   const filteredStudents = people.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

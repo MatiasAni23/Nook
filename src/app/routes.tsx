@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserRouter, Navigate } from "react-router";
 import { AdminHome } from "./features/admin/AdminHome";
 import { AdminLayout } from "./features/admin/AdminLayout";
@@ -11,7 +11,7 @@ import { ProfileSetupView } from "./features/auth/ProfileSetupView";
 import { RecoverPasswordView } from "./features/auth/RecoverPasswordView";
 import { VerifyAccountView } from "./features/auth/VerifyAccountView";
 import { ChatView } from "./features/chat/ChatView";
-import { clearStoredCurrentUser, useCurrentUser } from "./context/CurrentUserContext";
+import { useCurrentUser } from "./context/CurrentUserContext";
 import { DelegateHome } from "./features/delegado/DelegateHome";
 import { DelegateLayout } from "./features/delegado/DelegateLayout";
 import { DelegateMyPlaces } from "./features/delegado/DelegateMyPlaces";
@@ -27,6 +27,7 @@ import { EditProfileView } from "./features/perfil/EditProfileView";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
 import { Layout } from "./features/shared/Layout";
 import { isSupabaseConfigured } from "./lib/supabase";
+import { clearAppCaches } from "./services/appCacheService";
 import { getCurrentUserProfile } from "./services/currentUserService";
 import {
   ensureAppUserRecord,
@@ -55,16 +56,89 @@ const setGlobalUserRole = (role: UserRole) => {
 };
 
 const logoutAndRedirect = async () => {
-  if (isSupabaseConfigured) {
-    await signOut();
+  try {
+    if (isSupabaseConfigured) {
+      await signOut();
+    }
+  } finally {
+    await clearAppCaches();
+    window.location.replace("/");
   }
-
-  clearStoredCurrentUser();
-  window.location.replace("/");
 };
 
+function PrivateRoute({
+  allowedRoles,
+  children,
+}: {
+  allowedRoles?: UserRole[];
+  children: ReactNode;
+}) {
+  const { clearCurrentUser, currentUser, isLoadingCurrentUser } = useCurrentUser();
+  const [hasSession, setHasSession] = useState<boolean | null>(
+    isSupabaseConfigured ? null : true,
+  );
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setHasSession(true);
+      return;
+    }
+
+    let isMounted = true;
+
+    getCurrentSession()
+      .then(async (session) => {
+        if (!isMounted) return;
+
+        if (!session?.user) {
+          await clearAppCaches();
+          clearCurrentUser();
+          if (isMounted) setHasSession(false);
+          return;
+        }
+
+        setHasSession(true);
+      })
+      .catch(async () => {
+        await clearAppCaches();
+        clearCurrentUser();
+        if (isMounted) setHasSession(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clearCurrentUser]);
+
+  useEffect(() => {
+    if (currentUser?.role) {
+      setGlobalUserRole(currentUser.role);
+    }
+  }, [currentUser?.role]);
+
+  if (!isSupabaseConfigured) return <>{children}</>;
+
+  if (hasSession === false) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (hasSession === null || (isLoadingCurrentUser && !currentUser)) {
+    return <div className="size-full grid place-items-center text-sm text-gray-600">Cargando sesion...</div>;
+  }
+
+  if (!currentUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AuthWrapper() {
-  const { clearCurrentUser, currentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
+  const { clearCurrentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<UserRole>("student");
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
@@ -81,10 +155,6 @@ function AuthWrapper() {
     setUserName(appUser?.name ?? fallbackName);
     setNeedsProfileSetup(!appUser?.profile_completed && role !== "admin" && role !== "delegate");
 
-    if (currentUser?.id === userId) {
-      return;
-    }
-
     const profile = await getCurrentUserProfile();
     if (profile) {
       setCurrentUser(profile);
@@ -96,7 +166,10 @@ function AuthWrapper() {
 
     getCurrentSession()
       .then((session) => {
-        if (!session?.user) return;
+        if (!session?.user) {
+          clearCurrentUser();
+          return clearAppCaches();
+        }
         return applyAuthenticatedUser(
           session.user.id,
           session.user.user_metadata.full_name ?? "",
@@ -144,6 +217,8 @@ function AuthWrapper() {
       throw new Error("No se pudo iniciar sesion.");
     }
 
+    await clearAppCaches();
+
     if (!(await getAppUserRecord(user.id))) {
       await ensureAppUserRecord(user);
     }
@@ -176,6 +251,7 @@ function AuthWrapper() {
 
     await ensureAppUserRecord(user);
 
+    await clearAppCaches();
     setIsAuthenticated(true);
     setUserName(name);
     setNeedsProfileSetup(true);
@@ -195,15 +271,18 @@ function AuthWrapper() {
   };
 
   const handleLogout = async () => {
-    if (isSupabaseConfigured) {
-      await signOut();
+    try {
+      if (isSupabaseConfigured) {
+        await signOut();
+      }
+    } finally {
+      await clearAppCaches();
+      setIsAuthenticated(false);
+      setUserRole("student");
+      setGlobalUserRole("student");
+      setNeedsProfileSetup(false);
+      clearCurrentUser();
     }
-
-    setIsAuthenticated(false);
-    setUserRole("student");
-    setGlobalUserRole("student");
-    setNeedsProfileSetup(false);
-    clearCurrentUser();
   };
 
   if (isInitializing) {
@@ -248,7 +327,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/app",
-    element: <Layout />,
+    element: (
+      <PrivateRoute allowedRoles={["student", "worker"]}>
+        <Layout />
+      </PrivateRoute>
+    ),
     children: [
       { index: true, Component: MapView },
       { path: "profile", Component: ProfileWrapper },
@@ -263,7 +346,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    element: <AdminLayout onLogout={logoutAndRedirect} />,
+    element: (
+      <PrivateRoute allowedRoles={["admin"]}>
+        <AdminLayout onLogout={logoutAndRedirect} />
+      </PrivateRoute>
+    ),
     children: [
       { index: true, Component: AdminHome },
       { path: "places", Component: AdminManagePlaces },
@@ -273,7 +360,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/delegate",
-    element: <DelegateLayout onLogout={logoutAndRedirect} />,
+    element: (
+      <PrivateRoute allowedRoles={["delegate"]}>
+        <DelegateLayout onLogout={logoutAndRedirect} />
+      </PrivateRoute>
+    ),
     children: [
       { index: true, Component: DelegateHome },
       { path: "places", Component: DelegateMyPlaces },

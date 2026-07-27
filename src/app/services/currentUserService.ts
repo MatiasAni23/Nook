@@ -88,6 +88,12 @@ const favoritePlacesCache = new Map<string, { timestamp: number; places: Favorit
 const favoritePlacesRequests = new Map<string, Promise<FavoritePlace[]>>();
 const FAVORITE_PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
+export function clearCurrentUserServiceCaches() {
+  chatUsersCache.clear();
+  favoritePlacesCache.clear();
+  favoritePlacesRequests.clear();
+}
+
 function toFavoritePlace(place: unknown): FavoritePlace | null {
   if (!place || typeof place !== "object") return null;
 

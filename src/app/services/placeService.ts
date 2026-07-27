@@ -92,6 +92,11 @@ const PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 let placesCache: { timestamp: number; places: AppPlace[] } | null = null;
 let placesRequest: Promise<AppPlace[]> | null = null;
 
+export function clearPlacesCache() {
+  placesCache = null;
+  placesRequest = null;
+}
+
 type PlaceRow = {
   id: string;
   name: string;
