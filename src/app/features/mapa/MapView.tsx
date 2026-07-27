@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { APIProvider, Map, Marker, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
+import {
+  APIProvider,
+  Map,
+  Marker,
+  useMap,
+  type MapCameraChangedEvent,
+} from "@vis.gl/react-google-maps";
 import { LocateFixed, Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
@@ -41,6 +47,30 @@ const cleanMapStyles: google.maps.MapTypeStyle[] = [
     stylers: [{ visibility: "off" }],
   },
   {
+    featureType: "poi.business",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.medical",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.park",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.place_of_worship",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.school",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.sports_complex",
+    stylers: [{ visibility: "off" }],
+  },
+  {
     featureType: "transit",
     stylers: [{ visibility: "off" }],
   },
@@ -75,6 +105,36 @@ function RecenterMap({ request }: { request: RecenterRequest | null }) {
   }, [request?.id, map]);
 
   return null;
+}
+
+function PlaceMapMarker({
+  place,
+  onClick,
+}: {
+  place: Pick<AppPlace, "lat" | "lng" | "type" | "name">;
+  onClick: () => void;
+}) {
+  const map = useMap();
+  const canBuildIcon =
+    Boolean(map) &&
+    typeof google !== "undefined" &&
+    typeof google.maps?.Size === "function" &&
+    typeof google.maps?.Point === "function";
+
+  if (!canBuildIcon) return null;
+
+  return (
+    <Marker
+      position={{ lat: place.lat, lng: place.lng }}
+      title={place.name}
+      onClick={onClick}
+      icon={{
+        url: getPlacePinAsset(place.type),
+        scaledSize: new google.maps.Size(50, 50),
+        anchor: new google.maps.Point(25, 50),
+      }}
+    />
+  );
 }
 
 export function MapView() {
@@ -320,18 +380,6 @@ export function MapView() {
     }
   };
 
-  const getPlaceMarkerIcon = (type: string): string | google.maps.Icon => {
-    const url = getPlacePinAsset(type);
-
-    if (typeof google === "undefined") return url;
-
-    return {
-      url,
-      scaledSize: new google.maps.Size(50, 50),
-      anchor: new google.maps.Point(25, 50),
-    };
-  };
-
   const getUserMarkerIcon = () => {
     return createSvgMarkerUrl(`
         <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
@@ -482,11 +530,10 @@ export function MapView() {
                 const placeUrl = userRole === 'worker' ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
 
                 return (
-                  <Marker
+                  <PlaceMapMarker
                     key={place.id}
-                    position={{ lat: place.lat, lng: place.lng }}
+                    place={place}
                     onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })}
-                    icon={getPlaceMarkerIcon(place.type)}
                   />
                 );
               })}

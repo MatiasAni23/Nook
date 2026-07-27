@@ -1,12 +1,42 @@
 import { useEffect, useState } from "react";
 import { MapPin, TrendingUp, Users, Star } from "lucide-react";
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
 import { Card, CardContent } from "../../components/ui/card";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
 import { getPlacePinAsset } from "../mapa/placePinAssets";
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+function AdminPlaceMapMarker({
+  place,
+  onClick,
+}: {
+  place: AppPlace;
+  onClick: () => void;
+}) {
+  const map = useMap();
+  const canBuildIcon =
+    Boolean(map) &&
+    typeof google !== "undefined" &&
+    typeof google.maps?.Size === "function" &&
+    typeof google.maps?.Point === "function";
+
+  if (!canBuildIcon) return null;
+
+  return (
+    <Marker
+      position={{ lat: place.lat, lng: place.lng }}
+      title={place.name}
+      onClick={onClick}
+      icon={{
+        url: getPlacePinAsset(place.type),
+        scaledSize: new google.maps.Size(50, 50),
+        anchor: new google.maps.Point(25, 50),
+      }}
+    />
+  );
+}
 
 export function AdminHome() {
   const [userLocation] = useState({ lat: -33.4569, lng: -70.6483 });
@@ -66,18 +96,6 @@ export function AdminHome() {
       case 'private_office': return '🚪';
       default: return '📍';
     }
-  };
-
-  const getPlaceMarkerIcon = (type: string): string | google.maps.Icon => {
-    const url = getPlacePinAsset(type);
-
-    if (typeof google === "undefined") return url;
-
-    return {
-      url,
-      scaledSize: new google.maps.Size(50, 50),
-      anchor: new google.maps.Point(25, 50),
-    };
   };
 
   return (
@@ -140,11 +158,9 @@ export function AdminHome() {
 
                       {/* Place markers */}
                       {dbPlaces.map((place) => (
-                        <Marker
+                        <AdminPlaceMapMarker
                           key={place.id}
-                          position={{ lat: place.lat, lng: place.lng }}
-                          title={place.name}
-                          icon={getPlaceMarkerIcon(place.type)}
+                          place={place}
                           onClick={() => setSelectedPlace(place)}
                         />
                       ))}
