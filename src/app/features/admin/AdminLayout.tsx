@@ -56,19 +56,21 @@ export function AdminLayout({ onLogout }: AdminLayoutProps) {
       <div className="pointer-events-none fixed inset-x-0 top-0 hidden h-56 bg-gradient-to-b from-white to-transparent md:block" />
 
       <aside className="group/sidebar fixed bottom-0 right-0 top-0 z-40 hidden w-20 flex-col overflow-hidden rounded-l-[1.35rem] border-l border-[#E6E8F5] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] transition-[width] duration-300 hover:w-72 md:flex">
-        <div className="border-b border-[#EEF0F8] p-4">
-          <div className="flex items-center gap-3">
-            <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_12px_24px_rgba(79,70,229,0.24)]">
+        <div className="relative h-[5.75rem] border-b border-[#EEF0F8]">
+          <div className="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center transition-[left,transform] duration-300 group-hover/sidebar:left-4 group-hover/sidebar:translate-x-0">
+            <div className="grid size-12 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_12px_24px_rgba(79,70,229,0.24)]">
               <MapPin className="size-5" />
             </div>
-            <div className="min-w-0 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+          </div>
+          <div className="absolute inset-y-0 left-20 right-4 flex min-w-0 items-center opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+            <div className="min-w-0">
               <p className="text-lg font-black text-[#1E1B4B]">Nook Admin</p>
               <p className="text-xs font-bold text-slate-400">Panel operativo</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2 p-4" aria-label="Navegacion administrador">
+        <nav className="flex-1 space-y-2 py-4" aria-label="Navegacion administrador">
           {navItems.map(({ path, icon: Icon, label, description }) => {
             const isActive = isActivePath(path);
 
@@ -76,7 +78,7 @@ export function AdminLayout({ onLogout }: AdminLayoutProps) {
               <button
                 key={path}
                 type="button"
-                className={`group flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition ${
+                className={`group relative h-16 w-full rounded-2xl border text-left transition ${
                   isActive
                     ? "border-transparent bg-transparent text-[#4F46E5]"
                     : "border-transparent text-slate-500 hover:border-[#E6E8F5] hover:bg-[#FAFBFF] hover:text-[#1E1B4B]"
@@ -84,37 +86,41 @@ export function AdminLayout({ onLogout }: AdminLayoutProps) {
                 onClick={() => navigate(path)}
                 aria-current={isActive ? "page" : undefined}
               >
-                <div
-                  className={`grid size-10 shrink-0 place-items-center rounded-xl transition ${
+                <div className="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center transition-[left,transform] duration-300 group-hover/sidebar:left-4 group-hover/sidebar:translate-x-0">
+                  <div
+                    className={`grid size-10 place-items-center rounded-xl transition ${
                     isActive ? "bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.24)]" : "bg-[#F1F3FA] text-slate-500 group-hover:text-[#4F46E5]"
                   }`}
-                >
-                  <Icon className="size-5" />
+                  >
+                    <Icon className="size-5" />
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+                <div className="absolute inset-y-0 left-16 right-10 flex min-w-0 flex-col justify-center opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
                   <p className="truncate text-sm font-black">{label}</p>
                   <p className="truncate text-xs font-medium text-slate-400">{description}</p>
                 </div>
                 <ChevronRight
-                  className={`size-4 shrink-0 transition ${isActive ? "opacity-0 group-hover/sidebar:opacity-100" : "opacity-0 group-hover/sidebar:opacity-60"}`}
+                  className={`absolute right-4 top-1/2 size-4 -translate-y-1/2 transition ${isActive ? "opacity-0 group-hover/sidebar:opacity-100" : "opacity-0 group-hover/sidebar:opacity-60"}`}
                 />
               </button>
             );
           })}
         </nav>
 
-        <div className="border-t border-[#EEF0F8] p-4">
-          <Button
-            variant="outline"
-            className="h-12 w-full justify-start overflow-hidden rounded-2xl border-[#E1E5F4] px-3 font-bold text-slate-600 hover:bg-red-50 hover:text-red-600"
+        <div className="border-t border-[#EEF0F8] py-4">
+          <button
+            type="button"
+            className="relative h-12 w-full rounded-2xl border border-[#E1E5F4] font-bold text-slate-600 transition hover:bg-red-50 hover:text-red-600"
             onClick={onLogout}
             aria-label="Cerrar sesion"
           >
-            <LogOut className="size-5 shrink-0" />
-            <span className="ml-3 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+            <span className="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center transition-[left,transform] duration-300 group-hover/sidebar:left-4 group-hover/sidebar:translate-x-0">
+              <LogOut className="size-5" />
+            </span>
+            <span className="absolute inset-y-0 left-16 right-4 flex items-center opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
               Cerrar sesion
             </span>
-          </Button>
+          </button>
         </div>
       </aside>
 
