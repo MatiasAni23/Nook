@@ -206,10 +206,20 @@ export function AdminManagePlaces() {
   if (view === "add") {
     return (
       <div className="size-full flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          <AdminAddPlace onCreated={handlePlaceCreated} />
+        <div className="hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setView("list")}
+            className="rounded-xl border-[#E1E5F4] bg-white font-semibold text-slate-700 shadow-sm hover:border-[#4F46E5] hover:bg-[#F8FAFF] hover:text-[#4F46E5]"
+          >
+            ← Volver a listado
+          </Button>
         </div>
-        <div className="absolute top-4 left-4 z-50">
+        <div className="flex-1 overflow-hidden">
+          <AdminAddPlace onCreated={handlePlaceCreated} onBack={() => setView("list")} />
+        </div>
+        <div className="hidden">
           <Button 
             variant="outline" 
             size="sm" 
@@ -249,10 +259,30 @@ export function AdminManagePlaces() {
   if (view === "edit" && editingPlace) {
     return (
       <div className="size-full flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          <AdminEditPlace place={editingPlace} onSave={handleSaveComplete} />
+        <div className="hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setView("list");
+              setEditingPlace(null);
+            }}
+            className="rounded-xl border-[#E1E5F4] bg-white font-semibold text-slate-700 shadow-sm hover:border-[#4F46E5] hover:bg-[#F8FAFF] hover:text-[#4F46E5]"
+          >
+            ← Volver a listado
+          </Button>
         </div>
-        <div className="absolute top-4 left-4 z-50">
+        <div className="flex-1 overflow-hidden">
+          <AdminEditPlace
+            place={editingPlace}
+            onSave={handleSaveComplete}
+            onBack={() => {
+              setView("list");
+              setEditingPlace(null);
+            }}
+          />
+        </div>
+        <div className="hidden">
           <Button
             variant="outline"
             size="sm"

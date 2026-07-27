@@ -4,6 +4,7 @@ import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
 import { Card, CardContent } from "../../components/ui/card";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+import { cleanMapStyles } from "../mapa/mapStyles";
 import { getPlacePinAsset } from "../mapa/placePinAssets";
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
@@ -151,6 +152,7 @@ export function AdminHome() {
                       disableDefaultUI
                       clickableIcons={false}
                       gestureHandling="greedy"
+                      styles={cleanMapStyles}
                       className="absolute inset-0"
                     >
                       {/* User location marker */}

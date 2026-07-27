@@ -17,6 +17,7 @@ import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/place
 import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./placeFilters";
 import { getDetailNavigationState } from "./navigationState";
 import { getPlacePinAsset } from "./placePinAssets";
+import { cleanMapStyles } from "./mapStyles";
 
 // Configuracion base del mapa y del rol activo.
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
@@ -39,57 +40,6 @@ type RecenterRequest = {
 };
 
 let savedMapCamera: SavedMapCamera | null = null;
-
-// Estilo limpio para reducir ruido visual y destacar los lugares de Nook.
-const cleanMapStyles: google.maps.MapTypeStyle[] = [
-  {
-    featureType: "poi",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.business",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.medical",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.park",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.place_of_worship",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.school",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "poi.sports_complex",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "transit",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "administrative",
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    featureType: "landscape",
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-];
 
 const createSvgMarkerUrl = (svg: string) => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;

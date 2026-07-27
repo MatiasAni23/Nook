@@ -44,6 +44,7 @@ import {
 
 interface AdminAddPlaceProps {
   onCreated?: (place: AppPlace) => void;
+  onBack?: () => void;
 }
 
 type AmenityOption = {
@@ -163,7 +164,7 @@ function CenterMapPin() {
   );
 }
 
-export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
+export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PlaceCategory>("study");
   const [type, setType] = useState<PlaceType>("library");
@@ -452,7 +453,20 @@ export function AdminAddPlace({ onCreated }: AdminAddPlaceProps) {
       <div className="flex-1 overflow-auto p-4 pb-32">
         <div className="space-y-4">
           <div>
-            <h2 className="text-2xl mb-1" style={{ fontWeight: 700 }}>Agregar Nuevo Lugar</h2>
+            <div className="mb-1 flex items-center gap-3">
+              {onBack && (
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={onBack}
+                  className="size-10 shrink-0 rounded-xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.20)] hover:bg-[#4338CA]"
+                  aria-label="Volver a listado"
+                >
+                  <ArrowLeft className="size-5" />
+                </Button>
+              )}
+              <h2 className="text-2xl" style={{ fontWeight: 700 }}>Agregar Nuevo Lugar</h2>
+            </div>
             <p className="text-gray-600">Completa la informacion del espacio y fija su ubicacion.</p>
           </div>
 

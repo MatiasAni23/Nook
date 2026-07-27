@@ -1,61 +1,186 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { Home, Plus, BarChart3, LogOut, Settings } from "lucide-react";
+import {
+  BarChart3,
+  ChevronRight,
+  Home,
+  LogOut,
+  MapPin,
+  Plus,
+  Settings,
+} from "lucide-react";
 import { Button } from "../../components/ui/button";
 
 interface AdminLayoutProps {
   onLogout: () => void;
 }
 
+const navItems = [
+  {
+    path: "/admin",
+    icon: Home,
+    label: "Inicio",
+    description: "Resumen general",
+  },
+  {
+    path: "/admin/places",
+    icon: Plus,
+    label: "Lugares",
+    description: "Crear y editar espacios",
+  },
+  {
+    path: "/admin/stats",
+    icon: BarChart3,
+    label: "Estadisticas",
+    description: "Metricas y rendimiento",
+  },
+  {
+    path: "/admin/management",
+    icon: Settings,
+    label: "Gestion",
+    description: "Usuarios y soporte",
+  },
+];
+
 export function AdminLayout({ onLogout }: AdminLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const navItems = [
-    { path: "/admin", icon: Home, label: "Inicio" },
-    { path: "/admin/places", icon: Plus, label: "Lugares" },
-    { path: "/admin/stats", icon: BarChart3, label: "Estadísticas" },
-    { path: "/admin/management", icon: Settings, label: "Gestión" },
-  ];
+  const isActivePath = (path: string) =>
+    location.pathname === path ||
+    (path === "/admin/management" && location.pathname.startsWith("/admin/management")) ||
+    (path === "/admin/places" && location.pathname.startsWith("/admin/places"));
+  const activeItem = navItems.find((item) => isActivePath(item.path)) ?? navItems[0];
 
   return (
-    <div className="size-full relative bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-4 py-3 shadow-sm flex items-center justify-between">
-        <div>
-          <h1 className="text-lg text-[#4F46E5]" style={{ fontWeight: 800 }}>Admin - Nook</h1>
+    <div className="relative min-h-screen bg-[#F6F7FB] text-[#111827]">
+      <div className="pointer-events-none fixed inset-x-0 top-0 hidden h-56 bg-gradient-to-b from-white to-transparent md:block" />
+
+      <aside className="group/sidebar fixed bottom-0 right-0 top-0 z-40 hidden w-20 flex-col overflow-hidden rounded-l-[1.35rem] border-l border-[#E6E8F5] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] transition-[width] duration-300 hover:w-72 md:flex">
+        <div className="border-b border-[#EEF0F8] p-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_12px_24px_rgba(79,70,229,0.24)]">
+              <MapPin className="size-5" />
+            </div>
+            <div className="min-w-0 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+              <p className="text-lg font-black text-[#1E1B4B]">Nook Admin</p>
+              <p className="text-xs font-bold text-slate-400">Panel operativo</p>
+            </div>
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onLogout}>
-          <LogOut className="size-4 mr-2" />
-          Salir
-        </Button>
-      </header>
 
-      <main className="size-full">
-        <Outlet />
-      </main>
+        <nav className="flex-1 space-y-2 p-4" aria-label="Navegacion administrador">
+          {navItems.map(({ path, icon: Icon, label, description }) => {
+            const isActive = isActivePath(path);
 
-      {/* Gradient overlay for navigation */}
-      <div className="fixed bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none z-40" />
+            return (
+              <button
+                key={path}
+                type="button"
+                className={`group flex w-full items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition ${
+                  isActive
+                    ? "border-transparent bg-transparent text-[#4F46E5]"
+                    : "border-transparent text-slate-500 hover:border-[#E6E8F5] hover:bg-[#FAFBFF] hover:text-[#1E1B4B]"
+                }`}
+                onClick={() => navigate(path)}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <div
+                  className={`grid size-10 shrink-0 place-items-center rounded-xl transition ${
+                    isActive ? "bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.24)]" : "bg-[#F1F3FA] text-slate-500 group-hover:text-[#4F46E5]"
+                  }`}
+                >
+                  <Icon className="size-5" />
+                </div>
+                <div className="min-w-0 flex-1 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+                  <p className="truncate text-sm font-black">{label}</p>
+                  <p className="truncate text-xs font-medium text-slate-400">{description}</p>
+                </div>
+                <ChevronRight
+                  className={`size-4 shrink-0 transition ${isActive ? "opacity-0 group-hover/sidebar:opacity-100" : "opacity-0 group-hover/sidebar:opacity-60"}`}
+                />
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Floating circular navigation */}
-      <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3">
+        <div className="border-t border-[#EEF0F8] p-4">
+          <Button
+            variant="outline"
+            className="h-12 w-full justify-start overflow-hidden rounded-2xl border-[#E1E5F4] px-3 font-bold text-slate-600 hover:bg-red-50 hover:text-red-600"
+            onClick={onLogout}
+            aria-label="Cerrar sesion"
+          >
+            <LogOut className="size-5 shrink-0" />
+            <span className="ml-3 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
+              Cerrar sesion
+            </span>
+          </Button>
+        </div>
+      </aside>
+
+      <div className="relative min-h-screen md:pr-20">
+        <header className="sticky top-0 z-30 border-b border-[#E6E8F5]/80 bg-white/95 px-4 py-4 backdrop-blur md:px-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-black tracking-normal text-[#111827] md:text-3xl">
+                  {activeItem.label}
+                </h1>
+                <p className="hidden text-sm font-medium text-slate-500 md:block">{activeItem.description}</p>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLogout}
+                className="rounded-xl font-bold text-slate-500 hover:bg-red-50 hover:text-red-600 md:hidden"
+              >
+                <LogOut className="mr-2 size-4" />
+                Salir
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="mx-auto min-h-[calc(100vh-5rem)] max-w-7xl px-0 pb-28 md:px-8 md:pb-8">
+          <Outlet />
+        </main>
+      </div>
+
+      <div className="pointer-events-none fixed bottom-0 left-0 right-0 z-40 h-28 bg-gradient-to-t from-white via-white/85 to-transparent md:hidden" />
+
+      <nav
+        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#E8EAF7] bg-white px-2 py-2 shadow-[0_16px_34px_rgba(15,23,42,0.12)] sm:gap-1.5 sm:px-2.5 md:hidden"
+        aria-label="Navegacion administrador movil"
+      >
         {navItems.map(({ path, icon: Icon, label }) => {
-          const isActive = location.pathname === path ||
-            (path === "/admin/management" && location.pathname.startsWith("/admin/management")) ||
-            (path === "/admin/places" && location.pathname.startsWith("/admin/places"));
+          const isActive = isActivePath(path);
 
           return (
             <button
               key={path}
-              className={`size-12 rounded-full flex items-center justify-center transition-all shadow-lg ${
-                isActive
-                  ? 'bg-[#4F46E5] text-white scale-105'
-                  : 'bg-white text-gray-600 hover:bg-purple-50'
-              }`}
+              type="button"
+              className="group flex w-[4rem] flex-col items-center gap-1 outline-none"
               onClick={() => navigate(path)}
               aria-label={label}
+              aria-current={isActive ? "page" : undefined}
             >
-              <Icon className="size-5" />
+              <span
+                className={`grid size-[2.625rem] place-items-center rounded-full border transition ${
+                  isActive
+                    ? "border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_10px_18px_rgba(79,70,229,0.26)]"
+                    : "border-[#E8EAF7] bg-white text-[#6D5DD3] group-hover:border-[#D7DBF5] group-hover:text-[#4F46E5]"
+                }`}
+              >
+                <Icon className="size-[1.125rem]" strokeWidth={isActive ? 2.6 : 2.2} />
+              </span>
+              <span
+                className={`w-full truncate text-center text-[10px] font-semibold leading-none transition-colors ${
+                  isActive ? "text-[#4F46E5]" : "text-[#7C70C9] group-hover:text-[#4F46E5]"
+                }`}
+              >
+                {label}
+              </span>
             </button>
           );
         })}
