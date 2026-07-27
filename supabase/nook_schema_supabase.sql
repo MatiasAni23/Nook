@@ -912,6 +912,19 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 GRANT EXECUTE ON FUNCTION is_current_user_delegate_for_place(UUID) TO authenticated;
 
+CREATE POLICY users_select_reservation_participants_for_managed_places ON users
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1
+            FROM reservations
+            WHERE reservations.user_id = users.id
+            AND (
+                is_current_user_admin()
+                OR is_current_user_delegate_for_place(reservations.place_id)
+            )
+        )
+    );
+
 CREATE OR REPLACE FUNCTION is_current_user_place_manager()
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -964,12 +977,28 @@ CREATE POLICY place_amenities_delete_admin ON place_amenities
 CREATE POLICY reservations_select_own ON reservations
     FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY reservations_select_place_manager ON reservations
+    FOR SELECT USING (
+        is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+    );
+
 CREATE POLICY reservations_insert_own ON reservations
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 CREATE POLICY reservations_update_own_pending ON reservations
     FOR UPDATE USING (auth.uid() = user_id AND status = 'pending')
     WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY reservations_update_place_manager ON reservations
+    FOR UPDATE USING (
+        is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+    )
+    WITH CHECK (
+        is_current_user_admin()
+        OR is_current_user_delegate_for_place(place_id)
+    );
 
 -- Reviews propias y lectura publica.
 CREATE POLICY reviews_select_all ON reviews

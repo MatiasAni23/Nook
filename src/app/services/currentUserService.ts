@@ -84,11 +84,16 @@ export interface ChatUser {
 
 const chatUsersCache = new Map<string, { timestamp: number; users: ChatUser[] }>();
 const CHAT_USERS_CACHE_TTL_MS = 5 * 60 * 1000;
+let currentUserProfileCache: { timestamp: number; userId: string; profile: CurrentUserProfile | null } | null = null;
+let currentUserProfileRequest: Promise<CurrentUserProfile | null> | null = null;
+const CURRENT_USER_PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 const favoritePlacesCache = new Map<string, { timestamp: number; places: FavoritePlace[] }>();
 const favoritePlacesRequests = new Map<string, Promise<FavoritePlace[]>>();
 const FAVORITE_PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function clearCurrentUserServiceCaches() {
+  currentUserProfileCache = null;
+  currentUserProfileRequest = null;
   chatUsersCache.clear();
   favoritePlacesCache.clear();
   favoritePlacesRequests.clear();
@@ -121,7 +126,7 @@ function toFavoritePlace(place: unknown): FavoritePlace | null {
   };
 }
 
-export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null> {
+async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
   if (!supabase) return null;
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -179,6 +184,45 @@ export async function getCurrentUserProfile(): Promise<CurrentUserProfile | null
   };
 }
 
+export async function getCurrentUserProfile(options?: { forceRefresh?: boolean }): Promise<CurrentUserProfile | null> {
+  if (!supabase) return null;
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  const sessionUserId = sessionData.session?.user.id;
+
+  if (
+    !options?.forceRefresh &&
+    sessionUserId &&
+    currentUserProfileCache?.userId === sessionUserId &&
+    Date.now() - currentUserProfileCache.timestamp < CURRENT_USER_PROFILE_CACHE_TTL_MS
+  ) {
+    return currentUserProfileCache.profile;
+  }
+
+  if (!options?.forceRefresh && currentUserProfileRequest) {
+    return currentUserProfileRequest;
+  }
+
+  currentUserProfileRequest = fetchCurrentUserProfile()
+    .then((profile) => {
+      if (profile) {
+        currentUserProfileCache = {
+          timestamp: Date.now(),
+          userId: profile.id,
+          profile,
+        };
+      } else {
+        currentUserProfileCache = null;
+      }
+      return profile;
+    })
+    .finally(() => {
+      currentUserProfileRequest = null;
+    });
+
+  return currentUserProfileRequest;
+}
+
 export async function updateCurrentUserProfile(input: {
   name: string;
   role: "student" | "worker";
@@ -233,6 +277,8 @@ export async function updateCurrentUserProfile(input: {
 
     if (avatarError) throw avatarError;
   }
+
+  currentUserProfileCache = null;
 }
 
 export async function uploadCurrentUserProfileImage(file: File) {
@@ -278,6 +324,7 @@ export async function uploadCurrentUserProfileImage(file: File) {
 
   if (userError) throw userError;
 
+  currentUserProfileCache = null;
   return imageUrl;
 }
 

@@ -1,7 +1,9 @@
 import { clearStoredCurrentUser } from "../context/CurrentUserContext";
 import { clearCachedImages } from "../components/ui/cached-image";
+import { clearAdminManagementCache } from "./adminManagementService";
 import { clearChatServiceCaches } from "./chatService";
 import { clearCurrentUserServiceCaches } from "./currentUserService";
+import { clearDelegateServiceCache } from "./delegateService";
 import { clearPlacesCache } from "./placeService";
 
 function clearNookSessionStorage() {
@@ -14,8 +16,10 @@ function clearNookSessionStorage() {
 
 export async function clearAppCaches() {
   clearStoredCurrentUser();
+  clearAdminManagementCache();
   clearCurrentUserServiceCaches();
   clearChatServiceCaches();
+  clearDelegateServiceCache();
   clearPlacesCache();
   clearNookSessionStorage();
   await clearCachedImages();
