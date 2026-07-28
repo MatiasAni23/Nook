@@ -1,2 +1,5 @@
 [functions.send-delegate-invitation]
 verify_jwt = false
+
+[functions.complete-password-recovery]
+verify_jwt = false

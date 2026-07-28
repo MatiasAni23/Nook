@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import type { RegisterResult } from "../../services/authService";
+import { LegalDocumentsDialog, type LegalDocument } from "./LegalDocumentsDialog";
 
 interface LoginViewProps {
   onLogin: (email: string, password: string) => Promise<void> | void;
@@ -277,6 +278,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
 
   const passwordScore = useMemo(() => getPasswordScore(registerPassword), [registerPassword]);
   const passwordStrength = getPasswordStrength(passwordScore);
@@ -555,7 +557,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                       <button
                         type="button"
                         onClick={() => navigate("/recover-password")}
-                        className="w-full rounded-xl px-3 py-2 text-xs font-black text-slate-400 transition hover:bg-[#EEF2FF] hover:text-[#4F46E5]"
+                        className="w-full px-3 py-2 text-xs font-black text-slate-400 transition hover:text-[#4F46E5] hover:underline hover:decoration-2 hover:underline-offset-4"
                       >
                         Olvide mi contraseña
                       </button>
@@ -679,13 +681,15 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
               </Tabs>
               <p className="mt-6 hidden text-center text-xs font-medium text-slate-300 lg:block">
                 Al continuar aceptas los{" "}
-                <span className="font-black text-[#4F46E5]">Terminos</span> y la{" "}
-                <span className="font-black text-[#4F46E5]">Privacidad</span>
+                <button type="button" onClick={() => setLegalDocument("terms")} className="inline-block text-xs font-bold text-[#4F46E5] transition-transform duration-200 hover:-translate-y-px hover:scale-[1.03] hover:text-[#4338CA]">Términos</button>{" "}
+                y la{" "}
+                <button type="button" onClick={() => setLegalDocument("privacy")} className="inline-block text-xs font-bold text-[#4F46E5] transition-transform duration-200 hover:-translate-y-px hover:scale-[1.03] hover:text-[#4338CA]">Privacidad</button>
               </p>
             </div>
           </motion.div>
         </section>
       </div>
+      <LegalDocumentsDialog document={legalDocument} onDocumentChange={setLegalDocument} />
     </div>
   );
 }

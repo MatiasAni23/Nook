@@ -169,6 +169,46 @@ export async function verifyPasswordRecoveryCode(email: string, code: string) {
   return data;
 }
 
+export async function completePasswordRecovery(email: string, code: string, password: string) {
+  const client = requireSupabase();
+  const { data, error } = await client.functions.invoke("complete-password-recovery", {
+    body: {
+      email: email.trim().toLowerCase(),
+      code: code.replace(/\s/g, ""),
+      password,
+    },
+  });
+
+  if (error) {
+    const context = (error as { context?: unknown }).context;
+
+    if (context instanceof Response) {
+      let payload: { error?: string } | null = null;
+
+      try {
+        payload = await context.clone().json();
+      } catch {
+        // Fall through to the original Edge Function error below.
+      }
+
+      if (payload?.error === "invalid_or_expired_code") {
+        throw new Error("El código no es válido o ya expiró. Solicita uno nuevo e intenta otra vez.");
+      }
+      if (payload?.error === "weak_password") {
+        throw new Error("La contraseña no cumple los requisitos de seguridad.");
+      }
+    }
+
+    throw error;
+  }
+
+  if (!data?.ok) {
+    throw new Error("No se pudo actualizar la contraseña.");
+  }
+
+  return data;
+}
+
 export async function updateRecoveredPassword(password: string) {
   const client = requireSupabase();
   const { data, error } = await client.auth.updateUser({ password });
