@@ -7,7 +7,7 @@ import {
   useMap,
   type MapCameraChangedEvent,
 } from "@vis.gl/react-google-maps";
-import { LocateFixed, Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
+import { Crown, LocateFixed, Search, SlidersHorizontal, ChevronDown, Star } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Card, CardContent } from "../../components/ui/card";
 import { CachedImage } from "../../components/ui/cached-image";
@@ -634,6 +634,12 @@ export function MapView() {
                     {/* Informacion resumida del lugar */}
                     <div className="p-2">
                       <div onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app") })} className="cursor-pointer">
+                        {place.isPromoted && (
+                          <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#4F46E5]">
+                            <Crown className="size-3" />
+                            Destacado
+                          </div>
+                        )}
                         <h4 className="font-semibold text-xs line-clamp-1 mb-0.5">{place.name}</h4>
                         <p className="text-xs text-gray-400 mb-1 line-clamp-1">{getPlaceZoneLabel(place)}</p>
                         {placeHasPrice ? (

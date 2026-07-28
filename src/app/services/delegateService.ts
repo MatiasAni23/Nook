@@ -23,6 +23,7 @@ export interface DelegateDashboardData {
   profile: CurrentUserProfile | null;
   places: DelegateAssignedPlace[];
   reservations: DelegateReservation[];
+  subscriptionActive: boolean;
 }
 
 const DELEGATE_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -60,6 +61,31 @@ function normalizePaymentMethod(value: string | null | undefined, amount: number
 function getRelatedSingle<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+export async function getCurrentDelegateSubscription(options?: { forceRefresh?: boolean }) {
+  const client = requireSupabase();
+  const { data: userData, error: userError } = await client.auth.getUser();
+
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("No hay un usuario autenticado.");
+
+  if (
+    !options?.forceRefresh &&
+    dashboardCache?.userId === userData.user.id &&
+    Date.now() - dashboardCache.timestamp < DELEGATE_CACHE_TTL_MS
+  ) {
+    return dashboardCache.dashboard.subscriptionActive;
+  }
+
+  const { data, error } = await client
+    .from("delegates")
+    .select("subscription_active")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.subscription_active);
 }
 
 async function fetchCurrentDelegateReservations(): Promise<{ userId: string; reservations: DelegateReservation[] }> {
@@ -184,12 +210,13 @@ export async function getCurrentDelegateDashboard(options?: { forceRefresh?: boo
     getCurrentUserProfile(options),
     listCurrentDelegatePlaces(options),
     listCurrentDelegateReservations(options),
+    getCurrentDelegateSubscription(options),
   ])
-    .then(([profile, places, reservations]) => {
+    .then(([profile, places, reservations, subscriptionActive]) => {
       const userId = profile?.id ?? sessionUserId;
       if (!userId) throw new Error("No hay un usuario autenticado.");
 
-      const dashboard = { profile, places, reservations };
+      const dashboard = { profile, places, reservations, subscriptionActive };
       dashboardCache = {
         timestamp: Date.now(),
         userId,
@@ -211,8 +238,9 @@ export async function getFreshCurrentDelegateDashboard(): Promise<DelegateDashbo
     listCurrentDelegatePlaces({ forceRefresh: true }),
     listCurrentDelegateReservations({ forceRefresh: true }),
   ]);
+  const subscriptionActive = await getCurrentDelegateSubscription({ forceRefresh: true });
 
-  const dashboard = { profile, places, reservations };
+  const dashboard = { profile, places, reservations, subscriptionActive };
   if (profile) {
     dashboardCache = {
       timestamp: Date.now(),

@@ -44,6 +44,7 @@ export interface AppPlace {
   capacityMax?: number | null;
   images: string[];
   amenities: PlaceAmenity[];
+  isPromoted?: boolean;
 }
 
 export interface CreatePlaceInput {
@@ -126,6 +127,7 @@ type PlaceRow = {
     is_available: boolean;
     additional_info: string | null;
   }> | null;
+  is_promoted?: boolean | null;
 };
 
 function requireSupabase() {
@@ -186,11 +188,20 @@ function toAppPlace(row: PlaceRow): AppPlace {
       isAvailable: amenity.is_available,
       additionalInfo: amenity.additional_info,
     })),
+    isPromoted: Boolean(row.is_promoted),
   };
 }
 
 async function fetchPlaces(): Promise<AppPlace[]> {
   const client = requireSupabase();
+  const promotedResult = await client.rpc("list_public_places");
+
+  if (!promotedResult.error && promotedResult.data) {
+    return ((promotedResult.data ?? []) as PlaceRow[])
+      .map(toAppPlace)
+      .sort(sortPromotedPlaces);
+  }
+
   const { data, error } = await client
     .from("places")
     .select(
@@ -230,7 +241,13 @@ async function fetchPlaces(): Promise<AppPlace[]> {
 
   if (error) throw error;
 
-  return ((data ?? []) as PlaceRow[]).map(toAppPlace);
+  return ((data ?? []) as PlaceRow[]).map(toAppPlace).sort(sortPromotedPlaces);
+}
+
+export function sortPromotedPlaces(a: AppPlace, b: AppPlace) {
+  if (a.isPromoted !== b.isPromoted) return a.isPromoted ? -1 : 1;
+  if (b.rating !== a.rating) return b.rating - a.rating;
+  return b.reviews - a.reviews;
 }
 
 export function getCachedPlaces() {

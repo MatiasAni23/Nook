@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { AlertTriangle, Bell, Search, Star } from "lucide-react";
+import { AlertTriangle, Bell, Crown, Search, Star } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
@@ -341,8 +341,16 @@ export function DiscoverView() {
 
                     <div className="flex h-24 flex-1 min-w-0 flex-col justify-between">
                       <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-semibold text-sm leading-tight line-clamp-1">{place.name}</h4>
+                          <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            {place.isPromoted && (
+                              <div className="mb-0.5 inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-[#4F46E5]">
+                                <Crown className="size-3" />
+                                Destacado
+                              </div>
+                            )}
+                            <h4 className="font-semibold text-sm leading-tight line-clamp-1">{place.name}</h4>
+                          </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <Star className="size-3 fill-yellow-400 text-yellow-400" />
                             <span className="text-xs font-semibold">{place.rating}</span>

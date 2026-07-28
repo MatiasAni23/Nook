@@ -159,6 +159,7 @@ CREATE TABLE delegates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'suspended', 'pending')),
+    subscription_active BOOLEAN NOT NULL DEFAULT FALSE,
     joined_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_active TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     notes TEXT,
@@ -168,6 +169,7 @@ CREATE TABLE delegates (
 
 CREATE INDEX idx_delegates_user_id ON delegates(user_id);
 CREATE INDEX idx_delegates_status ON delegates(status);
+CREATE INDEX idx_delegates_subscription_active ON delegates(subscription_active);
 
 -- =============================================
 -- TABLA: delegate_invitations
@@ -669,6 +671,102 @@ JOIN users u ON d.user_id = u.id
 LEFT JOIN delegate_places dp ON d.id = dp.delegate_id
 GROUP BY d.id, u.name, u.email, u.phone;
 
+-- Lugares publicos con ranking premium calculado en base de datos.
+CREATE OR REPLACE FUNCTION list_public_places()
+RETURNS TABLE (
+    id UUID,
+    name TEXT,
+    type TEXT,
+    category TEXT,
+    description TEXT,
+    address TEXT,
+    latitude DECIMAL,
+    longitude DECIMAL,
+    zone TEXT,
+    rating DECIMAL,
+    reviews_count INTEGER,
+    capacity_min INTEGER,
+    capacity_max INTEGER,
+    hours TEXT,
+    price_per_hour DECIMAL,
+    website_url TEXT,
+    wifi BOOLEAN,
+    outlets BOOLEAN,
+    parking BOOLEAN,
+    quietness_level INTEGER,
+    lighting_level INTEGER,
+    images TEXT[],
+    is_promoted BOOLEAN,
+    place_amenities JSONB
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        p.id,
+        p.name::TEXT,
+        p.type::TEXT,
+        p.category::TEXT,
+        p.description,
+        p.address::TEXT,
+        p.latitude,
+        p.longitude,
+        p.zone::TEXT,
+        p.rating,
+        p.reviews_count,
+        p.capacity_min,
+        p.capacity_max,
+        p.hours::TEXT,
+        p.price_per_hour,
+        p.website_url,
+        p.wifi,
+        p.outlets,
+        p.parking,
+        p.quietness_level,
+        p.lighting_level,
+        p.images,
+        EXISTS (
+            SELECT 1
+            FROM delegate_places dp
+            JOIN delegates d ON d.id = dp.delegate_id
+            WHERE dp.place_id = p.id
+            AND d.status = 'active'
+            AND d.subscription_active = TRUE
+        ) AS is_promoted,
+        COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'amenity_key', pa.amenity_key,
+                        'amenity_name', pa.amenity_name,
+                        'is_available', pa.is_available,
+                        'additional_info', pa.additional_info
+                    )
+                    ORDER BY pa.amenity_name
+                )
+                FROM place_amenities pa
+                WHERE pa.place_id = p.id
+            ),
+            '[]'::jsonb
+        ) AS place_amenities
+    FROM places p
+    WHERE p.status = 'active'
+    ORDER BY
+        EXISTS (
+            SELECT 1
+            FROM delegate_places dp
+            JOIN delegates d ON d.id = dp.delegate_id
+            WHERE dp.place_id = p.id
+            AND d.status = 'active'
+            AND d.subscription_active = TRUE
+        ) DESC,
+        p.rating DESC,
+        p.reviews_count DESC,
+        p.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+GRANT EXECUTE ON FUNCTION list_public_places() TO authenticated;
+
 -- =============================================
 -- FUNCIONES Y TRIGGERS
 -- =============================================
@@ -858,7 +956,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON reservations, reviews, place_reports, fa
 GRANT SELECT, INSERT ON place_report_confirmations TO authenticated;
 GRANT SELECT, UPDATE ON notifications TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON support_tickets, support_ticket_messages TO authenticated;
-GRANT SELECT ON delegates, delegate_places TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON delegates, delegate_places TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON delegate_invitations TO authenticated;
 
 -- Perfil publico del usuario autenticado.
@@ -1368,6 +1466,18 @@ CREATE POLICY support_ticket_messages_insert_participants ON support_ticket_mess
 CREATE POLICY delegates_select_own ON delegates
     FOR SELECT USING (auth.uid() = user_id);
 
+CREATE POLICY delegates_select_admin ON delegates
+    FOR SELECT USING (is_current_user_admin());
+
+CREATE POLICY delegates_insert_admin ON delegates
+    FOR INSERT WITH CHECK (is_current_user_admin());
+
+CREATE POLICY delegates_update_admin ON delegates
+    FOR UPDATE USING (is_current_user_admin()) WITH CHECK (is_current_user_admin());
+
+CREATE POLICY delegates_delete_admin ON delegates
+    FOR DELETE USING (is_current_user_admin());
+
 CREATE POLICY delegate_places_select_own ON delegate_places
     FOR SELECT USING (
         EXISTS (
@@ -1376,6 +1486,18 @@ CREATE POLICY delegate_places_select_own ON delegate_places
             AND delegates.user_id = auth.uid()
         )
     );
+
+CREATE POLICY delegate_places_select_admin ON delegate_places
+    FOR SELECT USING (is_current_user_admin());
+
+CREATE POLICY delegate_places_insert_admin ON delegate_places
+    FOR INSERT WITH CHECK (is_current_user_admin());
+
+CREATE POLICY delegate_places_update_admin ON delegate_places
+    FOR UPDATE USING (is_current_user_admin()) WITH CHECK (is_current_user_admin());
+
+CREATE POLICY delegate_places_delete_admin ON delegate_places
+    FOR DELETE USING (is_current_user_admin());
 
 -- Invitaciones de delegados: los admins las administran; los invitados las consultan por RPC.
 CREATE POLICY delegate_invitations_select_admin ON delegate_invitations

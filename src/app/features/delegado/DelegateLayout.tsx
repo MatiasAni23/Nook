@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { AlertTriangle, Calendar, ChevronRight, Home, LogOut, MapPin, Settings } from "lucide-react";
+import { AlertTriangle, BarChart3, Calendar, ChevronRight, Home, LogOut, MapPin, Settings } from "lucide-react";
 import { Button } from "../../components/ui/button";
 
 interface DelegateLayoutProps {
@@ -31,6 +31,12 @@ const navItems = [
     icon: AlertTriangle,
     label: "Reportes",
     description: "Tickets activos",
+  },
+  {
+    path: "/delegate/stats",
+    icon: BarChart3,
+    label: "Estadísticas",
+    description: "Premium bloqueado",
   },
   {
     path: "/delegate/settings",
@@ -166,7 +172,7 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
             <motion.button
               key={path}
               type="button"
-              className="group flex w-[3.75rem] flex-col items-center gap-1 outline-none"
+              className="group flex w-[3.35rem] flex-col items-center gap-1 outline-none sm:w-[3.75rem]"
               onClick={() => navigate(path)}
               aria-label={label}
               aria-current={isActive ? "page" : undefined}

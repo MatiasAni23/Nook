@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit, Mail, MapPin, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
+import { Crown, Edit, Mail, MapPin, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
@@ -13,6 +13,7 @@ import {
   listManagedPlaceOptions,
   saveManagedDelegate,
   updateManagedDelegateStatus,
+  updateManagedDelegateSubscription,
   type DelegateStatus,
   type ManagedDelegate,
   type ManagedPlaceOption,
@@ -23,6 +24,7 @@ interface DelegateFormData {
   email: string;
   phone: string;
   status: DelegateStatus;
+  subscriptionActive: boolean;
   assignedPlaces: string[];
 }
 
@@ -31,6 +33,7 @@ const emptyFormData: DelegateFormData = {
   email: "",
   phone: "",
   status: "pending",
+  subscriptionActive: false,
   assignedPlaces: [],
 };
 
@@ -108,6 +111,7 @@ export function AdminDelegates() {
       email: delegate.email,
       phone: delegate.phone ?? "",
       status: delegate.status,
+      subscriptionActive: delegate.subscriptionActive,
       assignedPlaces: delegate.assignedPlaces,
     });
     setFormError("");
@@ -150,6 +154,7 @@ export function AdminDelegates() {
         email: formData.email,
         phone: formData.phone,
         status: formData.status,
+        subscriptionActive: formData.subscriptionActive,
         assignedPlaces: formData.assignedPlaces,
       });
 
@@ -200,6 +205,27 @@ export function AdminDelegates() {
     } catch (error) {
       setDelegates(previousDelegates);
       setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar el delegado.");
+    } finally {
+      setUpdatingDelegateId(null);
+    }
+  };
+
+  const handleSubscriptionChange = async (delegate: ManagedDelegate) => {
+    const nextSubscriptionState = !delegate.subscriptionActive;
+    const previousDelegates = delegates;
+    setUpdatingDelegateId(delegate.id);
+    setErrorMessage("");
+    setDelegates((current) =>
+      current.map((item) =>
+        item.id === delegate.id ? { ...item, subscriptionActive: nextSubscriptionState } : item,
+      ),
+    );
+
+    try {
+      await updateManagedDelegateSubscription(delegate, nextSubscriptionState);
+    } catch (error) {
+      setDelegates(previousDelegates);
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar la suscripcion.");
     } finally {
       setUpdatingDelegateId(null);
     }
@@ -266,6 +292,12 @@ export function AdminDelegates() {
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="font-semibold">{delegate.name}</h4>
                         <Badge className={getStatusColor(delegate.status)}>{getStatusLabel(delegate.status)}</Badge>
+                        {delegate.subscriptionActive && (
+                          <Badge className="border-purple-300 bg-purple-100 text-[#4F46E5]">
+                            <Crown className="mr-1 size-3" />
+                            Premium
+                          </Badge>
+                        )}
                       </div>
                       <div className="space-y-1 text-sm text-gray-600">
                         <div className="flex items-center gap-2">
@@ -327,6 +359,16 @@ export function AdminDelegates() {
                           Activar
                         </>
                       )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={updatingDelegateId === delegate.id}
+                      onClick={() => handleSubscriptionChange(delegate)}
+                      className={delegate.subscriptionActive ? "text-purple-600 border-purple-300" : "text-gray-700 border-gray-300"}
+                    >
+                      <Crown className="size-3 mr-1" />
+                      {delegate.subscriptionActive ? "Quitar premium" : "Dar premium"}
                     </Button>
                     <Button
                       variant="outline"
@@ -437,6 +479,25 @@ export function AdminDelegates() {
                     <option value="suspended">Suspendido</option>
                   </select>
                 </div>
+
+                <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-purple-50">
+                  <input
+                    type="checkbox"
+                    checked={formData.subscriptionActive}
+                    disabled={Boolean(createdInviteUrl)}
+                    onChange={(event) => setFormData({ ...formData, subscriptionActive: event.target.checked })}
+                    className="mt-1 size-4"
+                  />
+                  <span>
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <Crown className="size-4 text-[#4F46E5]" />
+                      Suscripcion premium activa
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">
+                      Desbloquea estadisticas y prioriza sus lugares en busquedas y recomendados.
+                    </span>
+                  </span>
+                </label>
 
                 <div className="space-y-2">
                   <Label>Lugares asignados</Label>

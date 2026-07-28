@@ -33,6 +33,7 @@ export interface ManagedDelegate {
   email: string;
   phone: string | null;
   status: DelegateStatus;
+  subscriptionActive: boolean;
   placesCount: number;
   assignedPlaces: string[];
   joinedDate: Date;
@@ -77,6 +78,7 @@ export interface SaveDelegateInput {
   email: string;
   phone: string;
   status?: DelegateStatus;
+  subscriptionActive?: boolean;
   assignedPlaces: string[];
 }
 
@@ -295,7 +297,7 @@ async function fetchManagedDelegates(): Promise<ManagedDelegate[]> {
   const client = requireSupabase();
   const { data, error } = await client
     .from("delegates_with_places")
-    .select("id, user_id, name, email, phone, status, places_count, assigned_place_ids, joined_date, last_active")
+    .select("id, user_id, name, email, phone, status, subscription_active, places_count, assigned_place_ids, joined_date, last_active")
     .order("joined_date", { ascending: false });
 
   if (error) throw error;
@@ -307,6 +309,7 @@ async function fetchManagedDelegates(): Promise<ManagedDelegate[]> {
     email: String(delegate.email ?? ""),
     phone: delegate.phone ?? null,
     status: (delegate.status ?? "pending") as DelegateStatus,
+    subscriptionActive: Boolean(delegate.subscription_active),
     placesCount: Number(delegate.places_count ?? 0),
     assignedPlaces: toStringArray(delegate.assigned_place_ids),
     joinedDate: toDate(delegate.joined_date),
@@ -365,6 +368,7 @@ export async function saveManagedDelegate(input: SaveDelegateInput): Promise<Man
   const delegatePayload = {
     user_id: user.id,
     status: input.status ?? "pending",
+    subscription_active: Boolean(input.subscriptionActive),
     last_active: new Date().toISOString(),
   };
 
@@ -402,6 +406,7 @@ export async function saveManagedDelegate(input: SaveDelegateInput): Promise<Man
     email: normalizedEmail,
     phone: input.phone.trim() || null,
     status: (delegate.status ?? "pending") as DelegateStatus,
+    subscriptionActive: Boolean(input.subscriptionActive),
     placesCount: uniquePlaceIds.length,
     assignedPlaces: uniquePlaceIds,
     joinedDate: toDate(delegate.joined_date),
@@ -576,6 +581,26 @@ export async function updateManagedDelegateStatus(delegate: ManagedDelegate, sta
       managedDelegatesCache.delegates.map((currentDelegate) =>
         currentDelegate.id === delegate.id
           ? { ...currentDelegate, status, lastActive: new Date() }
+          : currentDelegate,
+      ),
+    );
+  }
+}
+
+export async function updateManagedDelegateSubscription(delegate: ManagedDelegate, subscriptionActive: boolean) {
+  const client = requireSupabase();
+  const { error } = await client
+    .from("delegates")
+    .update({ subscription_active: subscriptionActive, last_active: new Date().toISOString() })
+    .eq("id", delegate.id);
+
+  if (error) throw error;
+
+  if (managedDelegatesCache) {
+    cacheManagedDelegates(
+      managedDelegatesCache.delegates.map((currentDelegate) =>
+        currentDelegate.id === delegate.id
+          ? { ...currentDelegate, subscriptionActive, lastActive: new Date() }
           : currentDelegate,
       ),
     );

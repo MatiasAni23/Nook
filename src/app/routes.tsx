@@ -18,6 +18,7 @@ import { DelegateMyPlaces } from "./features/delegado/DelegateMyPlaces";
 import { DelegateReservations } from "./features/delegado/DelegateReservations";
 import { DelegateReports } from "./features/delegado/DelegateReports";
 import { DelegateSettings } from "./features/delegado/DelegateSettings";
+import { DelegateStats } from "./features/delegado/DelegateStats";
 import { DiscoverWrapper } from "./features/descubrir/DiscoverWrapper";
 import { StudentsView } from "./features/encontrar-estudiantes/StudentsView";
 import { CheckoutView } from "./features/mapa/CheckoutView";
@@ -370,6 +371,7 @@ export const router = createBrowserRouter([
       { path: "places", Component: DelegateMyPlaces },
       { path: "reservations", Component: DelegateReservations },
       { path: "reports", Component: DelegateReports },
+      { path: "stats", Component: DelegateStats },
       { path: "settings", Component: DelegateSettings },
     ],
   },
