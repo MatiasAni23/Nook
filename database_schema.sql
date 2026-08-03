@@ -56,6 +56,7 @@ CREATE TABLE public.places (
   name character varying NOT NULL,
   type character varying NOT NULL CHECK (type::text = ANY (ARRAY['library'::character varying, 'cafe'::character varying, 'coworking'::character varying, 'office'::character varying, 'meeting_room'::character varying, 'private_office'::character varying, 'park'::character varying]::text[])),
   category character varying NOT NULL CHECK (category::text = ANY (ARRAY['study'::character varying, 'work'::character varying]::text[])),
+  plan_type character varying NOT NULL DEFAULT 'basic'::character varying CHECK (plan_type::text = ANY (ARRAY['basic'::character varying, 'app_billing'::character varying, 'basic_premium'::character varying, 'host_billing'::character varying]::text[])),
   description text,
   address character varying NOT NULL,
   latitude numeric NOT NULL CHECK (latitude >= '-90'::integer::numeric AND latitude <= 90::numeric),

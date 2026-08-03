@@ -208,6 +208,7 @@ CREATE TABLE places (
     name VARCHAR(255) NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('library', 'cafe', 'coworking', 'office', 'meeting_room', 'private_office', 'park')),
     category VARCHAR(20) NOT NULL CHECK (category IN ('study', 'work')),
+    plan_type VARCHAR(30) NOT NULL DEFAULT 'basic' CHECK (plan_type IN ('basic', 'app_billing', 'basic_premium', 'host_billing')),
     description TEXT,
     address VARCHAR(500) NOT NULL,
 
@@ -262,6 +263,7 @@ CREATE TABLE places (
 
 CREATE INDEX idx_places_type ON places(type);
 CREATE INDEX idx_places_category ON places(category);
+CREATE INDEX idx_places_plan_type ON places(plan_type);
 CREATE INDEX idx_places_status ON places(status);
 CREATE INDEX idx_places_zone ON places(zone);
 CREATE INDEX idx_places_location ON places(latitude, longitude);
@@ -678,6 +680,7 @@ RETURNS TABLE (
     name TEXT,
     type TEXT,
     category TEXT,
+    plan_type TEXT,
     description TEXT,
     address TEXT,
     latitude DECIMAL,
@@ -706,6 +709,7 @@ BEGIN
         p.name::TEXT,
         p.type::TEXT,
         p.category::TEXT,
+        p.plan_type::TEXT,
         p.description,
         p.address::TEXT,
         p.latitude,

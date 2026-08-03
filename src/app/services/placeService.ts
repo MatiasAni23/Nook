@@ -2,6 +2,9 @@ import { supabase } from "../lib/supabase";
 
 export type PlaceCategory = "study" | "work";
 
+/** Plan comercial que determina las funcionalidades habilitadas para un lugar. */
+export type PlacePlanType = "basic" | "app_billing" | "basic_premium" | "host_billing";
+
 export type PlaceType =
   | "library"
   | "cafe"
@@ -23,6 +26,7 @@ export interface AppPlace {
   name: string;
   type: PlaceType;
   category: PlaceCategory;
+  planType: PlacePlanType;
   lat: number;
   lng: number;
   address: string;
@@ -51,6 +55,7 @@ export interface CreatePlaceInput {
   name: string;
   type: PlaceType;
   category: PlaceCategory;
+  planType: PlacePlanType;
   description: string;
   address: string;
   zone?: string | null;
@@ -103,6 +108,7 @@ type PlaceRow = {
   name: string;
   type: PlaceType;
   category: PlaceCategory;
+  plan_type: PlacePlanType;
   description: string | null;
   address: string;
   latitude: string | number;
@@ -162,6 +168,7 @@ function toAppPlace(row: PlaceRow): AppPlace {
     name: row.name,
     type: row.type,
     category: row.category,
+    planType: row.plan_type ?? "basic",
     lat: toNumber(row.latitude),
     lng: toNumber(row.longitude),
     address: row.address,
@@ -210,6 +217,7 @@ async function fetchPlaces(): Promise<AppPlace[]> {
       name,
       type,
       category,
+      plan_type,
       description,
       address,
       latitude,
@@ -289,6 +297,7 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
       name,
       type,
       category,
+      plan_type,
       description,
       address,
       latitude,
@@ -370,6 +379,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
       name: input.name,
       type: input.type,
       category: input.category,
+      plan_type: input.planType,
       description: input.description,
       address: input.address,
       latitude: input.latitude,
@@ -396,6 +406,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
       name,
       type,
       category,
+      plan_type,
       description,
       address,
       latitude,
@@ -467,6 +478,7 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
       name: input.name,
       type: input.type,
       category: input.category,
+      plan_type: input.planType,
       description: input.description,
       address: input.address,
       latitude: input.latitude,
@@ -491,6 +503,7 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
       name,
       type,
       category,
+      plan_type,
       description,
       address,
       latitude,

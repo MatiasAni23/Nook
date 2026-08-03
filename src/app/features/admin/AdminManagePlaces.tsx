@@ -31,6 +31,13 @@ import { AdminEditPlace } from "./AdminEditPlace";
 
 type SuccessDialogKind = "created" | "updated" | "deleted";
 
+const planTypeLabels: Record<AppPlace["planType"], string> = {
+  basic: "Basic",
+  app_billing: "App Billing",
+  basic_premium: "Basic Premium",
+  host_billing: "Host Billing",
+};
+
 export function AdminManagePlaces() {
   const [view, setView] = useState<"list" | "add" | "edit">("list");
   const [editingPlace, setEditingPlace] = useState<any>(null);
@@ -71,8 +78,8 @@ export function AdminManagePlaces() {
   }, []);
 
   const mockPlaces = [
-    ...studyPlaces.map((place) => ({ ...place, category: "study" as const, images: [], amenities: [] })),
-    ...workPlaces.map((place) => ({ ...place, category: "work" as const, outlets: false, images: [], amenities: [] })),
+    ...studyPlaces.map((place) => ({ ...place, category: "study" as const, planType: "basic" as const, images: [], amenities: [] })),
+    ...workPlaces.map((place) => ({ ...place, category: "work" as const, planType: "basic" as const, outlets: false, images: [], amenities: [] })),
   ];
   const allPlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
 
@@ -396,6 +403,9 @@ export function AdminManagePlaces() {
                         </Badge>
                         <Badge variant="outline" className="text-xs">
                           {place.category === "work" ? "Trabajo" : "Estudio"}
+                        </Badge>
+                        <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-xs text-indigo-700">
+                          {planTypeLabels[place.planType]}
                         </Badge>
                         {place.wifi && (
                           <Badge variant="outline" className="text-xs">

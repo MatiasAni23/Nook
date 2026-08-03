@@ -73,6 +73,7 @@ Catálogo de lugares de estudio y trabajo.
 - `name` - Nombre del lugar
 - `type` - Tipo: `library`, `cafe`, `coworking`, `office`, `meeting_room`, `private_office`, `park`
 - `category` - Categoría: `study` (estudiantes) o `work` (trabajadores)
+- `plan_type` - Plan comercial: `basic`, `app_billing`, `basic_premium` o `host_billing`
 - `latitude`, `longitude` - Coordenadas GPS
 - `zone` - Zona/comuna (ej: Las Condes, Providencia)
 - `rating` - Valoración promedio (0-5)

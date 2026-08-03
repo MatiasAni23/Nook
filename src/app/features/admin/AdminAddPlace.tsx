@@ -39,6 +39,7 @@ import {
   type AppPlace,
   type PlaceAmenity,
   type PlaceCategory,
+  type PlacePlanType,
   type PlaceType,
 } from "../../services/placeService";
 
@@ -109,6 +110,13 @@ const typeOptions: Record<PlaceCategory, Array<{ value: PlaceType; label: string
   ],
 };
 
+const planTypeOptions: Array<{ value: PlacePlanType; label: string; description: string }> = [
+  { value: "basic", label: "Basic", description: "Sin costo" },
+  { value: "app_billing", label: "App Billing", description: "Comisión + fee de pago" },
+  { value: "basic_premium", label: "Basic Premium", description: "Suscripción" },
+  { value: "host_billing", label: "Host Billing", description: "Comisión derivada / integración" },
+];
+
 function formatCoordinate(value: number) {
   return value.toFixed(coordinateDecimals);
 }
@@ -168,6 +176,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PlaceCategory>("study");
   const [type, setType] = useState<PlaceType>("library");
+  const [planType, setPlanType] = useState<PlacePlanType>("basic");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [zone, setZone] = useState("");
@@ -356,6 +365,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
     setName("");
     setCategory("study");
     setType("library");
+    setPlanType("basic");
     setDescription("");
     setAddress("");
     setZone("");
@@ -417,6 +427,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
         name,
         type,
         category,
+        planType,
         description,
         address,
         zone: zone || null,
@@ -595,6 +606,22 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Plan del lugar *</Label>
+                <Select value={planType} onValueChange={(value) => setPlanType(value as PlacePlanType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label} — {option.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
