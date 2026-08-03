@@ -490,7 +490,7 @@ export function WorkerProfileView() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs font-semibold text-[#4F46E5]">{formatPrice(place.price_per_hour)}/hr</p>
+                        <p className="text-xs font-semibold text-[#4F46E5]">{place.price_per_hour ? "De pago" : "Gratis"}</p>
                       </div>
                     </div>
                   </div>

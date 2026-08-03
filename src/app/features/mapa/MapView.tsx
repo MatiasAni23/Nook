@@ -643,10 +643,7 @@ export function MapView() {
                         <h4 className="font-semibold text-xs line-clamp-1 mb-0.5">{place.name}</h4>
                         <p className="text-xs text-gray-400 mb-1 line-clamp-1">{getPlaceZoneLabel(place)}</p>
                         {placeHasPrice ? (
-                          <>
-                            <p className="text-xs font-semibold text-[#4F46E5]">{formatPrice((place as any).pricePerHour)}</p>
-                            <p className="text-xs text-gray-400 mb-2">/hora</p>
-                          </>
+                          <p className="text-sm font-semibold text-[#4F46E5] mb-2">De pago</p>
                         ) : (
                           <p className="text-sm font-semibold text-[#4F46E5] mb-2">Gratis</p>
                         )}

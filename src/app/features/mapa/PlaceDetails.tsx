@@ -502,7 +502,7 @@ export function PlaceDetails() {
     ? `${place.capacityMin ?? 1} - ${place.capacityMax ?? place.capacity}`
     : "1 - 20";
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
-  const priceText = hasValidPrice ? `${formatPrice(place.pricePerHour)} / hora` : "Gratis";
+  const priceText = hasValidPrice ? "De pago" : "Gratis";
   const websiteUrl = typeof place.websiteUrl === "string" ? place.websiteUrl.trim() : "";
   const weekdaySchedule = schedule.slice(0, 5);
   const weekendSchedule = schedule.slice(5);

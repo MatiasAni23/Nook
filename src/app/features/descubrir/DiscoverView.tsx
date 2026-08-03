@@ -388,9 +388,8 @@ export function DiscoverView() {
                         )}
                         <div className="min-w-fit text-right">
                           <p className="font-semibold text-sm text-[#4F46E5]">
-                            {placeHasPrice ? formatPrice((place as any).pricePerHour) : "Gratis"}
+                            {placeHasPrice ? "De pago" : "Gratis"}
                           </p>
-                          {placeHasPrice && <p className="text-xs text-gray-500">/hora</p>}
                         </div>
                       </div>
                     </div>
