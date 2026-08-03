@@ -30,6 +30,7 @@ DROP TABLE IF EXISTS place_issues CASCADE;
 DROP TABLE IF EXISTS delegate_places CASCADE;
 DROP TABLE IF EXISTS delegates CASCADE;
 DROP TABLE IF EXISTS place_amenities CASCADE;
+DROP TABLE IF EXISTS place_spaces CASCADE;
 DROP TABLE IF EXISTS place_hours CASCADE;
 DROP TABLE IF EXISTS places CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
@@ -332,6 +333,18 @@ CREATE TABLE place_amenities (
 
 CREATE INDEX idx_place_amenities_place ON place_amenities(place_id);
 CREATE INDEX idx_place_amenities_key ON place_amenities(amenity_key);
+
+-- Espacios internos informativos, sin reservas (salas, oficinas, piezas de estudio, etc.).
+CREATE TABLE place_spaces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    place_id UUID NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    name VARCHAR(120) NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0),
+    image_url TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_place_spaces_place ON place_spaces(place_id);
 
 -- =============================================
 -- TABLA: reservations
@@ -925,6 +938,7 @@ COMMENT ON TABLE favorites IS 'Lugares favoritos de cada usuario';
 COMMENT ON TABLE reviews IS 'Reseñas y valoraciones de lugares';
 COMMENT ON TABLE place_hours IS 'Horarios detallados por día de la semana';
 COMMENT ON TABLE place_amenities IS 'Servicios y comodidades disponibles por lugar';
+COMMENT ON TABLE place_spaces IS 'Espacios informativos dentro de un lugar, sin reservas';
 
 COMMENT ON TABLE delegate_invitations IS 'Invitaciones enviadas por administradores para crear delegados';
 
@@ -940,6 +954,7 @@ ALTER TABLE delegates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE delegate_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_hours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_amenities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE place_spaces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE place_reports ENABLE ROW LEVEL SECURITY;
@@ -954,7 +969,7 @@ ALTER TABLE support_ticket_messages ENABLE ROW LEVEL SECURITY;
 -- Permisos de API para usuarios con sesion. Las policies de abajo filtran filas.
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT SELECT, INSERT, UPDATE ON users, user_profiles TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON places, place_amenities TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON places, place_amenities, place_spaces TO authenticated;
 GRANT SELECT ON place_hours, place_issues TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON reservations, reviews, place_reports, favorites, messages TO authenticated;
 GRANT SELECT, INSERT ON place_report_confirmations TO authenticated;
@@ -1073,6 +1088,20 @@ CREATE POLICY place_amenities_update_admin ON place_amenities
     FOR UPDATE USING (is_current_user_place_manager()) WITH CHECK (is_current_user_place_manager());
 
 CREATE POLICY place_amenities_delete_admin ON place_amenities
+    FOR DELETE USING (is_current_user_place_manager());
+
+CREATE POLICY place_spaces_select_active_places ON place_spaces
+    FOR SELECT USING (
+        EXISTS (SELECT 1 FROM places WHERE places.id = place_spaces.place_id AND places.status = 'active')
+    );
+
+CREATE POLICY place_spaces_insert_manager ON place_spaces
+    FOR INSERT WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY place_spaces_update_manager ON place_spaces
+    FOR UPDATE USING (is_current_user_place_manager()) WITH CHECK (is_current_user_place_manager());
+
+CREATE POLICY place_spaces_delete_manager ON place_spaces
     FOR DELETE USING (is_current_user_place_manager());
 
 -- Reservas propias.

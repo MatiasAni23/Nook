@@ -45,6 +45,7 @@ export interface DelegateAssignedPlace {
   name: string;
   type: string;
   category: "study" | "work";
+  planType: "basic" | "app_billing" | "basic_premium" | "host_billing";
   description: string;
   lat: number;
   lng: number;
@@ -69,6 +70,7 @@ export interface DelegateAssignedPlace {
     isAvailable: boolean;
     additionalInfo?: string | null;
   }>;
+  spaces: Array<{ id: string; name: string; capacity: number; imageUrl: string }>;
   reservationsCount: number;
 }
 
@@ -653,6 +655,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         name,
         type,
         category,
+        plan_type,
         description,
         latitude,
         longitude,
@@ -677,6 +680,12 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           amenity_name,
           is_available,
           additional_info
+        ),
+        place_spaces(
+          id,
+          name,
+          capacity,
+          image_url
         )
       )
     `,
@@ -695,6 +704,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
         name: String(place.name ?? ""),
         type: String(place.type ?? "library"),
         category: place.category === "work" ? "work" : "study",
+        planType: (place.plan_type ?? "basic") as DelegateAssignedPlace["planType"],
         description: String(place.description ?? ""),
         lat: Number(place.latitude ?? 0),
         lng: Number(place.longitude ?? 0),
@@ -718,6 +728,12 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           name: String(amenity.amenity_name),
           isAvailable: Boolean(amenity.is_available),
           additionalInfo: amenity.additional_info == null ? null : String(amenity.additional_info),
+        })),
+        spaces: (place.place_spaces ?? []).map((space) => ({
+          id: String(space.id),
+          name: String(space.name ?? ""),
+          capacity: Number(space.capacity ?? 0),
+          imageUrl: String(space.image_url ?? ""),
         })),
         reservationsCount: Array.isArray(place.reservations) ? place.reservations.length : 0,
       };

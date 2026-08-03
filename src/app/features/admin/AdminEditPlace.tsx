@@ -34,6 +34,7 @@ import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Slider } from "../../components/ui/slider";
 import { Switch } from "../../components/ui/switch";
+import { PlaceSpacesEditor, arePlaceSpacesValid, placeSpacesToDrafts, validPlaceSpaces, type PlaceSpaceDraft } from "../shared/PlaceSpacesEditor";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import {
   updatePlace,
@@ -49,6 +50,7 @@ interface AdminEditPlaceProps {
   place: Partial<AppPlace> & { id: string };
   onSave: (place?: AppPlace) => void;
   onBack?: () => void;
+  showPlanType?: boolean;
 }
 
 type AmenityOption = {
@@ -213,7 +215,7 @@ function parseHours(hours?: string): DaySchedule[] {
   return parsedDays;
 }
 
-export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
+export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: AdminEditPlaceProps) {
   const objectUrlsRef = useRef<string[]>([]);
   const initialCategory = getInitialCategory(place);
   const initialPosition = {
@@ -250,6 +252,7 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
   const [images, setImages] = useState<EditableImage[]>(
     (place.images ?? []).map((url) => ({ id: `existing-${url}`, type: "existing", url })),
   );
+  const [spaces, setSpaces] = useState<PlaceSpaceDraft[]>(() => placeSpacesToDrafts(place.spaces ?? []));
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -432,6 +435,11 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
       return;
     }
 
+    if (!arePlaceSpacesValid(spaces)) {
+      setErrorMessage("Completa nombre, capacidad e imagen para cada espacio agregado.");
+      return;
+    }
+
     if (!isSupabaseConfigured) {
       setErrorMessage("Supabase no esta configurado. No se puede actualizar el lugar en base de datos.");
       return;
@@ -462,6 +470,7 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
         quietnessLevel: quietness[0],
         lightingLevel: lighting[0],
         amenities: selectedAmenities,
+        spaces: validPlaceSpaces(spaces),
         images: images.map<PlaceImageInput>((image) => (
           image.type === "existing"
             ? { type: "existing", url: image.url }
@@ -588,6 +597,11 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
           </Card>
 
           <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-lg">Espacios del lugar</CardTitle></CardHeader>
+            <CardContent><PlaceSpacesEditor spaces={spaces} onChange={setSpaces} /></CardContent>
+          </Card>
+
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Informacion basica</CardTitle>
             </CardHeader>
@@ -626,7 +640,7 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {showPlanType && <div className="space-y-2">
                 <Label>Plan del lugar *</Label>
                 <Select value={planType} onValueChange={(value) => setPlanType(value as PlacePlanType)}>
                   <SelectTrigger>
@@ -640,7 +654,7 @@ export function AdminEditPlace({ place, onSave, onBack }: AdminEditPlaceProps) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

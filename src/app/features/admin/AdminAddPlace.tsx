@@ -33,6 +33,7 @@ import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Slider } from "../../components/ui/slider";
 import { Switch } from "../../components/ui/switch";
+import { PlaceSpacesEditor, arePlaceSpacesValid, validPlaceSpaces, type PlaceSpaceDraft } from "../shared/PlaceSpacesEditor";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import {
   createPlace,
@@ -46,6 +47,7 @@ import {
 interface AdminAddPlaceProps {
   onCreated?: (place: AppPlace) => void;
   onBack?: () => void;
+  showPlanType?: boolean;
 }
 
 type AmenityOption = {
@@ -172,7 +174,7 @@ function CenterMapPin() {
   );
 }
 
-export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
+export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminAddPlaceProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PlaceCategory>("study");
   const [type, setType] = useState<PlaceType>("library");
@@ -197,6 +199,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
     "outlets",
   ]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [spaces, setSpaces] = useState<PlaceSpaceDraft[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -380,6 +383,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
     setPinCoordinates(defaultPosition);
     setSelectedAmenityKeys(["wifi", "outlets"]);
     setImageFiles([]);
+    setSpaces([]);
   };
 
   const handleSubmit = async () => {
@@ -415,6 +419,11 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
       return;
     }
 
+    if (!arePlaceSpacesValid(spaces)) {
+      setErrorMessage("Completa nombre, capacidad e imagen para cada espacio agregado.");
+      return;
+    }
+
     if (!isSupabaseConfigured) {
       setErrorMessage("Supabase no esta configurado. No se puede guardar el lugar en base de datos.");
       return;
@@ -444,6 +453,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
         quietnessLevel: quietness[0],
         lightingLevel: lighting[0],
         amenities: selectedAmenities,
+        spaces: validPlaceSpaces(spaces),
         imageFiles,
       });
 
@@ -570,6 +580,11 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
           </Card>
 
           <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-lg">Espacios del lugar</CardTitle></CardHeader>
+            <CardContent><PlaceSpacesEditor spaces={spaces} onChange={setSpaces} /></CardContent>
+          </Card>
+
+          <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Informacion basica</CardTitle>
             </CardHeader>
@@ -608,7 +623,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              {showPlanType && <div className="space-y-2">
                 <Label>Plan del lugar *</Label>
                 <Select value={planType} onValueChange={(value) => setPlanType(value as PlacePlanType)}>
                   <SelectTrigger>
@@ -622,7 +637,7 @@ export function AdminAddPlace({ onCreated, onBack }: AdminAddPlaceProps) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">

@@ -21,6 +21,19 @@ export interface PlaceAmenity {
   additionalInfo?: string | null;
 }
 
+export interface PlaceSpace {
+  id: string;
+  name: string;
+  capacity: number;
+  imageUrl: string;
+}
+
+export type PlaceSpaceInput = {
+  name: string;
+  capacity: number;
+  image: { type: "existing"; url: string } | { type: "new"; file: File };
+};
+
 export interface AppPlace {
   id: string;
   name: string;
@@ -48,6 +61,7 @@ export interface AppPlace {
   capacityMax?: number | null;
   images: string[];
   amenities: PlaceAmenity[];
+  spaces: PlaceSpace[];
   isPromoted?: boolean;
 }
 
@@ -72,6 +86,7 @@ export interface CreatePlaceInput {
   quietnessLevel: number;
   lightingLevel: number;
   amenities: PlaceAmenity[];
+  spaces: PlaceSpaceInput[];
   imageFiles: File[];
 }
 
@@ -134,6 +149,7 @@ type PlaceRow = {
     additional_info: string | null;
   }> | null;
   is_promoted?: boolean | null;
+  place_spaces?: Array<{ id: string; name: string; capacity: number; image_url: string }> | null;
 };
 
 function requireSupabase() {
@@ -195,6 +211,12 @@ function toAppPlace(row: PlaceRow): AppPlace {
       isAvailable: amenity.is_available,
       additionalInfo: amenity.additional_info,
     })),
+    spaces: (row.place_spaces ?? []).map((space) => ({
+      id: space.id,
+      name: space.name,
+      capacity: space.capacity,
+      imageUrl: space.image_url,
+    })),
     isPromoted: Boolean(row.is_promoted),
   };
 }
@@ -204,7 +226,22 @@ async function fetchPlaces(): Promise<AppPlace[]> {
   const promotedResult = await client.rpc("list_public_places");
 
   if (!promotedResult.error && promotedResult.data) {
-    return ((promotedResult.data ?? []) as PlaceRow[])
+    const rows = (promotedResult.data ?? []) as PlaceRow[];
+    const { data: spaces, error: spacesError } = await client
+      .from("place_spaces")
+      .select("id, place_id, name, capacity, image_url");
+
+    if (!spacesError) {
+      const spacesByPlace = new Map<string, NonNullable<PlaceRow["place_spaces"]>>();
+      for (const space of spaces ?? []) {
+        const placeSpaces = spacesByPlace.get(String(space.place_id)) ?? [];
+        placeSpaces.push({ id: String(space.id), name: space.name, capacity: space.capacity, image_url: space.image_url });
+        spacesByPlace.set(String(space.place_id), placeSpaces);
+      }
+      rows.forEach((row) => { row.place_spaces = spacesByPlace.get(row.id) ?? []; });
+    }
+
+    return rows
       .map(toAppPlace)
       .sort(sortPromotedPlaces);
   }
@@ -241,6 +278,12 @@ async function fetchPlaces(): Promise<AppPlace[]> {
         amenity_name,
         is_available,
         additional_info
+      ),
+      place_spaces(
+        id,
+        name,
+        capacity,
+        image_url
       )
     `,
     )
@@ -321,6 +364,12 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
         amenity_name,
         is_available,
         additional_info
+      ),
+      place_spaces(
+        id,
+        name,
+        capacity,
+        image_url
       )
     `,
     )
@@ -361,6 +410,32 @@ async function uploadPlaceImages(placeId: string, imageFiles: File[]) {
   }
 
   return imageUrls;
+}
+
+async function savePlaceSpaces(placeId: string, spaces: PlaceSpaceInput[]) {
+  const client = requireSupabase();
+  const rows = [];
+
+  for (const space of spaces) {
+    let imageUrl: string;
+    if (space.image.type === "existing") {
+      imageUrl = space.image.url;
+    } else {
+      const [uploadedUrl] = await uploadPlaceImages(placeId, [space.image.file]);
+      imageUrl = uploadedUrl;
+    }
+    rows.push({ place_id: placeId, name: space.name.trim(), capacity: space.capacity, image_url: imageUrl });
+  }
+
+  if (rows.length === 0) return [];
+  const { data, error } = await client
+    .from("place_spaces")
+    .insert(rows)
+    .select("id, name, capacity, image_url");
+  if (error) throw error;
+  return (data ?? []).map((space) => ({
+    id: String(space.id), name: space.name, capacity: space.capacity, imageUrl: space.image_url,
+  }));
 }
 
 export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
@@ -446,9 +521,12 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
     if (amenitiesError) throw amenitiesError;
   }
 
+  const spaces = await savePlaceSpaces(placeId, input.spaces);
+
   const createdPlace = {
     ...toAppPlace({ ...(data as PlaceRow), place_amenities: [] }),
     amenities: availableAmenities,
+    spaces,
   };
   placesCache = {
     timestamp: Date.now(),
@@ -550,9 +628,14 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
     if (amenitiesError) throw amenitiesError;
   }
 
+  const { error: deleteSpacesError } = await client.from("place_spaces").delete().eq("place_id", input.id);
+  if (deleteSpacesError) throw deleteSpacesError;
+  const spaces = await savePlaceSpaces(input.id, input.spaces);
+
   const updatedPlace = {
     ...toAppPlace({ ...(data as PlaceRow), place_amenities: [] }),
     amenities: availableAmenities,
+    spaces,
   };
 
   if (placesCache) {

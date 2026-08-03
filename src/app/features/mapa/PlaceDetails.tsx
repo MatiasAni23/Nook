@@ -771,6 +771,27 @@ export function PlaceDetails() {
             )}
           </div>
 
+          {Array.isArray(place?.spaces) && place.spaces.length > 0 && (
+            <div>
+              <h3 className="mb-3 text-lg" style={{ fontWeight: 700 }}>Espacios del lugar</h3>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {place.spaces.map((space: { id: string; name: string; capacity: number; imageUrl: string }) => (
+                  <Card key={space.id} className="w-36 shrink-0 overflow-hidden border-0 bg-white shadow-md">
+                    <div className="aspect-[4/3] bg-pink-100">
+                      <CachedImage src={space.imageUrl} alt={space.name} className="size-full object-cover" />
+                    </div>
+                    <CardContent className="p-3">
+                      <p className="truncate text-sm font-semibold text-gray-900">{space.name}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <Users className="size-3.5" /> Capacidad: {space.capacity}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-blue-50 p-4 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-white shadow-sm">

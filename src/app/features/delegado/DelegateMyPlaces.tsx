@@ -102,7 +102,7 @@ export function DelegateMyPlaces() {
     return (
       <div className="size-full flex flex-col">
         <div className="flex-1 overflow-hidden">
-          <AdminAddPlace />
+          <AdminAddPlace showPlanType={false} />
         </div>
         <div className="absolute top-4 left-4 z-10">
           <Button variant="outline" size="sm" onClick={() => setView("list")} className="bg-white">
@@ -117,7 +117,7 @@ export function DelegateMyPlaces() {
     return (
       <div className="size-full flex flex-col">
         <div className="flex-1 overflow-hidden">
-          <AdminEditPlace place={editingPlace} onSave={handleSaveComplete} />
+          <AdminEditPlace place={editingPlace} onSave={handleSaveComplete} showPlanType={false} />
         </div>
         <div className="absolute top-4 left-4 z-10">
           <Button
