@@ -982,6 +982,17 @@ GRANT SELECT, INSERT, UPDATE ON delegate_invitations TO authenticated;
 CREATE POLICY users_select_own ON users
     FOR SELECT USING (auth.uid() = id);
 
+-- Un participante puede resolver el nombre del otro usuario solo cuando comparten un chat activo.
+CREATE POLICY users_select_chat_participants ON users
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1
+            FROM messages
+            WHERE (messages.sender_id = auth.uid() AND messages.receiver_id = users.id)
+               OR (messages.receiver_id = auth.uid() AND messages.sender_id = users.id)
+        )
+    );
+
 CREATE POLICY users_insert_own ON users
     FOR INSERT WITH CHECK (auth.uid() = id);
 

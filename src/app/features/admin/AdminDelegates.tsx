@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown, Edit, Mail, MapPin, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
+import { Crown, Edit, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
+import { useNavigate } from "react-router";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
@@ -38,12 +39,14 @@ const emptyFormData: DelegateFormData = {
 };
 
 export function AdminDelegates() {
+  const navigate = useNavigate();
   const [delegates, setDelegates] = useState<ManagedDelegate[]>([]);
   const [places, setPlaces] = useState<ManagedPlaceOption[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editingDelegate, setEditingDelegate] = useState<ManagedDelegate | null>(null);
   const [formData, setFormData] = useState<DelegateFormData>(emptyFormData);
+  const [placeSearchTerm, setPlaceSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [updatingDelegateId, setUpdatingDelegateId] = useState<string | null>(null);
@@ -95,12 +98,23 @@ export function AdminDelegates() {
     );
   }, [delegates, searchTerm]);
 
+  const filteredPlaces = useMemo(() => {
+    const normalizedSearch = placeSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) return places;
+
+    return places.filter((place) =>
+      [place.name, place.address, place.category === "work" ? "trabajo" : "estudio"]
+        .some((value) => value.toLowerCase().includes(normalizedSearch)),
+    );
+  }, [places, placeSearchTerm]);
+
   const handleCreate = () => {
     setEditingDelegate(null);
     setFormData(emptyFormData);
     setFormError("");
     setCreatedInviteUrl("");
     setCreatedInviteEmailStatus("");
+    setPlaceSearchTerm("");
     setShowModal(true);
   };
 
@@ -117,6 +131,7 @@ export function AdminDelegates() {
     setFormError("");
     setCreatedInviteUrl("");
     setCreatedInviteEmailStatus("");
+    setPlaceSearchTerm("");
     setShowModal(true);
   };
 
@@ -334,6 +349,15 @@ export function AdminDelegates() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => navigate(`/admin/chat/${delegate.userId}`)}
+                      className="border-sky-300 text-sky-700 hover:bg-sky-50"
+                    >
+                      <MessageCircle className="mr-1 size-3" />
+                      Contacto
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       disabled={updatingDelegateId === delegate.id}
                       onClick={() => handleEdit(delegate)}
                       className="text-[#4F46E5] border-[#4F46E5] hover:bg-purple-50"
@@ -501,8 +525,18 @@ export function AdminDelegates() {
 
                 <div className="space-y-2">
                   <Label>Lugares asignados</Label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      value={placeSearchTerm}
+                      onChange={(event) => setPlaceSearchTerm(event.target.value)}
+                      disabled={Boolean(createdInviteUrl)}
+                      placeholder="Buscar por nombre, categoría o dirección..."
+                      className="pl-9"
+                    />
+                  </div>
                   <div className="border rounded-lg p-3 max-h-56 overflow-auto space-y-2">
-                    {places.map((place) => (
+                    {filteredPlaces.map((place) => (
                       <label key={place.id} className="flex items-start gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded">
                         <input
                           type="checkbox"
@@ -520,6 +554,7 @@ export function AdminDelegates() {
                       </label>
                     ))}
                     {places.length === 0 && <p className="text-sm text-gray-500">No hay lugares disponibles.</p>}
+                    {places.length > 0 && filteredPlaces.length === 0 && <p className="text-sm text-gray-500">No encontramos lugares con esa búsqueda.</p>}
                   </div>
                   <p className="text-xs text-gray-500">{formData.assignedPlaces.length} lugar(es) seleccionado(s)</p>
                 </div>

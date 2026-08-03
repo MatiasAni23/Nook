@@ -5,6 +5,7 @@ import {
   Home,
   LogOut,
   MapPin,
+  MessageCircle,
   Plus,
   Settings,
 } from "lucide-react";
@@ -39,6 +40,12 @@ const navItems = [
     label: "Gestion",
     description: "Usuarios y soporte",
   },
+  {
+    path: "/admin/chat",
+    icon: MessageCircle,
+    label: "Chats",
+    description: "Conversaciones activas",
+  },
 ];
 
 export function AdminLayout({ onLogout }: AdminLayoutProps) {
@@ -48,7 +55,8 @@ export function AdminLayout({ onLogout }: AdminLayoutProps) {
   const isActivePath = (path: string) =>
     location.pathname === path ||
     (path === "/admin/management" && location.pathname.startsWith("/admin/management")) ||
-    (path === "/admin/places" && location.pathname.startsWith("/admin/places"));
+    (path === "/admin/places" && location.pathname.startsWith("/admin/places")) ||
+    (path === "/admin/chat" && location.pathname.startsWith("/admin/chat"));
   const activeItem = navItems.find((item) => isActivePath(item.path)) ?? navItems[0];
 
   return (

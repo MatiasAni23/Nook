@@ -357,6 +357,7 @@ export const router = createBrowserRouter([
       { path: "places", Component: AdminManagePlaces },
       { path: "stats", Component: AdminStats },
       { path: "management", Component: AdminManagement },
+      { path: "chat/:userId?", Component: ChatView },
     ],
   },
   {
@@ -371,6 +372,7 @@ export const router = createBrowserRouter([
       { path: "places", Component: DelegateMyPlaces },
       { path: "reservations", Component: DelegateReservations },
       { path: "reports", Component: DelegateReports },
+      { path: "chat/:userId?", Component: ChatView },
       { path: "stats", Component: DelegateStats },
       { path: "settings", Component: DelegateSettings },
     ],

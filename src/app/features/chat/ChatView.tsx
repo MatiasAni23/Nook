@@ -53,7 +53,7 @@ function ConversationListSkeleton() {
 
 function ChatThreadSkeleton() {
   return (
-    <div className="size-full flex flex-col bg-white">
+    <div className={`flex flex-col overflow-hidden bg-white ${userRole === "delegate" || userRole === "admin" ? "size-full" : "h-dvh max-h-dvh"}`}>
       <div className="border-b px-4 py-3 bg-white shadow-sm">
         <div className="flex items-center gap-3">
           <Skeleton className="size-9 rounded-md" />
@@ -126,6 +126,7 @@ export function ChatView() {
   const fallbackRole = getUserRole();
   const userRole = cachedUser?.role ?? fallbackRole;
   const currentUserId = cachedUser?.id ?? "";
+  const chatBasePath = userRole === "admin" ? "/admin/chat" : userRole === "delegate" ? "/delegate/chat" : "/app/chat";
 
   const [participants, setParticipants] = useState<Record<string, ChatUser>>({});
   const [conversations, setConversations] = useState<ConversationMap>({});
@@ -457,6 +458,11 @@ export function ChatView() {
         return { person, lastMessage, id };
       })
       .filter((item) => item.person && item.lastMessage)
+      .filter((item) => {
+        if (userRole === "admin") return item.person?.role === "delegate";
+        if (userRole === "delegate") return item.person?.role === "admin" || item.person?.role === "worker";
+        return true;
+      })
       .sort((left, right) =>
         right.lastMessage!.createdAt.getTime() - left.lastMessage!.createdAt.getTime(),
       );
@@ -478,13 +484,15 @@ export function ChatView() {
             ) : conversationList.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-gray-500">
-                  <p>No tienes conversaciones aun</p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => navigate(userRole === "worker" ? "/app/discover" : "/app/students")}
-                  >
-                    {userRole === "worker" ? "Buscar espacios" : "Buscar estudiantes"}
-                  </Button>
+                  <p>{userRole === "admin" || userRole === "delegate" ? "No hay chats activos" : "No tienes conversaciones aun"}</p>
+                  {userRole !== "admin" && userRole !== "delegate" && (
+                    <Button
+                      className="mt-4"
+                      onClick={() => navigate(userRole === "worker" ? "/app/discover" : "/app/students")}
+                    >
+                      {userRole === "worker" ? "Buscar espacios" : "Buscar estudiantes"}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -504,7 +512,7 @@ export function ChatView() {
                     className={`cursor-pointer transition-all hover:shadow-lg ${
                       isUnread ? "border-[#4F46E5]/30 bg-white shadow-sm" : "bg-white"
                     }`}
-                    onClick={() => navigate(`/app/chat/${id}`)}
+                    onClick={() => navigate(`${chatBasePath}/${id}`)}
                   >
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-3">
@@ -592,7 +600,7 @@ export function ChatView() {
   if (!activePerson && !isLoadingConversations) {
     return (
       <div className="p-4">
-        <Button variant="ghost" onClick={() => navigate("/app/chat")}> 
+        <Button variant="ghost" onClick={() => navigate(chatBasePath)}> 
           <ArrowLeft className="size-4 mr-2" />
           Volver
         </Button>
@@ -606,11 +614,11 @@ export function ChatView() {
   }
 
   return (
-    <div className="size-full flex flex-col bg-white">
+    <div className="flex h-[calc(100vh-5rem)] min-h-[34rem] flex-col bg-white">
       {/* Chat Header */}
       <div className="border-b px-4 py-3 bg-white shadow-sm">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/app/chat")}> 
+          <Button variant="ghost" size="sm" onClick={() => navigate(chatBasePath)}> 
             <ArrowLeft className="size-4" />
           </Button>
 
@@ -643,7 +651,7 @@ export function ChatView() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-4 space-y-4 bg-gray-50">
+      <div className="min-h-0 flex-1 overflow-hidden space-y-4 bg-gray-50 p-4">
         {!activeChat || activeChat.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-gray-500 text-center">
@@ -698,7 +706,7 @@ export function ChatView() {
       </div>
 
       {/* Message Input */}
-      <div className="border-t p-4 bg-white pb-20">
+      <div className="shrink-0 border-t bg-white p-4 pb-20">
         {chatError && (
           <div className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
             {chatError}

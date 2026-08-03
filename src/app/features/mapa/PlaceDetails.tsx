@@ -15,6 +15,7 @@ import {
   Lightbulb,
   Lock,
   MapPin,
+  MessageCircle,
   Monitor,
   ParkingCircle,
   Plug,
@@ -26,6 +27,9 @@ import {
   Wifi,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
+import { Textarea } from "../../components/ui/textarea";
 import { CachedImage, preloadCachedImage } from "../../components/ui/cached-image";
 import { ReportIssueModal } from "../shared/ReportIssueModal";
 import { getIssueIcon, getIssueLabel, placeIssues, studyPlaces, type IssueType, workPlaces } from "../../data/mockData";
@@ -35,6 +39,9 @@ import {
   setCurrentUserFavoritePlace,
 } from "../../services/currentUserService";
 import { getPlaceById, type AppPlace } from "../../services/placeService";
+import { startPlaceContact } from "../../services/placeContactService";
+import { sendChatMessage } from "../../services/chatService";
+import { useCurrentUser } from "../../context/CurrentUserContext";
 import {
   confirmPlaceReport,
   createPlaceReport,
@@ -125,6 +132,7 @@ function getScheduleSummary(schedule: DisplayScheduleDay[]) {
 export function PlaceDetails() {
   const { placeId } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useCurrentUser();
   const location = useLocation();
   const navigationState = location.state as DetailNavigationState | null;
   const backPath = navigationState?.from ?? "/app/discover";
@@ -143,11 +151,41 @@ export function PlaceDetails() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [readyImageUrls, setReadyImageUrls] = useState<Set<string>>(new Set());
   const [displayedImage, setDisplayedImage] = useState<string | undefined>();
+  const [showContactDialog, setShowContactDialog] = useState(false);
+  const [contactMessage, setContactMessage] = useState("");
+  const [isSendingContact, setIsSendingContact] = useState(false);
+  const [contactMessageStatus, setContactMessageStatus] = useState("");
   const currentPlaceImages: string[] = useMemo(
     () => Array.isArray(place?.images) ? place.images : [],
     [place?.images],
   );
   const selectedImage = currentPlaceImages[activeImageIndex];
+
+  const handlePlaceContact = async () => {
+    if (!placeId || !currentUser?.id || !contactMessage.trim()) return;
+    setIsSendingContact(true);
+    setContactMessageStatus("");
+    try {
+      const result = await startPlaceContact(placeId, contactMessage);
+      if (result.status === "active" && result.delegateUserId) {
+        await sendChatMessage({
+          senderId: currentUser.id,
+          receiverId: result.delegateUserId,
+          message: `[${place.name}] ${contactMessage.trim()}`,
+        });
+        setShowContactDialog(false);
+        setContactMessage("");
+        navigate(`/app/chat/${result.delegateUserId}`);
+      } else {
+        setContactMessageStatus("Tu mensaje quedó en espera. Se entregará al delegado cuando sea asignado.");
+        setContactMessage("");
+      }
+    } catch (error) {
+      setContactMessageStatus(error instanceof Error ? error.message : "No se pudo enviar el mensaje.");
+    } finally {
+      setIsSendingContact(false);
+    }
+  };
 
   useEffect(() => {
     if (initialPlace || !placeId || !isSupabaseConfigured) return;
@@ -628,6 +666,16 @@ export function PlaceDetails() {
             </Card>
           </div>
 
+          {currentUser?.role === "worker" && (
+            <button
+              type="button"
+              onClick={() => { setContactMessageStatus(""); setShowContactDialog(true); }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white hover:bg-[#4338CA]"
+            >
+              <MessageCircle className="size-4" /> Contactar al lugar
+            </button>
+          )}
+
           {place.description && (
             <div>
               <h3 className="text-lg mb-2" style={{ fontWeight: 700 }}>Descripcion</h3>
@@ -873,6 +921,20 @@ export function PlaceDetails() {
           onReport={handleReport}
         />
       )}
+      <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Contactar a {place.name}</DialogTitle>
+            <DialogDescription>Tu mensaje será enviado al delegado del lugar. Si aún no hay uno asignado, quedará en espera.</DialogDescription>
+          </DialogHeader>
+          {contactMessageStatus && <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{contactMessageStatus}</p>}
+          <Textarea value={contactMessage} onChange={(event) => setContactMessage(event.target.value)} placeholder="Escribe tu consulta..." />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowContactDialog(false)} disabled={isSendingContact}>Cancelar</Button>
+            <Button onClick={handlePlaceContact} disabled={!contactMessage.trim() || isSendingContact}>{isSendingContact ? "Enviando..." : "Enviar mensaje"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

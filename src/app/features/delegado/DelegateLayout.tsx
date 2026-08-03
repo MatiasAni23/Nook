@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { AlertTriangle, BarChart3, Calendar, ChevronRight, Home, LogOut, MapPin, Settings } from "lucide-react";
+import { AlertTriangle, BarChart3, Calendar, ChevronRight, Home, LogOut, MapPin, MessageCircle, Settings } from "lucide-react";
 import { Button } from "../../components/ui/button";
 
 interface DelegateLayoutProps {
@@ -33,6 +33,12 @@ const navItems = [
     description: "Tickets activos",
   },
   {
+    path: "/delegate/chat",
+    icon: MessageCircle,
+    label: "Chats",
+    description: "Conversaciones activas",
+  },
+  {
     path: "/delegate/stats",
     icon: BarChart3,
     label: "Estadísticas",
@@ -49,6 +55,7 @@ const navItems = [
 export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const isChatRoute = location.pathname.startsWith("/delegate/chat");
 
   const isActivePath = (path: string) =>
     location.pathname === path ||
@@ -56,7 +63,7 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
   const activeItem = navItems.find((item) => isActivePath(item.path)) ?? navItems[0];
 
   return (
-    <div className="relative min-h-screen bg-[#F6F7FB] text-[#111827]">
+    <div className={`relative bg-[#F6F7FB] text-[#111827] ${isChatRoute ? "flex h-dvh flex-col overflow-hidden" : "min-h-screen"}`}>
       <div className="pointer-events-none fixed inset-x-0 top-0 hidden h-56 bg-gradient-to-b from-white to-transparent md:block" />
 
       <aside className="group/sidebar fixed bottom-0 right-0 top-0 z-40 hidden w-20 flex-col overflow-hidden rounded-l-[1.35rem] border-l border-[#E6E8F5] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] transition-[width] duration-300 hover:w-72 md:flex">
@@ -132,8 +139,8 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
         </div>
       </aside>
 
-      <div className="relative min-h-screen md:pr-20">
-        <header className="sticky top-0 z-30 border-b border-[#E6E8F5]/80 bg-white/95 px-4 py-4 backdrop-blur md:px-8">
+      <div className={`relative md:pr-20 ${isChatRoute ? "flex min-h-0 flex-1 flex-col" : "min-h-screen"}`}>
+        <header className="z-30 shrink-0 border-b border-[#E6E8F5]/80 bg-white/95 px-4 py-4 backdrop-blur md:sticky md:top-0 md:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
             <div className="min-w-0">
               <h1 className="truncate text-2xl font-black tracking-normal text-[#111827] md:text-3xl">
@@ -154,7 +161,7 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
           </div>
         </header>
 
-        <main className="mx-auto min-h-[calc(100vh-5rem)] max-w-7xl px-0 pb-28 md:px-8 md:pb-8">
+        <main className={`mx-auto max-w-7xl px-0 md:px-8 ${isChatRoute ? "w-full min-h-0 flex-1 overflow-hidden pb-0 md:pb-0" : "min-h-[calc(100vh-5rem)] pb-28 md:pb-8"}`}>
           <Outlet />
         </main>
       </div>
