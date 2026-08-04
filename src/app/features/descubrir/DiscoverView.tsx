@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { AlertTriangle, Bell, Crown, Search, Star } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -20,6 +20,8 @@ import {
 } from "../mapa/placeFilters";
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
+import { getDistanceInKm, sortPlacesByDistance, type Coordinates } from "../mapa/proximity";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "../../components/ui/carousel";
 
 // Helpers de presentacion para normalizar datos antes de mostrarlos.
 function getAmenityLabel(key?: string, name?: string) {
@@ -43,6 +45,8 @@ export function DiscoverView() {
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [placesError, setPlacesError] = useState("");
+  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const [recommendedCarouselApi, setRecommendedCarouselApi] = useState<CarouselApi | null>(null);
   const [unreadCount, setUnreadCount] = useState(
     isSupabaseConfigured ? 0 : mockNotifications.filter((notification) => !notification.read).length,
   );
@@ -81,6 +85,24 @@ export function DiscoverView() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Descubrir usa la ubicación del dispositivo para ordenar "Cerca de ti".
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      },
+      () => undefined,
+      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 10_000 },
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   // Mantiene actualizado el contador del boton de notificaciones.
@@ -143,23 +165,6 @@ export function DiscoverView() {
     }
   };
 
-  // Distancia aproximada desde una ubicacion base en Santiago.
-  const calculateDistance = (lat: number, lng: number) => {
-    const userLat = -33.4569;
-    const userLng = -70.6483;
-    const R = 6371;
-    const dLat = ((lat - userLat) * Math.PI) / 180;
-    const dLng = ((lng - userLng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((userLat * Math.PI) / 180) *
-        Math.cos((lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return (R * c).toFixed(1);
-  };
-
   // Formato de precios en pesos chilenos para lugares con reserva pagada.
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("es-CL", {
@@ -170,24 +175,51 @@ export function DiscoverView() {
   };
 
   // Dataset local usado cuando Supabase no esta disponible.
-  const mockPlaces = [
-    ...studyPlaces.map((place) => ({
-      ...place,
-      category: "study" as const,
-      images: [],
-      amenities: [],
-    })),
-    ...workPlaces.map((place) => ({
-      ...place,
-      category: "work" as const,
-      images: [],
-      amenities: [],
-    })),
-  ];
+  const mockPlaces = useMemo(
+    () => [
+      ...studyPlaces.map((place) => ({
+        ...place,
+        category: "study" as const,
+        planType: "basic" as const,
+        images: [],
+        amenities: [],
+      })),
+      ...workPlaces.map((place) => ({
+        ...place,
+        category: "work" as const,
+        planType: "basic" as const,
+        images: [],
+        amenities: [],
+      })),
+    ],
+    [],
+  );
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
 
-  // La seccion Descubrir actualmente filtra solo por el texto del buscador.
-  const filteredPlaces = basePlaces.filter((place) => placeMatchesSearch(place, searchTerm));
+  // La sección se filtra y luego se ordena por la distancia a la ubicación actual.
+  const filteredPlaces = sortPlacesByDistance(
+    basePlaces.filter((place) => placeMatchesSearch(place, searchTerm)),
+    userLocation,
+  );
+
+  // Hasta tener la fuente comercial definitiva, la selección se rellena al azar.
+  // Si ya hay lugares con suscripción/promoción, esos tienen prioridad.
+  const recommendedPlaces = useMemo(() => {
+    const subscribedPlaces = basePlaces.filter(
+      (place) => place.isPromoted || place.planType !== "basic",
+    );
+    const source = subscribedPlaces.length > 0 ? subscribedPlaces : basePlaces;
+
+    return [...source].sort(() => Math.random() - 0.5).slice(0, 6);
+  }, [basePlaces]);
+
+  // Avanza el carrusel sin impedir que la persona lo deslice manualmente.
+  useEffect(() => {
+    if (!recommendedCarouselApi || recommendedPlaces.length === 0) return;
+
+    const intervalId = window.setInterval(() => recommendedCarouselApi.scrollNext(), 5_000);
+    return () => window.clearInterval(intervalId);
+  }, [recommendedCarouselApi, recommendedPlaces.length]);
 
   if ((isLoadingCurrentUser && !cachedUser) || isLoadingPlaces) {
     return <DiscoverSkeleton />;
@@ -264,21 +296,61 @@ export function DiscoverView() {
         </div>
 
         {/* Banner editorial destacado de la pantalla Descubrir. */}
-        <div className="px-4 py-4">
-          <div className="relative h-44 rounded-3xl overflow-hidden shadow-lg">
-            <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-[#4F46E5] p-6 flex flex-col justify-center">
-              <h2 className="text-xl text-white leading-tight mb-2" style={{ fontWeight: 700 }}>
-                Espacios que<br />inspiran<br />productividad
-              </h2>
-              <p className="text-white/95 text-xs leading-relaxed">
-                Encuentra el lugar perfecto<br />para crear, reunirte y crecer.
-              </p>
+        {/* Selección temporal de espacios recomendados. */}
+        <section className="px-4 pb-5">
+            <div className="mb-3 flex items-center gap-2 px-4">
+              <Crown className="size-5 text-[#F59E0B]" />
+              <h3 className="text-lg font-bold text-[#1E1B4B]">Recomendados para ti</h3>
             </div>
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gray-100">
-              <CachedImage src={discoverImageUrl} alt="" className="size-full object-cover" aria-hidden="true" />
-            </div>
-          </div>
-        </div>
+            <Carousel setApi={setRecommendedCarouselApi} opts={{ align: "start", loop: true }} className="w-full">
+              <CarouselContent>
+                <CarouselItem>
+                  <div className="relative h-44 overflow-hidden rounded-3xl shadow-lg">
+                    <div className="absolute inset-y-0 left-0 z-10 flex w-1/2 flex-col justify-center bg-[#4F46E5] p-6">
+                      <h2 className="mb-2 text-xl font-bold leading-tight text-white">
+                        Espacios que<br />inspiran<br />productividad
+                      </h2>
+                      <p className="text-xs leading-relaxed text-white/95">
+                        Encuentra el lugar perfecto<br />para crear, reunirte y crecer.
+                      </p>
+                    </div>
+                    <CachedImage src={discoverImageUrl} alt="Espacio recomendado para estudiar o trabajar" className="size-full object-cover" />
+                  </div>
+                </CarouselItem>
+                {recommendedPlaces.map((place) => {
+                  const placeUrl = place.category === "work" ? `/app/workplace/${place.id}` : `/app/place/${place.id}`;
+
+                  return (
+                    <CarouselItem key={place.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(placeUrl, { state: getDetailNavigationState("/app/discover") })}
+                        className="w-full overflow-hidden rounded-2xl bg-white text-left shadow-[0_8px_20px_rgba(15,23,42,0.10)] transition hover:-translate-y-0.5"
+                      >
+                        <div className={`relative h-28 ${place.images?.[0] ? "bg-gray-100" : `bg-gradient-to-br ${getPlaceImage(place.id)}`} flex items-center justify-center overflow-hidden`}>
+                          {place.images?.[0] ? (
+                            <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
+                          ) : (
+                            <span className="text-4xl">{getPlaceIcon(place.type)}</span>
+                          )}
+                          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold text-[#4F46E5] shadow-sm">
+                            <Crown className="size-3" /> Recomendado
+                          </span>
+                        </div>
+                        <div className="p-3">
+                          <p className="truncate text-sm font-bold text-gray-900">{place.name}</p>
+                          <p className="mt-1 truncate text-xs text-gray-500">{place.zone ?? place.address ?? "Santiago"}</p>
+                          <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-gray-700">
+                            <Star className="size-3 fill-yellow-400 text-yellow-400" /> {place.rating}
+                          </div>
+                        </div>
+                      </button>
+                    </CarouselItem>
+                  );
+                })}
+              </CarouselContent>
+            </Carousel>
+        </section>
 
         {/* Encabezado de la lista de resultados. */}
         <div className="px-4 mb-3 flex items-center justify-between">
@@ -359,7 +431,10 @@ export function DiscoverView() {
                         </div>
 
                         <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                          <span className="line-clamp-1">{place.zone ?? place.address ?? "Santiago"} - {calculateDistance(place.lat, place.lng)} km</span>
+                          <span className="line-clamp-1">
+                            {place.zone ?? place.address ?? "Santiago"}
+                            {userLocation ? ` - ${getDistanceInKm(userLocation, place).toFixed(1)} km` : ""}
+                          </span>
                         </div>
                       </div>
 

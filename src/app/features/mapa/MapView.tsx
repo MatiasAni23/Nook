@@ -18,6 +18,7 @@ import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./place
 import { getDetailNavigationState } from "./navigationState";
 import { getPlacePinAsset } from "./placePinAssets";
 import { cleanMapStyles } from "./mapStyles";
+import { sortPlacesByDistance } from "./proximity";
 
 // Configuracion base del mapa y del rol activo.
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
@@ -286,9 +287,11 @@ export function MapView() {
     ...workPlaces.map((place) => ({ ...place, category: "work" as const, images: [] })),
   ];
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
-  const places = basePlaces.filter((place) => {
+  const filteredPlaces = basePlaces.filter((place) => {
     return placeMatchesSearch(place, searchTerm) && placeMatchesTab(place, activeTab);
   });
+  // Los pines y el carrusel usan el mismo orden de cercanía.
+  const places = sortPlacesByDistance(filteredPlaces, userLocation);
 
   // Opciones visibles en el filtro horizontal.
   const tabs = [
