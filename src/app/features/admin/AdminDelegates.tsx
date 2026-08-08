@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown, Edit, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2, UserCheck, UserX } from "lucide-react";
+import { Crown, Edit, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -255,6 +255,21 @@ export function AdminDelegates() {
     }));
   };
 
+  const selectAllFilteredPlaces = () => {
+    setFormData((current) => ({
+      ...current,
+      assignedPlaces: Array.from(new Set([...current.assignedPlaces, ...filteredPlaces.map((place) => place.id)])),
+    }));
+  };
+
+  const clearFilteredPlaceSelection = () => {
+    const filteredPlaceIds = new Set(filteredPlaces.map((place) => place.id));
+    setFormData((current) => ({
+      ...current,
+      assignedPlaces: current.assignedPlaces.filter((id) => !filteredPlaceIds.has(id)),
+    }));
+  };
+
   return (
     <>
       <div className="space-y-4">
@@ -413,16 +428,30 @@ export function AdminDelegates() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-auto">
-            <CardContent className="p-6 space-y-4">
-              <div>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <Card className="flex w-full max-w-2xl max-h-[90vh] flex-col overflow-hidden">
+            <CardContent className="min-h-0 flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
                 <h3 className="text-xl font-semibold mb-2">{editingDelegate ? "Editar Delegado" : "Nuevo Delegado"}</h3>
                 <p className="text-sm text-gray-600">
                   {editingDelegate
                     ? "Actualiza sus datos y lugares asignados."
                     : "Crea una invitacion con correo fijo para que el delegado configure su contrasena."}
                 </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowModal(false)}
+                  disabled={isSaving}
+                  className="-mr-2 -mt-2 shrink-0"
+                  aria-label="Cerrar formulario"
+                >
+                  <X className="size-5" />
+                </Button>
               </div>
 
               {createdInviteUrl && (
@@ -524,7 +553,31 @@ export function AdminDelegates() {
                 </label>
 
                 <div className="space-y-2">
-                  <Label>Lugares asignados</Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Lugares asignados</Label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAllFilteredPlaces}
+                        disabled={Boolean(createdInviteUrl) || filteredPlaces.length === 0}
+                        className="h-8 px-2 text-xs text-[#4F46E5] hover:text-[#4338CA]"
+                      >
+                        Seleccionar todo
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilteredPlaceSelection}
+                        disabled={Boolean(createdInviteUrl) || formData.assignedPlaces.length === 0}
+                        className="h-8 px-2 text-xs text-gray-600"
+                      >
+                        Limpiar
+                      </Button>
+                    </div>
+                  </div>
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
                     <Input
@@ -559,8 +612,10 @@ export function AdminDelegates() {
                   <p className="text-xs text-gray-500">{formData.assignedPlaces.length} lugar(es) seleccionado(s)</p>
                 </div>
               </div>
+              </div>
+            </CardContent>
 
-              <div className="flex gap-2 pt-4">
+            <div className="flex shrink-0 gap-2 border-t bg-white p-6">
                 <Button variant="outline" onClick={() => setShowModal(false)} className="flex-1" disabled={isSaving}>
                   {createdInviteUrl ? "Cerrar" : "Cancelar"}
                 </Button>
@@ -569,8 +624,7 @@ export function AdminDelegates() {
                     {isSaving ? "Guardando..." : editingDelegate ? "Guardar Cambios" : "Crear Invitacion"}
                   </Button>
                 )}
-              </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}
