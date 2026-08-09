@@ -25,12 +25,16 @@ export interface PlaceSpace {
   id: string;
   name: string;
   capacity: number;
+  pricePerHour: number;
+  billingUnit: "hour" | "day" | "week" | "month";
   imageUrl: string;
 }
 
 export type PlaceSpaceInput = {
   name: string;
   capacity: number;
+  pricePerHour: number;
+  billingUnit: "hour" | "day" | "week" | "month";
   image: { type: "existing"; url: string } | { type: "new"; file: File };
 };
 
@@ -149,7 +153,7 @@ type PlaceRow = {
     additional_info: string | null;
   }> | null;
   is_promoted?: boolean | null;
-  place_spaces?: Array<{ id: string; name: string; capacity: number; image_url: string }> | null;
+  place_spaces?: Array<{ id: string; name: string; capacity: number; price_per_hour: string | number; billing_unit: "hour" | "day" | "week" | "month"; image_url: string }> | null;
 };
 
 function requireSupabase() {
@@ -215,6 +219,8 @@ function toAppPlace(row: PlaceRow): AppPlace {
       id: space.id,
       name: space.name,
       capacity: space.capacity,
+      pricePerHour: toNumber(space.price_per_hour),
+      billingUnit: space.billing_unit ?? "hour",
       imageUrl: space.image_url,
     })),
     isPromoted: Boolean(row.is_promoted),
@@ -229,13 +235,13 @@ async function fetchPlaces(): Promise<AppPlace[]> {
     const rows = (promotedResult.data ?? []) as PlaceRow[];
     const { data: spaces, error: spacesError } = await client
       .from("place_spaces")
-      .select("id, place_id, name, capacity, image_url");
+      .select("id, place_id, name, capacity, price_per_hour, billing_unit, image_url");
 
     if (!spacesError) {
       const spacesByPlace = new Map<string, NonNullable<PlaceRow["place_spaces"]>>();
       for (const space of spaces ?? []) {
         const placeSpaces = spacesByPlace.get(String(space.place_id)) ?? [];
-        placeSpaces.push({ id: String(space.id), name: space.name, capacity: space.capacity, image_url: space.image_url });
+        placeSpaces.push({ id: String(space.id), name: space.name, capacity: space.capacity, price_per_hour: space.price_per_hour, billing_unit: space.billing_unit, image_url: space.image_url });
         spacesByPlace.set(String(space.place_id), placeSpaces);
       }
       rows.forEach((row) => { row.place_spaces = spacesByPlace.get(row.id) ?? []; });
@@ -283,6 +289,8 @@ async function fetchPlaces(): Promise<AppPlace[]> {
         id,
         name,
         capacity,
+        price_per_hour,
+        billing_unit,
         image_url
       )
     `,
@@ -369,6 +377,8 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
         id,
         name,
         capacity,
+        price_per_hour,
+        billing_unit,
         image_url
       )
     `,
@@ -424,17 +434,17 @@ async function savePlaceSpaces(placeId: string, spaces: PlaceSpaceInput[]) {
       const [uploadedUrl] = await uploadPlaceImages(placeId, [space.image.file]);
       imageUrl = uploadedUrl;
     }
-    rows.push({ place_id: placeId, name: space.name.trim(), capacity: space.capacity, image_url: imageUrl });
+    rows.push({ place_id: placeId, name: space.name.trim(), capacity: space.capacity, price_per_hour: space.pricePerHour, billing_unit: space.billingUnit, image_url: imageUrl });
   }
 
   if (rows.length === 0) return [];
   const { data, error } = await client
     .from("place_spaces")
     .insert(rows)
-    .select("id, name, capacity, image_url");
+    .select("id, name, capacity, price_per_hour, billing_unit, image_url");
   if (error) throw error;
   return (data ?? []).map((space) => ({
-    id: String(space.id), name: space.name, capacity: space.capacity, imageUrl: space.image_url,
+    id: String(space.id), name: space.name, capacity: space.capacity, pricePerHour: toNumber(space.price_per_hour), billingUnit: space.billing_unit ?? "hour", imageUrl: space.image_url,
   }));
 }
 

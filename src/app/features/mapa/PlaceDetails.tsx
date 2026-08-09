@@ -831,7 +831,7 @@ export function PlaceDetails() {
             <div>
               <h3 className="mb-3 text-lg" style={{ fontWeight: 700 }}>Espacios del lugar</h3>
               <div className="flex gap-3 overflow-x-auto pb-2">
-                {place.spaces.map((space: { id: string; name: string; capacity: number; imageUrl: string }) => (
+                {place.spaces.map((space: { id: string; name: string; capacity: number; pricePerHour: number; billingUnit: "hour" | "day" | "week" | "month"; imageUrl: string }) => (
                   <Card key={space.id} className="w-36 shrink-0 overflow-hidden border-0 bg-white shadow-md">
                     <div className="aspect-[4/3] bg-pink-100">
                       <CachedImage src={space.imageUrl} alt={space.name} className="size-full object-cover" />
@@ -840,6 +840,9 @@ export function PlaceDetails() {
                       <p className="truncate text-sm font-semibold text-gray-900">{space.name}</p>
                       <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                         <Users className="size-3.5" /> Capacidad: {space.capacity}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#4F46E5]">
+                        <DollarSign className="size-3.5" /> {space.pricePerHour > 0 ? `$${space.pricePerHour.toLocaleString("es-CL")} / ${space.billingUnit === "day" ? "día" : space.billingUnit === "week" ? "semana" : space.billingUnit === "month" ? "mes" : "hora"}` : "Gratis"}
                       </p>
                     </CardContent>
                   </Card>

@@ -340,6 +340,8 @@ CREATE TABLE place_spaces (
     place_id UUID NOT NULL REFERENCES places(id) ON DELETE CASCADE,
     name VARCHAR(120) NOT NULL,
     capacity INTEGER NOT NULL CHECK (capacity > 0),
+    price_per_hour DECIMAL(10, 2) NOT NULL DEFAULT 0 CHECK (price_per_hour >= 0),
+    billing_unit VARCHAR(10) NOT NULL DEFAULT 'hour' CHECK (billing_unit IN ('hour', 'day', 'week', 'month')),
     image_url TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

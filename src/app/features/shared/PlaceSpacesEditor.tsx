@@ -1,4 +1,4 @@
-import { ImagePlus, Plus, Trash2, Users } from "lucide-react";
+import { CircleDollarSign, ImagePlus, Plus, Trash2, Users } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -8,6 +8,8 @@ export type PlaceSpaceDraft = {
   id: string;
   name: string;
   capacity: string;
+  pricePerHour: string;
+  billingUnit: "hour" | "day" | "week" | "month";
   image: PlaceSpaceInput["image"] | null;
   previewUrl?: string;
 };
@@ -17,6 +19,8 @@ export function placeSpacesToDrafts(spaces: PlaceSpace[]): PlaceSpaceDraft[] {
     id: space.id,
     name: space.name,
     capacity: String(space.capacity),
+    pricePerHour: String(space.pricePerHour),
+    billingUnit: space.billingUnit ?? "hour",
     image: { type: "existing", url: space.imageUrl },
     previewUrl: space.imageUrl,
   }));
@@ -26,12 +30,14 @@ export function validPlaceSpaces(drafts: PlaceSpaceDraft[]): PlaceSpaceInput[] {
   return drafts.map((space) => ({
     name: space.name.trim(),
     capacity: Number(space.capacity),
+    pricePerHour: Number(space.pricePerHour),
+    billingUnit: space.billingUnit,
     image: space.image!,
   }));
 }
 
 export function arePlaceSpacesValid(drafts: PlaceSpaceDraft[]) {
-  return drafts.every((space) => space.name.trim() && Number.isInteger(Number(space.capacity)) && Number(space.capacity) > 0 && space.image);
+  return drafts.every((space) => space.name.trim() && Number.isInteger(Number(space.capacity)) && Number(space.capacity) > 0 && Number.isFinite(Number(space.pricePerHour)) && Number(space.pricePerHour) >= 0 && space.image);
 }
 
 interface PlaceSpacesEditorProps {
@@ -41,7 +47,7 @@ interface PlaceSpacesEditorProps {
 
 export function PlaceSpacesEditor({ spaces, onChange }: PlaceSpacesEditorProps) {
   const addSpace = () => onChange([...spaces, {
-    id: crypto.randomUUID(), name: "", capacity: "", image: null,
+    id: crypto.randomUUID(), name: "", capacity: "", pricePerHour: "", billingUnit: "hour", image: null,
   }]);
 
   const updateSpace = (id: string, change: Partial<PlaceSpaceDraft>) => {
@@ -76,8 +82,11 @@ export function PlaceSpacesEditor({ spaces, onChange }: PlaceSpacesEditorProps) 
               updateSpace(space.id, { image: { type: "new", file }, previewUrl: URL.createObjectURL(file) });
             }}
           />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1"><Label htmlFor={`space-name-${space.id}`}>Nombre *</Label><Input id={`space-name-${space.id}`} value={space.name} onChange={(event) => updateSpace(space.id, { name: event.target.value })} placeholder="Ej.: Sala de estudio 1" /></div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
+            <div className="space-y-3">
+              <div className="space-y-1"><Label htmlFor={`space-name-${space.id}`}>Nombre *</Label><Input id={`space-name-${space.id}`} value={space.name} onChange={(event) => updateSpace(space.id, { name: event.target.value })} placeholder="Ej.: Sala de estudio 1" /></div>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_8.5rem]"><div className="space-y-1"><Label htmlFor={`space-price-${space.id}`}><CircleDollarSign className="mr-1 inline size-3.5" />Precio (CLP) *</Label><Input id={`space-price-${space.id}`} type="number" min="0" step="1" value={space.pricePerHour} onChange={(event) => updateSpace(space.id, { pricePerHour: event.target.value })} placeholder="0" /></div><div className="space-y-1"><Label htmlFor={`space-unit-${space.id}`}>Cobro</Label><select id={`space-unit-${space.id}`} value={space.billingUnit} onChange={(event) => updateSpace(space.id, { billingUnit: event.target.value as PlaceSpaceDraft["billingUnit"] })} className="h-9 w-full rounded-md border border-[#DCD8FF] bg-white px-2.5 text-sm font-medium text-[#312E81] shadow-sm outline-none transition focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15"><option value="hour">Por hora</option><option value="day">Por día</option><option value="week">Por semana</option><option value="month">Por mes</option></select></div></div>
+            </div>
             <div className="space-y-1"><Label htmlFor={`space-capacity-${space.id}`}><Users className="mr-1 inline size-3.5" />Capacidad *</Label><Input id={`space-capacity-${space.id}`} type="number" min="1" value={space.capacity} onChange={(event) => updateSpace(space.id, { capacity: event.target.value })} placeholder="8" /></div>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={() => onChange(spaces.filter((item) => item.id !== space.id))} className="self-center text-red-600 hover:bg-red-50 hover:text-red-700" aria-label="Quitar espacio"><Trash2 className="size-4" /></Button>

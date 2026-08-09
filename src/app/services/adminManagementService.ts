@@ -70,7 +70,7 @@ export interface DelegateAssignedPlace {
     isAvailable: boolean;
     additionalInfo?: string | null;
   }>;
-  spaces: Array<{ id: string; name: string; capacity: number; imageUrl: string }>;
+  spaces: Array<{ id: string; name: string; capacity: number; pricePerHour: number; imageUrl: string }>;
   reservationsCount: number;
 }
 
@@ -685,6 +685,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           id,
           name,
           capacity,
+          price_per_hour,
           image_url
         )
       )
@@ -733,6 +734,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           id: String(space.id),
           name: String(space.name ?? ""),
           capacity: Number(space.capacity ?? 0),
+          pricePerHour: Number(space.price_per_hour ?? 0),
           imageUrl: String(space.image_url ?? ""),
         })),
         reservationsCount: Array.isArray(place.reservations) ? place.reservations.length : 0,
