@@ -14,6 +14,7 @@ import { CachedImage } from "../../components/ui/cached-image";
 import { studyPlaces, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+import { trackPlaceAnalyticsEvents } from "../../services/placeAnalyticsService";
 import { hasValidPlacePrice, placeMatchesSearch, placeMatchesTab } from "./placeFilters";
 import { getDetailNavigationState } from "./navigationState";
 import { getPlacePinAsset } from "./placePinAssets";
@@ -116,6 +117,7 @@ export function MapView() {
   const sheetRef = useRef<HTMLDivElement>(null);
   const hasRequestedGoogleFallbackRef = useRef(false);
   const isDraggingSheetRef = useRef(false);
+  const trackedHomeImpressionsRef = useRef(new Set<string>());
 
   // Normaliza ubicaciones obtenidas por navegador o por Google Geolocation.
   const applyUserCoordinates = (coords: Coordinates, source: UserLocationSource, shouldCenterMap = false) => {
@@ -292,6 +294,19 @@ export function MapView() {
   });
   // Los pines y el carrusel usan el mismo orden de cercanía.
   const places = sortPlacesByDistance(filteredPlaces, userLocation);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const visiblePlaceIds = places
+      .slice(0, 5)
+      .map((place) => place.id)
+      .filter((placeId) => !trackedHomeImpressionsRef.current.has(placeId));
+
+    if (visiblePlaceIds.length === 0) return;
+    visiblePlaceIds.forEach((placeId) => trackedHomeImpressionsRef.current.add(placeId));
+    void trackPlaceAnalyticsEvents(visiblePlaceIds, "home_impression");
+  }, [places]);
 
   // Opciones visibles en el filtro horizontal.
   const tabs = [

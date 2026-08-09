@@ -1800,4 +1800,34 @@ ON CONFLICT (id) DO UPDATE SET
     email_verified = EXCLUDED.email_verified,
     updated_at = NOW();
 
+-- Eventos de navegación para medir visibilidad y aperturas de cada lugar.
+CREATE TABLE IF NOT EXISTS place_analytics_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    place_id UUID NOT NULL REFERENCES places(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type VARCHAR(30) NOT NULL CHECK (event_type IN ('home_impression', 'details_view')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_place_analytics_events_type_created_at
+    ON place_analytics_events(event_type, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_place_analytics_events_place_created_at
+    ON place_analytics_events(place_id, created_at DESC);
+
+ALTER TABLE place_analytics_events ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT ON place_analytics_events TO authenticated;
+
+CREATE POLICY place_analytics_events_insert_own ON place_analytics_events
+    FOR INSERT WITH CHECK (
+        auth.uid() = user_id
+        AND EXISTS (
+            SELECT 1 FROM places
+            WHERE places.id = place_analytics_events.place_id
+              AND places.status = 'active'
+        )
+    );
+
+CREATE POLICY place_analytics_events_select_admin ON place_analytics_events
+    FOR SELECT USING (is_current_user_admin());
+
 COMMIT;

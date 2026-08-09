@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import {
   AlertTriangle,
@@ -39,6 +39,7 @@ import {
   setCurrentUserFavoritePlace,
 } from "../../services/currentUserService";
 import { getPlaceById, type AppPlace } from "../../services/placeService";
+import { trackPlaceAnalyticsEvent } from "../../services/placeAnalyticsService";
 import { startPlaceContact } from "../../services/placeContactService";
 import { sendChatMessage } from "../../services/chatService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
@@ -155,6 +156,7 @@ export function PlaceDetails() {
   const [contactMessage, setContactMessage] = useState("");
   const [isSendingContact, setIsSendingContact] = useState(false);
   const [contactMessageStatus, setContactMessageStatus] = useState("");
+  const trackedDetailIdsRef = useRef(new Set<string>());
   const currentPlaceImages: string[] = useMemo(
     () => Array.isArray(place?.images) ? place.images : [],
     [place?.images],
@@ -208,6 +210,12 @@ export function PlaceDetails() {
       isMounted = false;
     };
   }, [initialPlace, placeId]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !place?.id || trackedDetailIdsRef.current.has(place.id)) return;
+    trackedDetailIdsRef.current.add(place.id);
+    void trackPlaceAnalyticsEvent(place.id, "details_view");
+  }, [place?.id]);
 
   useEffect(() => {
     let isMounted = true;
