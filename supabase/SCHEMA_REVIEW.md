@@ -14,7 +14,7 @@ Problema actual:
 password_hash VARCHAR(255) NOT NULL
 ```
 
-Debe eliminarse. El archivo `supabase/nook_schema_supabase.sql` ya delega las credenciales a Supabase Auth.
+Debe eliminarse. El archivo `supabase/pinwi_schema_supabase.sql` ya delega las credenciales a Supabase Auth.
 
 ### 2. `users.id`
 
@@ -26,7 +26,7 @@ Recomendado:
 id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE
 ```
 
-El archivo `supabase/nook_schema_supabase.sql` define esta foreign key.
+El archivo `supabase/pinwi_schema_supabase.sql` define esta foreign key.
 
 ### 3. Seeds de usuarios demo
 
@@ -34,14 +34,14 @@ Estos inserts no crean usuarios reales en Supabase Auth:
 
 ```sql
 INSERT INTO users (...)
-VALUES ('admin@nook.cl', ...);
+VALUES ('admin@pinwi.cl', ...);
 ```
 
 Si los ejecutas asi, tendras filas en `public.users`, pero no podran iniciar sesion. Los usuarios demo deben crearse desde Supabase Auth o desde un backend con service role.
 
 ### 4. RLS
 
-Para usar Supabase desde frontend, las tablas expuestas necesitan Row Level Security. El archivo `supabase/nook_schema_supabase.sql` agrega politicas base para los modulos actuales.
+Para usar Supabase desde frontend, las tablas expuestas necesitan Row Level Security. El archivo `supabase/pinwi_schema_supabase.sql` agrega politicas base para los modulos actuales.
 
 Mas adelante hay que refinar permisos administrativos y flujos de delegados segun las pantallas reales.
 
@@ -67,7 +67,7 @@ Recomendacion:
 ## Orden sugerido para montar en Supabase
 
 1. Crear proyecto Supabase.
-2. Ejecutar `supabase/nook_schema_supabase.sql` en una base nueva o descartable.
+2. Ejecutar `supabase/pinwi_schema_supabase.sql` en una base nueva o descartable.
 3. Crear usuarios desde Supabase Auth.
 4. Si ya existian usuarios Auth antes de ejecutar el schema, el mismo script los sincroniza en `public.users`.
 5. Refinar permisos de admin y delegado segun los flujos finales.

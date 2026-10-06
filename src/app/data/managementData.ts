@@ -15,7 +15,7 @@ export const mockDelegates: Delegate[] = [
   {
     id: 'd1',
     name: 'María González',
-    email: 'maria@nook.cl',
+    email: 'maria@pinwi.cl',
     phone: '+56 9 1234 5678',
     status: 'active',
     placesCount: 3,
@@ -26,7 +26,7 @@ export const mockDelegates: Delegate[] = [
   {
     id: 'd2',
     name: 'Carlos Rodríguez',
-    email: 'carlos@nook.cl',
+    email: 'carlos@pinwi.cl',
     phone: '+56 9 8765 4321',
     status: 'active',
     placesCount: 2,
@@ -37,7 +37,7 @@ export const mockDelegates: Delegate[] = [
   {
     id: 'd3',
     name: 'Ana Martínez',
-    email: 'ana@nook.cl',
+    email: 'ana@pinwi.cl',
     phone: '+56 9 5555 6666',
     status: 'pending',
     placesCount: 0,
@@ -165,7 +165,7 @@ export const mockSupportTickets: SupportTicket[] = [
       {
         id: 'm2',
         from: 'support',
-        name: 'Soporte Nook',
+        name: 'Soporte Pinwi',
         message: 'Hola, estamos revisando el problema. ¿Podrías decirnos qué error específico te aparece?',
         timestamp: new Date('2026-05-18T14:00:00'),
       },

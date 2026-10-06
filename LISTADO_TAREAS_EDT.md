@@ -1,5 +1,5 @@
 # 📋 EDT - Estructura de Desglose del Trabajo
-## Nook/StudyConnect - Sistema de Gestión de Espacios
+## Pinwi/StudyConnect - Sistema de Gestión de Espacios
 
 ---
 

@@ -1,3 +1,5 @@
+import { BrandLogo } from "../../components/BrandLogo";
+import { AuthBackground } from "./AuthBackground";
 import {
   useEffect,
   useMemo,
@@ -40,73 +42,6 @@ interface ProfileSetupViewProps {
   onComplete: (role: "student" | "worker", profileData: any) => Promise<void> | void;
 }
 
-function ProfileSetupBackground() {
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA]">
-      <svg
-        className="absolute inset-0 h-full w-full opacity-40 [mask-image:radial-gradient(circle_at_50%_50%,transparent_0%,transparent_26%,rgba(0,0,0,0.25)_38%,black_58%)]"
-        viewBox="0 0 1440 900"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <g fill="none" stroke="white" strokeLinecap="round">
-          <path d="M-80 190 C140 140 220 270 390 225 S690 95 860 185 1110 350 1520 235" strokeWidth="4" opacity="0.52" />
-          <path d="M-60 520 C190 450 330 560 520 500 S820 325 1010 420 1210 640 1510 560" strokeWidth="3" opacity="0.42" />
-          <path d="M110 940 C235 700 205 510 340 365 S520 190 520 -80" strokeWidth="4" opacity="0.42" />
-          <path d="M1030 950 C955 730 1005 545 1120 370 S1290 145 1260 -70" strokeWidth="4" opacity="0.38" />
-          <path d="M-120 720 L210 610 L470 700 L750 620 L1005 710 L1510 590" strokeWidth="2" opacity="0.35" />
-          <path d="M-80 355 L210 420 L455 335 L700 392 L940 310 L1510 390" strokeWidth="2" opacity="0.34" />
-        </g>
-      </svg>
-
-      <div className="absolute left-1/2 top-1/2 h-[42rem] w-[42rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.10] blur-3xl" />
-
-      <svg
-        className="absolute inset-0 h-full w-full opacity-70"
-        viewBox="0 0 1440 900"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <g fill="white">
-          <circle cx="92" cy="86" r="1.8" opacity="0.45" />
-          <circle cx="188" cy="248" r="1.4" opacity="0.40" />
-          <circle cx="322" cy="118" r="2.1" opacity="0.34" />
-          <circle cx="485" cy="690" r="1.6" opacity="0.40" />
-          <circle cx="778" cy="82" r="2" opacity="0.38" />
-          <circle cx="1040" cy="192" r="2.2" opacity="0.42" />
-          <circle cx="1324" cy="118" r="2" opacity="0.46" />
-          <circle cx="262" cy="818" r="2.1" opacity="0.40" />
-          <circle cx="720" cy="822" r="1.9" opacity="0.38" />
-          <circle cx="1288" cy="548" r="1.9" opacity="0.38" />
-          <circle cx="300" cy="388" r="1.7" opacity="0.34" />
-          <circle cx="1092" cy="410" r="1.6" opacity="0.34" />
-        </g>
-      </svg>
-
-      <motion.div
-        className="absolute left-[14%] top-[22%] hidden size-12 place-items-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-[0_14px_28px_rgba(49,46,129,0.18)] md:grid"
-        animate={{ y: [0, -8, 0], rotate: [0, 4, 0] }}
-        transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <MapPin className="size-5" />
-      </motion.div>
-      <motion.div
-        className="absolute bottom-[20%] left-[23%] hidden size-12 place-items-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-[0_14px_28px_rgba(49,46,129,0.18)] md:grid"
-        animate={{ y: [0, 9, 0], scale: [1, 1.04, 1] }}
-        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
-      >
-        <MapPin className="size-5" />
-      </motion.div>
-      <motion.div
-        className="absolute right-[16%] top-[24%] hidden size-10 place-items-center rounded-full border border-white/20 bg-white/10 text-white lg:grid"
-        animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut", delay: 0.35 }}
-      >
-        <MapPin className="size-4" />
-      </motion.div>
-    </div>
-  );
-}
 
 function RoleChoiceCard({
   title,
@@ -524,7 +459,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
   if (step === "role") {
     return (
       <div className="relative min-h-screen w-full overflow-y-auto bg-[#4F46E5] px-4 py-8">
-        <ProfileSetupBackground />
+        <AuthBackground variant="page" />
 
         <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center justify-center">
           <motion.div
@@ -534,14 +469,9 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
             transition={{ duration: 0.45, ease: "easeOut" }}
           >
             <div className="rounded-[1.5rem] bg-white px-5 pb-6 pt-6 sm:px-6">
-              <div className="mb-6 flex items-center gap-3">
-                <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
-                  <MapPin className="size-5" />
-                </div>
-                <div>
-                  <p className="text-xl font-black text-[#1E1B4B]">Nook</p>
-                  <p className="text-xs font-bold text-slate-400">Configuracion inicial</p>
-                </div>
+              <div className="mb-6">
+                <BrandLogo />
+                <p className="mt-2 text-xs font-bold text-slate-400">Configuración inicial</p>
               </div>
 
               <div className="mb-6 text-center">
@@ -551,7 +481,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
                 <h1 className="text-2xl font-black tracking-normal text-[#1E1B4B]">
                   Bienvenido, {userName.split(" ")[0]}
                 </h1>
-                <p className="mt-2 text-sm font-medium text-slate-500">Como quieres usar Nook?</p>
+                <p className="mt-2 text-sm font-medium text-slate-500">Como quieres usar Pinwi?</p>
               </div>
 
               <div className="space-y-4">
@@ -579,7 +509,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
 
   return (
     <div className="relative min-h-screen w-full overflow-y-auto bg-[#4F46E5] px-4 py-8">
-      <ProfileSetupBackground />
+      <AuthBackground variant="page" />
 
       <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center justify-center">
         <motion.div
@@ -589,6 +519,7 @@ export function ProfileSetupView({ userName, onComplete }: ProfileSetupViewProps
           transition={{ duration: 0.45, ease: "easeOut" }}
         >
           <div className="rounded-[1.5rem] bg-white px-5 pb-6 pt-6 sm:px-6">
+            <BrandLogo className="mb-5" />
             <div className="mb-6 flex items-center gap-3">
               <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
                 {selectedRole === "student" ? (

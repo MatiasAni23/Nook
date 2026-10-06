@@ -27,7 +27,7 @@ export function AdminSupport() {
     const newMessage: TicketMessage = {
       id: `m${Date.now()}`,
       from: 'support',
-      name: 'Soporte Nook',
+      name: 'Soporte Pinwi',
       message: replyMessage,
       timestamp: new Date(),
     };

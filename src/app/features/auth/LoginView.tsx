@@ -1,7 +1,9 @@
-import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { BrandLogo } from "../../components/BrandLogo";
+import { AuthBackground } from "./AuthBackground";
+import { useId, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { AnimatePresence, motion } from "motion/react";
-import { Eye, EyeOff, Lock, LogIn, Mail, MapPin, Phone, User, UserPlus } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Eye, EyeOff, Lock, LogIn, Mail, Phone, User, UserPlus } from "lucide-react";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
@@ -105,7 +107,7 @@ function PasswordVisibilityButton({
     <button
       type="button"
       onClick={onClick}
-      className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-[#7C83E8] transition hover:bg-[#EEF2FF] hover:text-[#4F46E5]"
+      className="absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-xl text-slate-500 transition hover:bg-[#EEF2FF] hover:text-[#4F46E5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5]"
       aria-label={label}
       title={label}
     >
@@ -133,8 +135,8 @@ function AuthField({
       >
         {label}
       </Label>
-      <div className="group relative flex min-h-12 items-center rounded-2xl border border-[#E0E7FF] bg-white px-4 shadow-[0_6px_16px_rgba(79,70,229,0.04)] transition focus-within:border-[#4F46E5] focus-within:bg-[#F8FAFF] focus-within:shadow-[0_10px_22px_rgba(79,70,229,0.09)]">
-        <Icon className="mr-3 size-4 shrink-0 text-[#8B93F5] transition group-focus-within:text-[#4F46E5]" />
+      <div className="group relative flex min-h-12 items-center rounded-2xl border border-[#E0E7FF] bg-white px-4 shadow-[0_6px_16px_rgba(79,70,229,0.04)] transition focus-within:border-[#4F46E5] focus-within:bg-[#F8FAFF] focus-within:ring-3 focus-within:ring-[#4F46E5]/10">
+        <Icon aria-hidden="true" className="mr-3 size-4 shrink-0 text-[#8B93F5] transition group-focus-within:text-[#4F46E5]" />
         {children}
       </div>
     </div>
@@ -145,7 +147,7 @@ function AuthInput(props: ComponentProps<typeof Input>) {
   return (
     <Input
       {...props}
-      className={`h-11 border-0 bg-transparent px-0 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0 ${
+      className={`h-11 border-0 bg-transparent px-0 text-base text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus-visible:border-0 focus-visible:ring-0 md:text-sm ${
         props.className ?? ""
       }`}
     />
@@ -160,7 +162,7 @@ function PrimaryAuthButton({
   return (
     <Button
       {...props}
-      className={`h-12 w-full rounded-2xl bg-[#4F46E5] font-black text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)] transition-all hover:-translate-y-0.5 hover:bg-[#4338CA] hover:shadow-[0_18px_30px_rgba(79,70,229,0.28)] active:translate-y-0 ${className}`}
+      className={`h-12 w-full rounded-2xl bg-[#4F46E5] font-black text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)] transition hover:bg-[#4338CA] focus-visible:ring-[#4F46E5]/40 ${className}`}
     >
       {children}
     </Button>
@@ -168,103 +170,36 @@ function PrimaryAuthButton({
 }
 
 function HeroDecor() {
+  const id = useId();
+  const edge = "M80 0 C48 120 48 200 80 320 C112 440 112 520 80 640 C48 760 48 820 80 900";
+  const surface = `${edge} H128 V0 Z`;
+
   return (
-    <>
       <svg
-        className="absolute inset-0 h-full w-full opacity-35 [mask-image:linear-gradient(90deg,black_0%,black_78%,transparent_100%)]"
-        viewBox="0 0 720 900"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <g fill="none" stroke="white" strokeLinecap="round">
-          <path d="M-90 170 C70 110 170 230 315 182 S520 45 810 155" strokeWidth="4" opacity="0.48" />
-          <path d="M-80 470 C85 420 205 515 365 455 S605 295 820 390" strokeWidth="3" opacity="0.40" />
-          <path d="M60 930 C165 700 120 520 240 360 S415 165 390 -90" strokeWidth="4" opacity="0.38" />
-          <path d="M-110 665 L105 590 L250 660 L445 595 L750 670" strokeWidth="2" opacity="0.32" />
-          <path d="M-70 320 L145 375 L300 305 L510 352 L800 300" strokeWidth="2" opacity="0.30" />
-          <path d="M605 -70 C560 150 510 250 575 440 S700 705 640 980" strokeWidth="2" opacity="0.28" />
-        </g>
-        <g fill="white" opacity="0.36">
-          <circle cx="145" cy="375" r="4" />
-          <circle cx="240" cy="360" r="4" />
-          <circle cx="365" cy="455" r="5" />
-          <circle cx="445" cy="595" r="4" />
-          <circle cx="575" cy="440" r="4" />
-        </g>
-      </svg>
-
-      <svg
-        className="absolute inset-0 h-full w-full opacity-65"
-        viewBox="0 0 720 900"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        <g fill="white">
-          <circle cx="68" cy="96" r="1.7" opacity="0.40" />
-          <circle cx="150" cy="245" r="1.4" opacity="0.34" />
-          <circle cx="258" cy="112" r="2" opacity="0.30" />
-          <circle cx="392" cy="720" r="1.6" opacity="0.36" />
-          <circle cx="502" cy="152" r="1.5" opacity="0.34" />
-          <circle cx="632" cy="94" r="2" opacity="0.36" />
-          <circle cx="645" cy="780" r="1.5" opacity="0.32" />
-          <circle cx="52" cy="724" r="1.5" opacity="0.32" />
-          <circle cx="220" cy="812" r="2" opacity="0.38" />
-          <circle cx="338" cy="338" r="1.5" opacity="0.30" />
-          <circle cx="585" cy="545" r="1.8" opacity="0.36" />
-          <circle cx="120" cy="520" r="1.6" opacity="0.34" />
-        </g>
-        <g fill="white" opacity="0.14">
-          <circle cx="68" cy="96" r="5" />
-          <circle cx="258" cy="112" r="5.5" />
-          <circle cx="632" cy="94" r="5.5" />
-          <circle cx="220" cy="812" r="5" />
-          <circle cx="585" cy="545" r="5" />
-        </g>
-      </svg>
-
-      <motion.div
-        className="absolute right-6 top-8 grid size-9 place-items-center rounded-full border border-white/25 bg-white/10 text-white lg:right-[18%] lg:top-[30%]"
-        animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <MapPin className="size-4" />
-      </motion.div>
-      <motion.div
-        className="absolute right-20 top-16 grid size-7 place-items-center rounded-full border border-white/15 bg-white/[0.07] text-white/70 lg:right-[42%] lg:top-[26%]"
-        animate={{ y: [0, 5, 0] }}
-        transition={{ duration: 4.3, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
-      >
-        <MapPin className="size-3" />
-      </motion.div>
-      <motion.div
-        className="absolute left-8 top-11 size-2 rounded-full border border-white/20 lg:left-[12%] lg:top-[46%]"
-        animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.25, 1] }}
-        transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <div className="absolute right-0 top-0 hidden h-full w-12 bg-white/16 blur-2xl md:block lg:w-24 lg:bg-white/18 lg:blur-3xl" />
-      <svg
-        className="absolute right-[-1px] top-0 hidden h-full w-20 text-white md:block lg:w-32"
+        className="pointer-events-none absolute right-[-1px] top-0 hidden h-full w-24 text-white md:block lg:w-32"
         viewBox="0 0 128 900"
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <path
-          className="lg:hidden"
-          d="M128 0 H92 C68 60 76 116 73 178 C69 270 105 344 106 432 C108 530 72 604 73 692 C74 770 102 822 86 900 H128 Z"
-          fill="currentColor"
-        />
-        <path
-          className="hidden lg:block"
-          d="M128 0 H62 C28 42 42 104 38 160 C32 248 91 318 95 408 C100 510 35 590 34 688 C33 762 83 796 90 874 C92 892 70 900 52 900 H128 Z"
-          fill="currentColor"
-        />
+        <defs>
+          <clipPath id={`${id}-surface`}><path d={surface} /></clipPath>
+          <filter id={`${id}-shadow`} x="-100%" y="-10%" width="300%" height="120%">
+            <feGaussianBlur stdDeviation="7" />
+            <feOffset dx="10" dy="2" />
+          </filter>
+        </defs>
+        <path d={surface} fill="currentColor" />
+        <g clipPath={`url(#${id}-surface)`}>
+          <path d={edge} fill="none" stroke="#1E1B4B" strokeOpacity=".22" strokeWidth="22" filter={`url(#${id}-shadow)`} />
+        </g>
+        <path d={edge} fill="none" stroke="white" strokeOpacity=".65" strokeWidth="1" />
       </svg>
-    </>
   );
 }
 
 export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const [activeTab, setActiveTab] = useState("login");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -398,70 +333,48 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-y-auto bg-white md:bg-[#F8FAFF]">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-[30rem] flex-col overflow-hidden bg-white shadow-[0_0_60px_rgba(15,23,42,0.10)] md:max-w-none md:flex-row md:shadow-none">
-        <section className="relative min-h-[15.5rem] overflow-hidden bg-gradient-to-br from-[#4F46E5] to-[#4338CA] px-7 pb-14 pt-12 text-white md:flex md:min-h-screen md:w-[42%] md:items-center md:justify-center md:px-8 md:py-10 lg:w-[50%] lg:px-14 lg:py-16 xl:w-[45%]">
+    <div className="pinwi-auth min-h-screen w-full overflow-y-auto bg-white">
+      <div className="relative mx-auto flex min-h-screen w-full flex-col overflow-hidden bg-white md:flex-row">
+        <section className="relative overflow-hidden px-6 pb-12 pt-6 text-white sm:px-8 md:sticky md:top-0 md:flex md:min-h-screen md:w-[42%] md:self-start md:items-center md:justify-center md:px-8 md:py-20 lg:w-[45%] lg:px-12">
+          <AuthBackground />
           <HeroDecor />
-          <div className="relative z-10 md:max-w-[14.5rem] lg:max-w-[22rem] lg:text-center xl:max-w-md">
-            <div className="mb-7 flex items-center gap-3 md:mb-12 lg:mb-24 lg:justify-center">
+          <div className="relative z-10 md:max-w-[14.5rem] md:pr-6 lg:max-w-[25rem] lg:pr-8 lg:text-center">
+            <div className="mb-10 hidden md:block lg:mb-12">
               <motion.div
-                className="grid size-11 place-items-center rounded-2xl bg-white/14 shadow-[0_10px_20px_rgba(49,46,129,0.16)]"
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <MapPin className="size-5" />
-              </motion.div>
-              <span className="text-xl font-black">Nook</span>
-            </div>
-            <div className="hidden lg:mb-16 lg:block">
-              <motion.div
-                className="relative mx-auto grid size-24 place-items-center rounded-full bg-white text-[#4F46E5] shadow-[0_18px_38px_rgba(49,46,129,0.20)]"
-                animate={{ y: [0, -8, 0] }}
+                className="mx-auto grid w-44 place-items-center rounded-[2rem] bg-white px-4 py-5 shadow-[0_18px_44px_rgba(24,31,100,0.18)] lg:w-60 lg:rounded-[2.5rem] lg:px-5 lg:py-6"
+                animate={prefersReducedMotion ? undefined : { y: [0, -3, 0] }}
                 transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
               >
-                <MapPin className="size-12" />
-                <span className="absolute -left-24 top-0 h-px w-24 rotate-45 border-t border-dashed border-white/20" />
-                <span className="absolute -right-20 top-4 h-px w-24 -rotate-45 border-t border-dashed border-white/20" />
+                <BrandLogo variant="full" className="w-36 lg:w-48" />
               </motion.div>
             </div>
-            <h1 className="max-w-[18rem] text-3xl font-black leading-tight tracking-normal md:text-[1.85rem] lg:mx-auto lg:max-w-[21rem] lg:text-[1.9rem] xl:max-w-[24rem] xl:text-[2rem]">
-              <span className="lg:hidden">Encuentra tu espacio perfecto</span>
-              <span className="hidden lg:inline">Tu proximo lugar favorito esta a un clic</span>
+            <h1 className="max-w-[20rem] text-[1.625rem] font-bold leading-[1.2] tracking-tight md:text-[1.85rem] lg:mx-auto lg:max-w-[23rem] lg:text-[2.25rem]">
+              <span className="lg:hidden">Encuentra tu espacio favorito</span>
+              <span className="hidden lg:inline">Tu próximo espacio favorito está a un clic</span>
             </h1>
-            <p className="mt-2 max-w-[18rem] text-sm font-medium text-white/78 md:max-w-[13.5rem] lg:mx-auto lg:mt-4 lg:max-w-[17rem] xl:max-w-xs">
-              Descubre cafes, bibliotecas y espacios de coworking en Chile
+            <p className="mt-2 max-w-[20rem] text-[0.8125rem] leading-relaxed text-white/90 md:text-sm lg:mx-auto lg:mt-4 lg:max-w-[20rem] lg:text-base">
+              Descubre cafés, bibliotecas y espacios de coworking en Chile.
             </p>
           </div>
         </section>
 
-        <section className="relative z-10 -mt-10 flex-1 rounded-t-[2rem] bg-white px-5 pb-8 pt-6 md:mt-0 md:flex md:min-h-screen md:w-[58%] md:items-start md:justify-center md:rounded-none md:px-7 md:py-8 lg:w-[50%] lg:px-10 lg:py-16 xl:w-[55%] xl:px-12">
+        <section className="relative z-10 -mt-6 flex-1 rounded-t-[2rem] bg-white px-6 pb-8 pt-7 shadow-[0_-12px_32px_rgba(30,27,75,0.10)] sm:px-8 md:mt-0 md:flex md:min-h-screen md:w-[58%] md:items-center md:justify-center md:rounded-none md:px-8 md:py-10 md:shadow-none lg:w-[55%] lg:px-12">
           <motion.div
-            className="mx-auto mb-6 h-1 w-9 rounded-full bg-[#E0E7FF] md:hidden"
-            animate={{ opacity: [0.45, 1, 0.45] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-          />
-
-          <motion.div
-            className="rounded-[1.65rem] bg-white p-1 shadow-[0_18px_42px_rgba(79,70,229,0.12)] md:w-full md:max-w-[26rem] md:shadow-[0_18px_42px_rgba(79,70,229,0.08)] lg:max-w-md lg:shadow-none"
-            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            className="mx-auto w-full max-w-md bg-white md:px-4 lg:px-5"
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ duration: prefersReducedMotion ? 0 : 0.3, ease: "easeOut" }}
           >
-            <div className="rounded-[1.5rem] bg-white px-4 pb-5 pt-1 sm:px-5">
-              <div className="mb-5 lg:mb-8">
-                <div className="mb-4 hidden items-center gap-3 lg:flex">
-                  <div className="grid size-10 place-items-center rounded-xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.18)]">
-                    <MapPin className="size-5" />
-                  </div>
-                  <span className="text-2xl font-black text-[#1E1B4B]">Nook</span>
+            <div>
+              <div className="mb-6 lg:mb-7">
+                <div className="mb-5 md:hidden">
+                  <BrandLogo />
                 </div>
                 <h2 className="text-2xl font-black tracking-normal text-[#1E1B4B] lg:text-3xl">
-                  <span className="lg:hidden">Hola de nuevo!</span>
-                  <span className="hidden lg:inline">Bienvenido de vuelta</span>
+                  {activeTab === "login" ? "Bienvenido de vuelta" : "Crea tu cuenta"}
                 </h2>
-                <p className="mt-1 text-sm font-medium text-slate-400">
-                  <span className="lg:hidden">Ingresa para continuar explorando</span>
-                  <span className="hidden lg:inline">Ingresa tus datos para continuar</span>
+                <p className="mt-1 text-sm font-medium leading-relaxed text-slate-500">
+                  {activeTab === "login" ? "Ingresa tus datos para seguir explorando." : "Encuentra un lugar para estudiar, trabajar y conectar."}
                 </p>
               </div>
 
@@ -471,19 +384,20 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                     <TabsTrigger
                       key={tab}
                       value={tab}
-                      className="relative z-10 rounded-[0.9rem] bg-transparent text-sm font-black text-[#7C83E8] transition data-[state=active]:text-white data-[state=active]:shadow-none"
+                      disabled={isSubmitting}
+                      className="relative z-10 h-11 rounded-xl bg-transparent text-sm font-black text-[#6D64CC] transition data-[state=active]:text-white data-[state=active]:shadow-none"
                     >
                       {activeTab === tab && (
                         <motion.span
                           layoutId="auth-tab-pill"
-                          className="absolute inset-0 -z-10 rounded-[0.9rem] bg-[#4F46E5] shadow-[0_10px_18px_rgba(79,70,229,0.22)]"
-                          transition={{ type: "spring", stiffness: 430, damping: 34 }}
+                          className="absolute inset-0 -z-10 rounded-xl bg-[#4F46E5] shadow-[0_10px_18px_rgba(79,70,229,0.22)]"
+                          transition={prefersReducedMotion ? { duration: 0 } : { type: "spring", stiffness: 430, damping: 34 }}
                         />
                       )}
                       {tab === "login" ? (
                         <>
                           <LogIn className="size-4" />
-                          Iniciar sesion
+                          Iniciar sesión
                         </>
                       ) : (
                         <>
@@ -498,10 +412,11 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                 <AnimatePresence mode="wait">
                   {errorMessage && (
                     <motion.div
+                      role="alert"
                       className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
-                      initial={{ opacity: 0, y: -8 }}
+                      initial={prefersReducedMotion ? false : { opacity: 0, y: -8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
+                      exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
                     >
                       {errorMessage}
                     </motion.div>
@@ -513,15 +428,20 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                     <motion.div
                       key="login"
                       className="space-y-5"
-                      initial={{ opacity: 0, x: -18 }}
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: -18 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 18 }}
-                      transition={{ duration: 0.22 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
                     >
-                      <AuthField id="login-email" label="Correo electronico" icon={Mail}>
+                      <AuthField id="login-email" label="Correo electrónico" icon={Mail}>
                         <AuthInput
                           id="login-email"
                           type="email"
+                          autoComplete="username"
+                          inputMode="email"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          name="email"
                           placeholder="tu@email.cl"
                           value={loginEmail}
                           onChange={(e) => setLoginEmail(e.target.value)}
@@ -535,6 +455,8 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                             type={showLoginPassword ? "text" : "password"}
                             placeholder="********"
                             value={loginPassword}
+                            autoComplete="current-password"
+                            name="password"
                             className="pr-10"
                             onChange={(e) => setLoginPassword(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
@@ -552,49 +474,57 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                         className="mt-3"
                       >
                         <LogIn className="size-4" />
-                        {isSubmitting ? "Ingresando..." : "Iniciar sesion"}
+                        {isSubmitting ? "Ingresando..." : "Iniciar sesión"}
                       </PrimaryAuthButton>
                       <button
                         type="button"
                         onClick={() => navigate("/recover-password")}
-                        className="w-full px-3 py-2 text-xs font-black text-slate-400 transition hover:text-[#4F46E5] hover:underline hover:decoration-2 hover:underline-offset-4"
+                        className="min-h-11 w-full rounded-xl px-3 py-2 text-sm font-semibold text-[#4F46E5] transition hover:bg-[#EEF2FF] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4F46E5]"
                       >
-                        Olvide mi contraseña
+                        Olvidé mi contraseña
                       </button>
                     </motion.div>
                   ) : (
                     <motion.div
                       key="register"
                       className="space-y-4"
-                      initial={{ opacity: 0, x: 18 }}
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: 18 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -18 }}
-                      transition={{ duration: 0.22 }}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.22 }}
                     >
                       <AuthField id="register-name" label="Nombre completo" icon={User}>
                         <AuthInput
                           id="register-name"
+                          name="name"
+                          autoComplete="name"
                           placeholder="Tu nombre"
                           value={registerName}
                           onChange={(e) => setRegisterName(e.target.value)}
                         />
                       </AuthField>
-                      <AuthField id="register-email" label="Correo electronico" icon={Mail}>
+                      <AuthField id="register-email" label="Correo electrónico" icon={Mail}>
                         <AuthInput
                           id="register-email"
                           type="email"
+                          name="email"
+                          autoComplete="email"
+                          autoCapitalize="none"
+                          spellCheck={false}
+                          inputMode="email"
                           placeholder="tu@email.cl"
                           value={registerEmail}
                           onChange={(e) => setRegisterEmail(e.target.value)}
                         />
                       </AuthField>
-                      <AuthField id="register-phone" label="Telefono" icon={Phone}>
+                      <AuthField id="register-phone" label="Teléfono" icon={Phone}>
                         <div className="flex w-full items-center">
-                          <span className="mr-2 whitespace-nowrap text-sm font-black text-[#7C83E8]">
+                          <span className="mr-2 whitespace-nowrap text-sm font-semibold text-slate-600">
                             +56 9
                           </span>
                           <AuthInput
                             id="register-phone"
+                            name="phone"
                             type="tel"
                             inputMode="numeric"
                             placeholder="1234 5678"
@@ -612,6 +542,8 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                         <div className="relative w-full">
                           <AuthInput
                             id="register-password"
+                            name="new-password"
+                            autoComplete="new-password"
                             type={showRegisterPassword ? "text" : "password"}
                             placeholder="********"
                             value={registerPassword}
@@ -632,10 +564,10 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                           <motion.div
                             className={`h-full rounded-full ${passwordStrength.color}`}
                             animate={{ width: registerPassword ? passwordStrength.width : "0%" }}
-                            transition={{ duration: 0.3 }}
+                            transition={{ duration: prefersReducedMotion ? 0 : 0.3 }}
                           />
                         </div>
-                        <p className="text-xs font-medium text-slate-400">
+                        <p className="text-xs font-medium text-slate-600">
                           Seguridad: {registerPassword ? passwordStrength.label : "Sin datos"}
                         </p>
                       </div>
@@ -643,6 +575,8 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                         <div className="relative w-full">
                           <AuthInput
                             id="register-password-confirm"
+                            name="password-confirmation"
+                            autoComplete="new-password"
                             type={showRegisterPasswordConfirm ? "text" : "password"}
                             placeholder="********"
                             value={registerPasswordConfirm}
@@ -679,11 +613,11 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
                   )}
                 </AnimatePresence>
               </Tabs>
-              <p className="mt-6 hidden text-center text-xs font-medium text-slate-300 lg:block">
-                Al continuar aceptas los{" "}
-                <button type="button" onClick={() => setLegalDocument("terms")} className="inline-block text-xs font-bold text-[#4F46E5] transition-transform duration-200 hover:-translate-y-px hover:scale-[1.03] hover:text-[#4338CA]">Términos</button>{" "}
+              <p className="mt-6 border-t border-slate-100 pt-4 text-center text-xs leading-6 text-slate-600">
+                Consulta nuestros{" "}
+                <button type="button" onClick={() => setLegalDocument("terms")} className="inline-block min-h-11 rounded-md px-1 text-xs font-semibold text-[#4F46E5] underline decoration-[#4F46E5]/30 underline-offset-4 focus-visible:outline-2 focus-visible:outline-[#4F46E5]">Términos</button>{" "}
                 y la{" "}
-                <button type="button" onClick={() => setLegalDocument("privacy")} className="inline-block text-xs font-bold text-[#4F46E5] transition-transform duration-200 hover:-translate-y-px hover:scale-[1.03] hover:text-[#4338CA]">Privacidad</button>
+                <button type="button" onClick={() => setLegalDocument("privacy")} className="inline-block min-h-11 rounded-md px-1 text-xs font-semibold text-[#4F46E5] underline decoration-[#4F46E5]/30 underline-offset-4 focus-visible:outline-2 focus-visible:outline-[#4F46E5]">Política de privacidad</button>
               </p>
             </div>
           </motion.div>

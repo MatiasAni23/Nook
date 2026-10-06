@@ -140,7 +140,7 @@ export function AdminStats() {
           <div>
             <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-[#6259B8]"><BarChart3 className="size-4" /> Lectura operativa</div>
             <h2 className="text-2xl font-black tracking-tight text-[#201A53] md:text-3xl">Lo esencial de tu red.</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Reservas, reportes y distribución de lugares: sólo datos que ya existen en Nook.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Reservas, reportes y distribución de lugares: sólo datos que ya existen en Pinwi.</p>
           </div>
           <div className="flex rounded-xl border border-[#DFDCF8] bg-white p-1 shadow-sm">
             {([30, 90] as Period[]).map((value) => <Button key={value} type="button" variant="ghost" size="sm" onClick={() => setPeriod(value)} className={`rounded-lg px-3 font-bold ${period === value ? "bg-[#4F46E5] text-white hover:bg-[#4338CA] hover:text-white" : "text-slate-500"}`}>Últimos {value} días</Button>)}

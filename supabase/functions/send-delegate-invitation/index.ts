@@ -50,9 +50,9 @@ function getDefaultHtmlContent(name: string, inviteUrl: string) {
   const safeUrl = escapeHtml(inviteUrl);
 
   return `
-    <h2>Tu invitacion para ser delegado en Nook</h2>
+    <h2>Tu invitacion para ser delegado en Pinwi</h2>
     <p>Hola ${safeName},</p>
-    <p>Te invitamos a administrar lugares en Nook. Para aceptar la invitacion, abre el siguiente enlace y configura tu contrasena.</p>
+    <p>Te invitamos a administrar lugares en Pinwi. Para aceptar la invitacion, abre el siguiente enlace y configura tu contrasena.</p>
     <p>
       <a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
         Aceptar invitacion
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     const brevoTemplateId = Deno.env.get("BREVO_DELEGATE_TEMPLATE_ID");
     const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
-    const senderName = Deno.env.get("BREVO_SENDER_NAME") ?? "Nook";
+    const senderName = Deno.env.get("BREVO_SENDER_NAME") ?? "Pinwi";
 
     if (!supabaseUrl || !anonKey || !serviceRoleKey) {
       console.error("Missing Edge Function env vars", {
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
     if (templateId && Number.isFinite(templateId)) {
       brevoPayload.templateId = templateId;
     } else {
-      brevoPayload.subject = "Tu invitacion para ser delegado en Nook";
+      brevoPayload.subject = "Tu invitacion para ser delegado en Pinwi";
       brevoPayload.htmlContent = getDefaultHtmlContent(body.name, body.inviteUrl);
     }
 

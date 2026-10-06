@@ -433,7 +433,7 @@ export function EditProfileView() {
                     id="company"
                     value={company}
                     onChange={(event) => setCompany(event.target.value)}
-                    placeholder="Ej: Nook"
+                    placeholder="Ej: Pinwi"
                     className="h-11 bg-gray-50"
                   />
                 </div>

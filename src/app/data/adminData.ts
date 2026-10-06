@@ -25,7 +25,7 @@ export interface ZoneStats {
 // Mock admin user
 export const mockAdminUser: User = {
   id: 'admin-1',
-  email: 'admin@nook.cl',
+  email: 'admin@pinwi.cl',
   name: 'Administrador',
   role: 'admin',
 };
@@ -34,13 +34,13 @@ export const mockAdminUser: User = {
 export const mockDelegates: User[] = [
   {
     id: 'delegate-1',
-    email: 'maria@nook.cl',
+    email: 'maria@pinwi.cl',
     name: 'María González',
     role: 'delegado',
   },
   {
     id: 'delegate-2',
-    email: 'carlos@nook.cl',
+    email: 'carlos@pinwi.cl',
     name: 'Carlos Rodríguez',
     role: 'delegado',
   },

@@ -1,3 +1,5 @@
+import { BrandLogo } from "../../components/BrandLogo";
+import { AuthBackground } from "./AuthBackground";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, Mail, ShieldCheck, UserPlus } from "lucide-react";
@@ -235,9 +237,11 @@ export function DelegateInviteView() {
   };
 
   return (
-    <div className="size-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
-      <Card className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#4F46E5] p-4 py-8">
+      <AuthBackground variant="page" />
+      <Card className="relative z-10 w-full max-w-md rounded-[1.65rem] border-[#E0E7FF] shadow-[0_24px_60px_rgba(49,46,129,0.20)]">
         <CardHeader>
+          <BrandLogo className="mb-3" />
           <button
             type="button"
             onClick={() => navigate("/")}

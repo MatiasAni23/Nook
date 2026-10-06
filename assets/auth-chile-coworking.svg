@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="420" viewBox="0 0 1000 420" fill="none">
+  <title>Una ciudad de espacios e ideas</title>
+  <desc>Arquitectura inspirada en Santiago y Valparaíso, los Andes, una biblioteca y espacios de coworking.</desc>
+  <defs>
+    <linearGradient id="mountains" x1="0" y1="80" x2="0" y2="340" gradientUnits="userSpaceOnUse"><stop stop-color="#DAE5FF" stop-opacity=".05"/><stop offset="1" stop-color="#DAE5FF" stop-opacity=".01"/></linearGradient>
+    <linearGradient id="buildings" x1="0" y1="120" x2="0" y2="420" gradientUnits="userSpaceOnUse"><stop stop-color="#DDE8FF" stop-opacity=".08"/><stop offset="1" stop-color="#DDE8FF" stop-opacity=".015"/></linearGradient>
+    <pattern id="windows" width="13" height="18" patternUnits="userSpaceOnUse"><path d="M3 4H8V12H3Z" stroke="#E4EBFF" stroke-width=".7" stroke-opacity=".55"/></pattern>
+    <pattern id="glass" width="11" height="17" patternUnits="userSpaceOnUse"><path d="M0 0H11M0 0V17" stroke="#E4EBFF" stroke-width=".7" stroke-opacity=".45"/></pattern>
+    <g id="home" stroke="#E4EBFF" stroke-width="1" stroke-linejoin="round">
+      <path d="M0 20L33 0L68 20V76H0Z" fill="url(#buildings)"/>
+      <path d="M-5 23L33 0L73 23M0 29H68M0 52H68M45 76V59H57V76M12 35H24V45H12ZM44 35H56V45H44ZM12 59H24V69H12Z"/>
+    </g>
+    <g id="tree" stroke="#E4EBFF" stroke-width="1" stroke-linecap="round">
+      <path d="M0 30V-2M0 14L-9 5M0 7L9-2"/>
+      <path d="M-13 12C-29 2-20-11-15-14C-15-35 10-39 17-20C37-16 28 8 16 12C9 18-7 19-13 12Z" fill="#DDE8FF" fill-opacity=".035"/>
+    </g>
+    <g id="dome" stroke="#E4EBFF" stroke-width="1.2" stroke-linejoin="round">
+      <path d="M-28 0C-28-19-16-28 0-34C16-28 28-19 28 0Z" fill="url(#buildings)"/>
+      <path d="M-31 0H31V8H-31ZM-16 0C-16-21-7-29 0-34C7-29 16-21 16 0M0-34V-45M-6-40H6M-22 8V34H22V8M-13 34V20C-13 11-3 11-3 20V34M3 34V20C3 11 13 11 13 20V34"/>
+    </g>
+  </defs>
+  <!-- Andes and the silhouette of a hill with a summit monument. -->
+  <g stroke="#E4EBFF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-30 207L48 152L84 172L142 110L183 146L220 131L302 199L350 164L413 212L475 171L520 185L594 112L623 130L655 89L711 142L745 121L810 181L856 157L913 195L1008 163V350H-30Z" fill="url(#mountains)" stroke-opacity=".5" stroke-width="1.1"/>
+    <path d="M114 140L142 110L167 133L149 130L141 142L131 132M566 141L594 112L614 134L600 129L591 141L583 135M631 117L655 89L689 119L666 108L657 121L647 112" stroke-opacity=".4" stroke-width=".9"/>
+    <path d="M-10 228L81 198L152 220L224 183L296 224L372 193L442 240M483 225L552 193L604 222L685 177L746 202L812 187" stroke-opacity=".2" stroke-width=".9"/>
+    <path d="M675 278C746 254 790 228 827 192C845 175 866 177 882 190C923 221 960 241 1014 247" stroke-opacity=".5" stroke-width="1.2"/>
+    <path d="M850 181L853 164H865L868 181M859 164V143M851 150H867M855 153V166M863 153V166" stroke-opacity=".6"/>
+  </g>
+  <g stroke="#E4EBFF" stroke-width=".9" opacity=".35">
+    <path d="M-12 300V255H31V300M38 302V236H73V303M81 300V268H126V302M231 295V246H276V295M286 302V271H325V302M683 298V236H716V298M727 298V254H764V298M774 298V271H801M908 299V252H947V298M956 302V231H995V302" fill="url(#buildings)"/>
+    <path d="M38 240H73V300H38ZM231 250H276V294H231ZM683 240H716V297H683ZM956 235H995V299H956Z" fill="url(#windows)" stroke="none"/>
+    <use href="#home" transform="translate(770 260) scale(.7)"/><use href="#home" transform="translate(813 233) scale(.8)"/><use href="#home" transform="translate(865 263) scale(.7)"/>
+    <path d="M830 295V304H838V312H846V320H854V328H862V336"/>
+  </g>
+  <!-- A slender Santiago tower with a tapering crown. -->
+  <g stroke="#E4EBFF" stroke-width="1.1" stroke-linejoin="round" opacity=".68">
+    <path d="M131 315V87L142 48L151 12L165 10L177 47L188 87V315Z" fill="url(#buildings)"/>
+    <path d="M142 315V89L154 22M177 315V89L162 22M131 89H188M134 77H185M141 54H178M150 24H169M128 315H191"/>
+    <path d="M131 92H188V309H131Z" fill="url(#glass)" stroke="none"/>
+    <path d="M96 319V192L120 180V319M98 194H120M102 205H114V310H102Z" fill="url(#glass)"/>
+    <path d="M194 319V228H222V319M194 233H222V315H194Z" fill="url(#windows)"/>
+  </g>
+  <!-- Historic facades, twin towers and an arched library. -->
+  <g stroke="#E4EBFF" stroke-width="1.1" stroke-linejoin="round" opacity=".6">
+    <path d="M340 336V230H362V336M441 336V230H463V336M334 236H368M435 236H469M340 227L351 203L362 227M441 227L452 203L463 227M351 203V193M345 197H357M452 203V193M446 197H458" fill="url(#buildings)"/>
+    <path d="M345 250V242C345 235 357 235 357 242V250ZM446 250V242C446 235 458 235 458 242V250ZM346 265H356V282H346ZM447 265H457V282H447Z"/>
+    <path d="M362 336V280L401 253L441 280V336M356 285L401 253L447 285M366 291H438M377 336V315C377 305 390 305 390 315V336M395 336V308C395 298 408 298 408 308V336M414 336V315C414 305 427 305 427 315V336M367 338H438" fill="url(#buildings)"/>
+    <circle cx="401" cy="280" r="7"/><path d="M398 280H404M401 277V283M401 253V242"/>
+    <use href="#dome" transform="translate(513 263)"/>
+    <path d="M474 337V298H551V337M483 337V313C483 304 495 304 495 313V337M508 337V310C508 301 520 301 520 310V337M533 337V313C533 304 545 304 545 313V337" fill="url(#buildings)"/>
+    <path d="M579 337V286H692V337M572 286L635 259L699 286ZM586 289H685M591 337V306C591 296 606 296 606 306V337M627 337V306C627 296 642 296 642 306V337M663 337V306C663 296 678 296 678 306V337" fill="url(#buildings)"/>
+    <path d="M598 302V337M634 302V337M670 302V337M583 341H688"/>
+    <use href="#home" transform="translate(246 264) scale(.9)"/>
+  </g>
+  <!-- Foreground neighborhood, a coworking window and tree-lined streets. -->
+  <g stroke="#E4EBFF" stroke-width="1" stroke-linejoin="round" opacity=".55">
+    <path d="M-10 413V350H40V413M44 414V326H89V414M94 414V358H140V414M145 413V345H187V414M193 414V366H234V414M242 414V338H295V414M303 413V359H347V413M353 414V346H397V414M405 414V367H445V414M454 414V348H502V414M509 414V334H564V414M570 414V362H615V414M623 414V351H668V414M675 414V328H735V414M742 414V360H788V414M796 414V348H842V414M850 414V366H899V414M908 414V329H964V414M970 414V356H1008" fill="url(#buildings)"/>
+    <path d="M48 333H84V410H48ZM149 350H182V409H149ZM245 343H291V410H245ZM357 352H392V410H357ZM513 340H558V410H513ZM627 356H663V410H627ZM912 335H958V410H912Z" fill="url(#windows)" stroke="none"/>
+    <path d="M674 329H736M684 341H726V374H684ZM705 341V374M684 358H726M685 382H725M690 382V398M720 382V398M691 365H699V371H691ZM711 365H720V371H711Z"/>
+    <path d="M238 338H298M510 333H563M906 329H966M0 413H1000"/>
+    <use href="#tree" transform="translate(19 381) scale(.65)"/><use href="#tree" transform="translate(221 359) scale(.7)"/><use href="#tree" transform="translate(325 352) scale(.62)"/><use href="#tree" transform="translate(431 353) scale(.6)"/><use href="#tree" transform="translate(597 347) scale(.72)"/><use href="#tree" transform="translate(770 351) scale(.65)"/><use href="#tree" transform="translate(874 353) scale(.8)"/><use href="#tree" transform="translate(989 332) scale(.6)"/>
+  </g>
+</svg>

@@ -28,6 +28,7 @@ import { EditProfileView } from "./features/perfil/EditProfileView";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
 import { Layout } from "./features/shared/Layout";
 import { isSupabaseConfigured } from "./lib/supabase";
+import { LegalDocumentPage } from "./features/auth/LegalDocumentPage";
 import { clearAppCaches } from "./services/appCacheService";
 import { getCurrentUserProfile } from "./services/currentUserService";
 import {
@@ -183,7 +184,7 @@ function AuthWrapper() {
   }, []);
 
   const handleDemoLogin = (email: string, password: string) => {
-    if (email === "admin@nook.cl" && password === "admin123") {
+    if (email === "admin@pinwi.cl" && password === "admin123") {
       setIsAuthenticated(true);
       setUserRole("admin");
       setGlobalUserRole("admin");
@@ -310,6 +311,14 @@ function AuthWrapper() {
 }
 
 export const router = createBrowserRouter([
+  {
+    path: "/terminos",
+    element: <LegalDocumentPage document="terms" />,
+  },
+  {
+    path: "/privacidad",
+    element: <LegalDocumentPage document="privacy" />,
+  },
   {
     path: "/",
     Component: AuthWrapper,

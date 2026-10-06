@@ -1,3 +1,4 @@
+import { BrandLogo } from "../../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { AlertTriangle, Bell, Crown, Search, Star } from "lucide-react";
@@ -236,12 +237,7 @@ export function DiscoverView() {
             <div className="pointer-events-none absolute left-28 bottom-3 size-28 rounded-full border border-white/[0.04]" />
 
             <div className="relative z-10 mb-7 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="grid size-9 place-items-center rounded-xl bg-white/14 text-sm font-black shadow-[0_10px_20px_rgba(49,46,129,0.12)]">
-                  N
-                </div>
-                <h1 className="text-lg font-black">Nook</h1>
-              </div>
+              <BrandLogo tone="light" />
               <div className="flex items-center gap-2">
                 <button
                   type="button"

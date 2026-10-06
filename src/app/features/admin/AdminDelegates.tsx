@@ -500,7 +500,7 @@ export function AdminDelegates() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="Ej: maria@nook.cl"
+                    placeholder="Ej: maria@pinwi.cl"
                     value={formData.email}
                     disabled={Boolean(editingDelegate) || Boolean(createdInviteUrl)}
                     onChange={(event) => setFormData({ ...formData, email: event.target.value })}

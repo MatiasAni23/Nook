@@ -530,7 +530,7 @@ export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: A
                     <Map
                       defaultCenter={pinPosition}
                       defaultZoom={14}
-                      mapId="nook-admin-edit-place-map"
+                      mapId="pinwi-admin-edit-place-map"
                       gestureHandling="greedy"
                       disableDefaultUI
                       onClick={handleGoogleMapClick}

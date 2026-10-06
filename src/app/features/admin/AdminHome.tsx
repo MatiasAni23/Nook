@@ -112,7 +112,7 @@ export function AdminHome() {
               </div>
               <h2 className="text-3xl font-black tracking-tight md:text-4xl">Todo lo importante, a la vista.</h2>
               <p className="mt-3 text-sm leading-6 text-indigo-100 md:text-base">
-                Revisa la salud de Nook, prioriza incidencias y mantén la red de lugares creciendo con orden.
+                Revisa la salud de Pinwi, prioriza incidencias y mantén la red de lugares creciendo con orden.
               </p>
               <p className="mt-4 text-xs font-semibold capitalize text-indigo-200">{today}</p>
             </div>
@@ -248,7 +248,7 @@ export function AdminHome() {
           <div className="rounded-[1.5rem] border border-[#DCD9FF] bg-gradient-to-br from-[#EEEDFF] via-[#F8F7FF] to-white p-5 md:p-6">
             <div className="flex size-11 items-center justify-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_10px_22px_rgba(79,70,229,0.24)]"><Sparkles className="size-5" /></div>
             <h3 className="mt-5 text-xl font-black tracking-tight text-[#201A53]">Haz crecer la red con intención.</h3>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Publica los próximos espacios, asigna responsables y revisa el rendimiento para que Nook sea más útil en cada zona.</p>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">Publica los próximos espacios, asigna responsables y revisa el rendimiento para que Pinwi sea más útil en cada zona.</p>
             <Button onClick={() => navigate("/admin/places")} className="mt-5 rounded-xl bg-[#4F46E5] font-bold hover:bg-[#4338CA]">
               Administrar lugares <ArrowRight className="ml-2 size-4" />
             </Button>

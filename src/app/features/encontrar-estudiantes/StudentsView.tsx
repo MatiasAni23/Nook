@@ -21,7 +21,7 @@ interface StudentCard {
   bio: string;
 }
 
-const CACHE_KEY_PREFIX = "nook-students-cache-v1";
+const CACHE_KEY_PREFIX = "pinwi-students-cache-v1";
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function StudentsView() {

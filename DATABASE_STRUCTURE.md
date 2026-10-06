@@ -1,4 +1,4 @@
-# 📊 Estructura de Base de Datos - Nook/StudyConnect
+# 📊 Estructura de Base de Datos - Pinwi/StudyConnect
 
 ## Resumen General
 

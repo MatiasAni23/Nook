@@ -511,7 +511,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
                     <Map
                       defaultCenter={pinPosition}
                       defaultZoom={14}
-                      mapId="nook-admin-place-map"
+                      mapId="pinwi-admin-place-map"
                       gestureHandling="greedy"
                       disableDefaultUI
                       onClick={handleGoogleMapClick}

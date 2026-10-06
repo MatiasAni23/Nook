@@ -1,4 +1,4 @@
-# Nook
+# Pinwi
 
 Aplicacion web para descubrir, reservar y administrar espacios de estudio y trabajo.
 
@@ -56,7 +56,7 @@ VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
 VITE_SUPABASE_ANON_KEY=TU_ANON_KEY_O_PUBLISHABLE_KEY
 ```
 
-4. Ejecuta el schema completo listo para Supabase en `supabase/nook_schema_supabase.sql`.
+4. Ejecuta el schema completo listo para Supabase en `supabase/pinwi_schema_supabase.sql`.
 
 La autenticacion se maneja con Supabase Auth. Los datos publicos del usuario se guardan en `public.users` y el perfil extendido en `public.user_profiles`.
 
@@ -91,7 +91,7 @@ src/
 ## Credenciales demo
 
 ```txt
-admin@nook.cl / admin123
+admin@pinwi.cl / admin123
 delegado@demo.cl / delegado123
 trabajador@demo.cl / trabajador123
 estudiante@demo.cl / estudiante123
@@ -99,4 +99,12 @@ estudiante@demo.cl / estudiante123
 
 ## Nota
 
+La auditoría de privacidad y seguridad del 6 de octubre de 2026 está en [PRIVACY_AUDIT.md](PRIVACY_AUDIT.md). Incluye brechas verificadas en el repositorio y el orden de corrección para la entrada en vigor de la Ley 21.719. Los documentos públicos de desarrollo están en `/terminos` y `/privacidad`; su contenido compartido está en `src/app/features/auth/legalDocuments.ts`. Son borradores y aún requieren identidad del responsable, contacto y procedimientos operativos antes de publicar una versión definitiva.
+
 Por ahora varias pantallas usan datos mock y logica demo. La idea es reemplazar eso despues por autenticacion, base de datos y servicios reales.
+
+## Identidad visual de Pinwi
+
+El logo original está en `assets/Logo_Pinwi.svg`. `assets/pinwi-mark.svg` y `assets/pinwi-wordmark.svg` conservan sus trazados y ajustan el encuadre para usarlos en tamaños pequeños. Si cambia el original, deben actualizarse ambas variantes. `src/app/components/BrandLogo.tsx` comparte la marca entre las pantallas de acceso, navegación y paneles.
+
+El fondo ilustrado está en `assets/auth-chile-coworking.svg` y se muestra mediante `src/app/features/auth/AuthBackground.tsx`. Combina un degradado azul y violeta con rutas de mapa suaves y una silueta de arquitectura chilena en la franja inferior. El inicio de sesión separa los paneles con una curva suave y una sombra hacia el formulario. En escritorio, el logo completo del archivo original aparece sobre una base blanca en el panel izquierdo; en móvil, la marca se muestra sobre el formulario. El formulario adapta sus espacios a escritorio y móvil, incluye autocompletado y respeta la preferencia de movimiento reducido.

@@ -1,5 +1,5 @@
 -- =============================================
--- NOOK - Database
+-- PINWI - Database
 -- IMPORTANTE: este script elimina y vuelve a crear las tablas.
 -- =============================================
 

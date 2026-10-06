@@ -1,3 +1,4 @@
+import { BrandLogo } from "../../components/BrandLogo";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { AlertTriangle, BarChart3, Calendar, ChevronRight, Home, LogOut, MapPin, MessageCircle, Settings } from "lucide-react";
@@ -69,13 +70,13 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
       <aside className="group/sidebar fixed bottom-0 right-0 top-0 z-40 hidden w-20 flex-col overflow-hidden rounded-l-[1.35rem] border-l border-[#E6E8F5] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.10)] transition-[width] duration-300 hover:w-72 md:flex">
         <div className="relative h-[5.75rem] border-b border-[#EEF0F8]">
           <div className="absolute left-1/2 top-1/2 grid -translate-x-1/2 -translate-y-1/2 place-items-center transition-[left,transform] duration-300 group-hover/sidebar:left-4 group-hover/sidebar:translate-x-0">
-            <div className="grid size-12 place-items-center rounded-2xl bg-[#4F46E5] text-white shadow-[0_12px_24px_rgba(79,70,229,0.24)]">
-              <MapPin className="size-5" />
+            <div className="grid size-12 place-items-center rounded-2xl bg-[#EEF2FF]">
+              <BrandLogo variant="mark" className="h-11" />
             </div>
           </div>
           <div className="absolute inset-y-0 left-20 right-4 flex min-w-0 items-center opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100">
             <div className="min-w-0">
-              <p className="text-lg font-black text-[#1E1B4B]">Nook Delegate</p>
+              <p className="text-lg font-black text-[#1E1B4B]">Pinwi Delegate</p>
               <p className="text-xs font-bold text-slate-400">Panel de gestion</p>
             </div>
           </div>
@@ -142,11 +143,14 @@ export function DelegateLayout({ onLogout }: DelegateLayoutProps) {
       <div className={`relative md:pr-20 ${isChatRoute ? "flex min-h-0 flex-1 flex-col" : "min-h-screen"}`}>
         <header className="z-30 shrink-0 border-b border-[#E6E8F5]/80 bg-white/95 px-4 py-4 backdrop-blur md:sticky md:top-0 md:px-8">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="truncate text-2xl font-black tracking-normal text-[#111827] md:text-3xl">
-                {activeItem.label}
-              </h1>
-              <p className="hidden text-sm font-medium text-slate-500 md:block">{activeItem.description}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <BrandLogo variant="mark" className="h-10 md:hidden" />
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-black tracking-normal text-[#111827] md:text-3xl">
+                  {activeItem.label}
+                </h1>
+                <p className="hidden text-sm font-medium text-slate-500 md:block">{activeItem.description}</p>
+              </div>
             </div>
 
             <Button

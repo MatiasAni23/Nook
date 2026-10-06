@@ -1,3 +1,4 @@
+import { BrandLogo } from "../../components/BrandLogo";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { Map, User, Users, MessageCircle, Search } from "lucide-react";
@@ -86,7 +87,11 @@ export function Layout() {
                   animate={{ scale: isActive ? 1.08 : 1 }}
                   transition={{ type: "spring", stiffness: 460, damping: 26 }}
                 >
-                  <Icon className="relative z-10 size-[1.125rem]" strokeWidth={isActive ? 2.6 : 2.2} />
+                  {path === "/app/discover" ? (
+                    <BrandLogo variant="mark" className="relative z-10 h-8 w-6" />
+                  ) : (
+                    <Icon className="relative z-10 size-[1.125rem]" strokeWidth={isActive ? 2.6 : 2.2} />
+                  )}
                 </motion.span>
               </motion.span>
               <span

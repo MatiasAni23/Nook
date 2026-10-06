@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type React from "react";
 import { cn } from "./utils";
 
-const IMAGE_CACHE_NAME = "nook-image-cache-v1";
+const IMAGE_CACHE_NAME = "pinwi-image-cache-v1";
 const objectUrlBySource = new Map<string, string>();
 const pendingSourceLoads = new Map<string, Promise<string>>();
 

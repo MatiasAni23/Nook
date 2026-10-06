@@ -99,7 +99,7 @@ export function DelegateStats() {
                     <div className="mb-4 grid size-12 place-items-center rounded-2xl bg-white/15">
                       <Lock className="size-6" />
                     </div>
-                    <h3 className="text-xl font-black">Desbloquea Nook Premium</h3>
+                    <h3 className="text-xl font-black">Desbloquea Pinwi Premium</h3>
                     <p className="mt-2 text-sm font-medium text-white/80">
                       Activa tu suscripcion para acceder a estadisticas y aparecer con mayor prioridad en busquedas y recomendados.
                     </p>

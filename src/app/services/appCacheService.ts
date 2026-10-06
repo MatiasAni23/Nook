@@ -6,11 +6,11 @@ import { clearCurrentUserServiceCaches } from "./currentUserService";
 import { clearDelegateServiceCache } from "./delegateService";
 import { clearPlacesCache } from "./placeService";
 
-function clearNookSessionStorage() {
+function clearPinwiSessionStorage() {
   if (typeof window === "undefined") return;
 
   Object.keys(window.sessionStorage)
-    .filter((key) => key.startsWith("nook-"))
+    .filter((key) => key.startsWith("pinwi-"))
     .forEach((key) => window.sessionStorage.removeItem(key));
 }
 
@@ -21,6 +21,6 @@ export async function clearAppCaches() {
   clearChatServiceCaches();
   clearDelegateServiceCache();
   clearPlacesCache();
-  clearNookSessionStorage();
+  clearPinwiSessionStorage();
   await clearCachedImages();
 }

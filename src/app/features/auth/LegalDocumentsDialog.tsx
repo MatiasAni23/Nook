@@ -7,124 +7,25 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 
-export type LegalDocument = "terms" | "privacy";
+import {
+  LEGAL_PUBLICATION_NOTICE,
+  LEGAL_REVIEW_DATE,
+  LEGAL_SOURCE_URL,
+  LEGAL_STATUS,
+  LEGAL_VERSION,
+  PRIVACY_SECTIONS,
+  TERMS_SECTIONS,
+  type LegalDocument,
+  type LegalSection,
+} from "./legalDocuments";
 
-interface LegalSection {
-  title: string;
-  paragraphs: string[];
-}
+export type { LegalDocument } from "./legalDocuments";
 
-const TERMS_SECTIONS: LegalSection[] = [
-  {
-    title: "1. Alcance y aceptación",
-    paragraphs: [
-      "Estos Términos regulan el uso de Nook, una plataforma para descubrir, guardar, recomendar y, cuando corresponda, reservar espacios para estudiar, trabajar o reunirse.",
-      "Al crear una cuenta, navegar en la plataforma o utilizar sus funciones, aceptas este documento y sus futuras actualizaciones. Este texto es una versión de trabajo y debe ser revisado antes de su publicación definitiva.",
-    ],
-  },
-  {
-    title: "2. Cuenta y seguridad",
-    paragraphs: [
-      "Debes entregar información exacta, mantenerla actualizada y proteger tus credenciales. No compartas tu contraseña ni permitas que otra persona utilice tu cuenta.",
-      "Puedes solicitar la recuperación de acceso mediante el correo asociado a tu cuenta. Nook podrá suspender cuentas ante señales de uso indebido, fraude, suplantación o riesgos para la seguridad de la comunidad.",
-    ],
-  },
-  {
-    title: "3. Uso de la plataforma",
-    paragraphs: [
-      "Nook permite consultar información de lugares, interactuar con otros usuarios y administrar reservas o espacios según el tipo de perfil. La disponibilidad, precios, horarios, condiciones de ingreso y servicios de cada lugar pueden cambiar.",
-      "Te comprometes a utilizar la plataforma de manera respetuosa, lícita y coherente con su propósito. Está prohibido publicar información falsa, vulnerar derechos de terceros, interferir con el servicio o intentar acceder a datos ajenos.",
-    ],
-  },
-  {
-    title: "4. Reservas y lugares",
-    paragraphs: [
-      "Las reservas, solicitudes y confirmaciones están sujetas a las condiciones informadas por cada lugar. Cuando exista un delegado o administrador del espacio, será responsable de mantener actualizada la información operacional que publique.",
-      "Nook actúa como plataforma tecnológica y no garantiza que un espacio mantenga su disponibilidad fuera de la información registrada. Las políticas de pago, cancelación, acceso y reembolso deberán definirse expresamente antes de habilitar funciones de cobro.",
-    ],
-  },
-  {
-    title: "5. Contenido y comunidad",
-    paragraphs: [
-      "Conservas la responsabilidad por el contenido que compartas, como reseñas, fotos, descripciones o mensajes. Al publicarlo, autorizas a Nook a mostrarlo dentro de la plataforma para operar y mejorar el servicio.",
-      "No se permite contenido ofensivo, discriminatorio, engañoso, ilícito o que infrinja derechos de autor, privacidad u otros derechos de terceros. Nook podrá moderar o retirar contenido que incumpla estas reglas.",
-    ],
-  },
-  {
-    title: "6. Disponibilidad y cambios",
-    paragraphs: [
-      "Trabajamos para mantener Nook disponible y actualizado, pero pueden existir pausas por mantenimiento, fallas técnicas, cambios de proveedores o causas fuera de nuestro control.",
-      "Podemos modificar funciones, requisitos o estos Términos. Si el cambio es relevante, procuraremos comunicarlo por los canales disponibles antes de que entre en vigencia.",
-    ],
-  },
-  {
-    title: "7. Contacto y vigencia",
-    paragraphs: [
-      "Para consultas sobre estos Términos, se habilitará un canal de contacto oficial antes del lanzamiento público. La versión publicada en la plataforma indicará su fecha de vigencia y el responsable legal correspondiente.",
-    ],
-  },
-];
-
-const PRIVACY_SECTIONS: LegalSection[] = [
-  {
-    title: "1. Propósito de esta política",
-    paragraphs: [
-      "Esta Política explica qué datos puede tratar Nook, para qué se utilizan y qué opciones tienes sobre ellos. Es un borrador base que deberá completarse con la identificación del responsable, los proveedores y los canales de contacto antes de su publicación definitiva.",
-    ],
-  },
-  {
-    title: "2. Datos que podemos tratar",
-    paragraphs: [
-      "Según cómo uses Nook, podemos tratar datos de cuenta como nombre, correo electrónico, teléfono, rol y foto de perfil; datos de uso como lugares guardados, reservas, reseñas e interacciones; y datos técnicos básicos necesarios para la seguridad y funcionamiento del servicio.",
-      "La ubicación solo debe utilizarse cuando actives una función que la requiera. No solicitamos información sensible salvo que una función futura lo informe de forma expresa y cuente con una base válida para ello.",
-    ],
-  },
-  {
-    title: "3. Finalidades del tratamiento",
-    paragraphs: [
-      "Usamos los datos para crear y proteger cuentas, mostrar lugares relevantes, gestionar reservas, facilitar la comunicación necesaria entre usuarios y espacios, responder solicitudes y mejorar la experiencia.",
-      "También podemos usar información agregada o disociada para métricas, rendimiento y planificación del servicio, procurando que no identifique directamente a una persona.",
-    ],
-  },
-  {
-    title: "4. Compartición de información",
-    paragraphs: [
-      "Solo compartimos los datos necesarios con proveedores que permiten operar la plataforma, como infraestructura, autenticación, almacenamiento o mensajería, bajo obligaciones de seguridad y confidencialidad.",
-      "Cuando solicites una reserva, el lugar o su delegado podrá recibir los datos indispensables para gestionar esa solicitud. No vendemos datos personales ni los compartimos para fines publicitarios ajenos a Nook sin una base adecuada y comunicación previa.",
-    ],
-  },
-  {
-    title: "5. Conservación y seguridad",
-    paragraphs: [
-      "Conservamos los datos mientras sean necesarios para prestar el servicio, atender obligaciones legales, resolver controversias o proteger la seguridad de Nook. Luego se eliminan o anonimizan conforme a criterios que deberán definirse en la versión final.",
-      "Aplicamos medidas técnicas y organizativas razonables, incluyendo controles de acceso y reglas de seguridad a nivel de base de datos. Ningún sistema es infalible, por lo que también te pedimos proteger tus credenciales y avisarnos ante actividad sospechosa.",
-    ],
-  },
-  {
-    title: "6. Tus derechos",
-    paragraphs: [
-      "Podrás solicitar información sobre tus datos, pedir su corrección, actualización, eliminación o bloqueo cuando corresponda, y retirar consentimientos opcionales. El alcance y los plazos de respuesta se ajustarán a la normativa aplicable.",
-      "Antes del lanzamiento público se incorporará el canal oficial para ejercer estos derechos y la identificación del responsable de datos. La normativa chilena reconoce derechos de las personas sobre el tratamiento de sus datos personales.",
-    ],
-  },
-  {
-    title: "7. Cookies y tecnologías similares",
-    paragraphs: [
-      "Nook puede utilizar almacenamiento local, cookies o tecnologías equivalentes para mantener la sesión, recordar preferencias, prevenir abuso y medir el rendimiento. Las herramientas analíticas o publicitarias adicionales deberán detallarse aquí antes de activarse.",
-    ],
-  },
-  {
-    title: "8. Cambios y contacto",
-    paragraphs: [
-      "Actualizaremos esta política cuando cambien nuestras prácticas o las obligaciones aplicables. La fecha de vigencia y el correo de privacidad se completarán antes de publicar la versión definitiva.",
-    ],
-  },
-];
-
-function DocumentSection({ section }: { section: LegalSection }) {
+export function DocumentSection({ section, headingLevel = 3 }: { section: LegalSection; headingLevel?: 2 | 3 }) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <section className="border-b border-slate-100 pb-5 last:border-0 last:pb-0">
-      <h3 className="text-sm font-black text-[#1E1B4B]">{section.title}</h3>
+      <Heading className="text-sm font-black text-[#1E1B4B]">{section.title}</Heading>
       <div className="mt-2.5 space-y-2.5 text-sm leading-6 text-slate-600">
         {section.paragraphs.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
@@ -159,7 +60,7 @@ export function LegalDocumentsDialog({
                 {isTerms ? "Términos de uso" : "Política de privacidad"}
               </DialogTitle>
               <DialogDescription className="mt-1 text-xs font-medium text-slate-400">
-                Borrador editable antes de la publicación definitiva
+                Versión {LEGAL_VERSION} · Revisado el {LEGAL_REVIEW_DATE}
               </DialogDescription>
             </div>
           </div>
@@ -189,10 +90,15 @@ export function LegalDocumentsDialog({
             <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#E0E7FF] bg-[#F8FAFF] px-4 py-3 text-xs leading-5 text-slate-500">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#4F46E5]" />
               <p>
-                Este contenido es una base operativa para Nook y requiere revisión jurídica antes de declarar su vigencia.
+                <strong className="block font-semibold text-slate-700">{LEGAL_STATUS}</strong>
+                {LEGAL_PUBLICATION_NOTICE}
               </p>
             </div>
             <div className="space-y-5">{sections.map((section) => <DocumentSection key={section.title} section={section} />)}</div>
+            <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm text-[#4F46E5]">
+              <a href={isTerms ? "/terminos" : "/privacidad"} className="underline underline-offset-4">Abrir documento completo</a>
+              <a href={LEGAL_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Consultar Ley N.º 21.719 (BCN)</a>
+            </div>
           </div>
         </div>
       </DialogContent>
