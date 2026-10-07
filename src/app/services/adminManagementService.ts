@@ -1,3 +1,5 @@
+import type { AppPlace } from "./placeService";
+import { clearCurrentUserServiceCaches } from "./currentUserService";
 import { supabase } from "../lib/supabase";
 
 export type ManagedUserRole = "student" | "worker";
@@ -40,37 +42,7 @@ export interface ManagedDelegate {
   lastActive: Date;
 }
 
-export interface DelegateAssignedPlace {
-  id: string;
-  name: string;
-  type: string;
-  category: "study" | "work";
-  planType: "basic" | "app_billing" | "basic_premium" | "host_billing";
-  description: string;
-  lat: number;
-  lng: number;
-  zone: string | null;
-  rating: number;
-  reviews: number;
-  hours: string;
-  pricePerHour?: number;
-  websiteUrl?: string | null;
-  capacityMin: number | null;
-  capacityMax: number | null;
-  wifi: boolean;
-  outlets: boolean;
-  parking: boolean;
-  quietness: number | null;
-  lighting: number | null;
-  address: string;
-  images: string[];
-  amenities: Array<{
-    key: string;
-    name: string;
-    isAvailable: boolean;
-    additionalInfo?: string | null;
-  }>;
-  spaces: Array<{ id: string; name: string; capacity: number; pricePerHour: number; imageUrl: string }>;
+export interface DelegateAssignedPlace extends AppPlace {
   reservationsCount: number;
 }
 
@@ -118,8 +90,6 @@ let managedDelegatesCache: { timestamp: number; delegates: ManagedDelegate[] } |
 let managedDelegatesRequest: Promise<ManagedDelegate[]> | null = null;
 let managedPlaceOptionsCache: { timestamp: number; places: ManagedPlaceOption[] } | null = null;
 let managedPlaceOptionsRequest: Promise<ManagedPlaceOption[]> | null = null;
-let currentDelegatePlacesCache: { timestamp: number; userId: string; places: DelegateAssignedPlace[] } | null = null;
-let currentDelegatePlacesRequest: Promise<DelegateAssignedPlace[]> | null = null;
 let delegateInvitationCache = new Map<string, { timestamp: number; invitation: DelegateInvitation }>();
 
 function requireSupabase() {
@@ -162,8 +132,6 @@ export function clearAdminManagementCache() {
   managedDelegatesRequest = null;
   managedPlaceOptionsCache = null;
   managedPlaceOptionsRequest = null;
-  currentDelegatePlacesCache = null;
-  currentDelegatePlacesRequest = null;
   delegateInvitationCache = new Map();
 }
 
@@ -341,97 +309,17 @@ export async function listManagedDelegates(options?: { forceRefresh?: boolean })
 }
 
 export async function saveManagedDelegate(input: SaveDelegateInput): Promise<ManagedDelegate> {
-  const client = requireSupabase();
-  const normalizedEmail = input.email.trim().toLowerCase();
-
-  const { data: user, error: userLookupError } = await client
-    .from("users")
-    .select("id, email, name, phone")
-    .ilike("email", normalizedEmail)
-    .maybeSingle();
-
-  if (userLookupError) throw userLookupError;
-  if (!user) {
-    throw new Error("No existe un usuario registrado con ese email. Primero debe crear su cuenta en la app.");
-  }
-
-  const { error: userUpdateError } = await client
-    .from("users")
-    .update({
-      name: input.name.trim(),
-      phone: input.phone.trim() || null,
-      role: "delegate",
-      status: input.status === "suspended" ? "suspended" : "active",
-    })
-    .eq("id", user.id);
-
-  if (userUpdateError) throw userUpdateError;
-
-  const delegatePayload = {
-    user_id: user.id,
-    status: input.status ?? "pending",
-    subscription_active: Boolean(input.subscriptionActive),
-    last_active: new Date().toISOString(),
-  };
-
-  const { data: delegate, error: delegateError } = await client
-    .from("delegates")
-    .upsert(input.id ? { id: input.id, ...delegatePayload } : delegatePayload, { onConflict: "user_id" })
-    .select("id, user_id, status, joined_date, last_active")
-    .single();
-
-  if (delegateError) throw delegateError;
-
-  const { error: deleteAssignmentsError } = await client
-    .from("delegate_places")
-    .delete()
-    .eq("delegate_id", delegate.id);
-
-  if (deleteAssignmentsError) throw deleteAssignmentsError;
-
-  const uniquePlaceIds = Array.from(new Set(input.assignedPlaces));
-  if (uniquePlaceIds.length > 0) {
-    const { error: insertAssignmentsError } = await client.from("delegate_places").insert(
-      uniquePlaceIds.map((placeId) => ({
-        delegate_id: delegate.id,
-        place_id: placeId,
-      })),
-    );
-
-    if (insertAssignmentsError) throw insertAssignmentsError;
-  }
-
-  const savedDelegate = {
-    id: String(delegate.id),
-    userId: String(delegate.user_id),
-    name: input.name.trim(),
-    email: normalizedEmail,
-    phone: input.phone.trim() || null,
-    status: (delegate.status ?? "pending") as DelegateStatus,
-    subscriptionActive: Boolean(input.subscriptionActive),
-    placesCount: uniquePlaceIds.length,
-    assignedPlaces: uniquePlaceIds,
-    joinedDate: toDate(delegate.joined_date),
-    lastActive: toDate(delegate.last_active),
-  };
-
-  if (managedDelegatesCache) {
-    const exists = managedDelegatesCache.delegates.some((currentDelegate) => currentDelegate.id === savedDelegate.id);
-    cacheManagedDelegates(
-      exists
-        ? managedDelegatesCache.delegates.map((currentDelegate) =>
-            currentDelegate.id === savedDelegate.id ? savedDelegate : currentDelegate,
-          )
-        : [savedDelegate, ...managedDelegatesCache.delegates],
-    );
-  }
-
-  if (managedUsersCache) {
-    cacheManagedUsers(managedUsersCache.users.filter((userRow) => userRow.id !== savedDelegate.userId));
-  }
-
-  currentDelegatePlacesCache = null;
-  return savedDelegate;
+  const { data: id, error } = await requireSupabase().rpc("save_managed_delegate", {
+    target_delegate_id: input.id ?? null, delegate_email: input.email.trim().toLowerCase(),
+    delegate_name: input.name.trim(), delegate_phone: input.phone.trim(),
+    delegate_status: input.status ?? "pending", delegate_subscription_active: Boolean(input.subscriptionActive),
+    assigned_place_ids: Array.from(new Set(input.assignedPlaces)),
+  });
+  if (error) throw error;
+  clearAdminManagementCache();
+  const saved = (await listManagedDelegates({ forceRefresh: true })).find((delegate) => delegate.id === id);
+  if (!saved) throw new Error("El delegado se guardo, pero no se pudo recargar. Actualiza la lista.");
+  return saved;
 }
 
 function toDelegateInvitation(row: Record<string, any>): DelegateInvitation {
@@ -560,73 +448,29 @@ export async function claimDelegateInvitation(token: string) {
   if (error) throw error;
 
   clearAdminManagementCache();
+  clearCurrentUserServiceCaches();
 }
 
 export async function updateManagedDelegateStatus(delegate: ManagedDelegate, status: DelegateStatus) {
-  const client = requireSupabase();
-  const { error: delegateError } = await client
-    .from("delegates")
-    .update({ status, last_active: new Date().toISOString() })
-    .eq("id", delegate.id);
-
-  if (delegateError) throw delegateError;
-
-  const { error: userError } = await client
-    .from("users")
-    .update({ status: status === "suspended" ? "suspended" : "active" })
-    .eq("id", delegate.userId);
-
-  if (userError) throw userError;
-
-  if (managedDelegatesCache) {
-    cacheManagedDelegates(
-      managedDelegatesCache.delegates.map((currentDelegate) =>
-        currentDelegate.id === delegate.id
-          ? { ...currentDelegate, status, lastActive: new Date() }
-          : currentDelegate,
-      ),
-    );
-  }
+  const { error } = await requireSupabase().rpc("set_managed_delegate_status", {
+    target_delegate_id: delegate.id, next_status: status,
+  });
+  if (error) throw error;
+  clearAdminManagementCache();
 }
 
 export async function updateManagedDelegateSubscription(delegate: ManagedDelegate, subscriptionActive: boolean) {
-  const client = requireSupabase();
-  const { error } = await client
-    .from("delegates")
-    .update({ subscription_active: subscriptionActive, last_active: new Date().toISOString() })
-    .eq("id", delegate.id);
-
+  const { error } = await requireSupabase().rpc("set_managed_delegate_subscription", {
+    target_delegate_id: delegate.id, subscription_active: subscriptionActive,
+  });
   if (error) throw error;
-
-  if (managedDelegatesCache) {
-    cacheManagedDelegates(
-      managedDelegatesCache.delegates.map((currentDelegate) =>
-        currentDelegate.id === delegate.id
-          ? { ...currentDelegate, subscriptionActive, lastActive: new Date() }
-          : currentDelegate,
-      ),
-    );
-  }
+  clearAdminManagementCache();
 }
 
 export async function deleteManagedDelegate(delegate: ManagedDelegate) {
-  const client = requireSupabase();
-  const { error: delegateError } = await client.from("delegates").delete().eq("id", delegate.id);
-  if (delegateError) throw delegateError;
-
-  const { error: userError } = await client
-    .from("users")
-    .update({ role: "worker", status: "active" })
-    .eq("id", delegate.userId);
-
-  if (userError) throw userError;
-
-  if (managedDelegatesCache) {
-    cacheManagedDelegates(managedDelegatesCache.delegates.filter((currentDelegate) => currentDelegate.id !== delegate.id));
-  }
-
-  managedUsersCache = null;
-  currentDelegatePlacesCache = null;
+  const { error } = await requireSupabase().rpc("delete_managed_delegate", { target_delegate_id: delegate.id });
+  if (error) throw error;
+  clearAdminManagementCache();
 }
 
 async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: DelegateAssignedPlace[] }> {
@@ -640,6 +484,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
   const { data: delegate, error: delegateError } = await client
     .from("delegates")
     .select("id")
+    .eq("status", "active")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -686,6 +531,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           name,
           capacity,
           price_per_hour,
+          billing_unit,
           image_url
         )
       )
@@ -696,14 +542,15 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
   if (error) throw error;
 
   const places = (data ?? [])
-    .map((assignment) => {
+    .map((assignment): DelegateAssignedPlace | null => {
       const place = Array.isArray(assignment.places) ? assignment.places[0] : assignment.places;
       if (!place) return null;
 
       return {
         id: String(place.id),
         name: String(place.name ?? ""),
-        type: String(place.type ?? "library"),
+        type: (place.type ?? "library") as AppPlace["type"],
+        openNow: false,
         category: place.category === "work" ? "work" : "study",
         planType: (place.plan_type ?? "basic") as DelegateAssignedPlace["planType"],
         description: String(place.description ?? ""),
@@ -735,6 +582,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
           name: String(space.name ?? ""),
           capacity: Number(space.capacity ?? 0),
           pricePerHour: Number(space.price_per_hour ?? 0),
+          billingUnit: (space.billing_unit ?? "hour") as AppPlace["spaces"][number]["billingUnit"],
           imageUrl: String(space.image_url ?? ""),
         })),
         reservationsCount: Array.isArray(place.reservations) ? place.reservations.length : 0,
@@ -745,34 +593,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{ userId: string; places: D
   return { userId, places };
 }
 
-export async function listCurrentDelegatePlaces(options?: { forceRefresh?: boolean }): Promise<DelegateAssignedPlace[]> {
-  const client = requireSupabase();
-  const { data: userData, error: userError } = await client.auth.getUser();
-
-  if (userError) throw userError;
-  if (!userData.user) throw new Error("No hay un usuario autenticado.");
-
-  if (
-    !options?.forceRefresh &&
-    currentDelegatePlacesCache &&
-    currentDelegatePlacesCache.userId === userData.user.id &&
-    isFresh(currentDelegatePlacesCache.timestamp)
-  ) {
-    return currentDelegatePlacesCache.places;
-  }
-
-  if (!options?.forceRefresh && currentDelegatePlacesRequest) {
-    return currentDelegatePlacesRequest;
-  }
-
-  currentDelegatePlacesRequest = fetchCurrentDelegatePlaces()
-    .then(({ userId, places }) => {
-      currentDelegatePlacesCache = { timestamp: Date.now(), userId, places };
-      return places;
-    })
-    .finally(() => {
-      currentDelegatePlacesRequest = null;
-    });
-
-  return currentDelegatePlacesRequest;
+export async function listCurrentDelegatePlaces(_options?: { forceRefresh?: boolean }): Promise<DelegateAssignedPlace[]> {
+  // Assignments may change in another session; always consult current permissions.
+  return (await fetchCurrentDelegatePlaces()).places;
 }

@@ -1,0 +1,72 @@
+.profile-page :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid #a5b4fc;
+  outline-offset: 3px;
+}
+
+.profile-account-link {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #6f6c80;
+  font-size: 13px;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+
+.profile-account-link:hover {
+  background: #f7f6fc;
+  color: #4f46e5;
+}
+
+.profile-account-link.profile-logout {
+  justify-content: flex-start;
+}
+
+.profile-edit section {
+  scroll-margin-top: 100px;
+  border: 1px solid #e9eaf2;
+  border-radius: 24px;
+  padding: 24px;
+  background: white;
+  box-shadow: 0 4px 20px rgb(30 27 75 / 2.5%);
+}
+
+.profile-edit
+  :is(input:not([type="checkbox"]):not([type="file"]), textarea, select) {
+  background: #fafafe;
+  border: 1px solid #e5e4ee;
+  border-radius: 12px;
+  box-shadow: none;
+  color: #25233b;
+}
+
+.profile-edit input[type="checkbox"] {
+  accent-color: #4f46e5;
+}
+
+.profile-edit label {
+  color: #55516c;
+  font-size: 13px;
+}
+
+.profile-edit textarea {
+  line-height: 1.7;
+  resize: vertical;
+}
+
+@media (max-width: 639px) {
+  .profile-edit section {
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-page * {
+    transition: none !important;
+  }
+}

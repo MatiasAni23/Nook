@@ -8,7 +8,7 @@ export interface RegisterInput {
   email: string;
   phone: string;
   password: string;
-  role?: UserRole;
+  role?: "student" | "worker";
   emailRedirectTo?: string;
 }
 
@@ -38,26 +38,9 @@ function requireSupabase() {
   return supabase;
 }
 
-export async function ensureAppUserRecord(user: User, role: UserRole = "student") {
-  const client = requireSupabase();
-  const { error } = await client
-    .from("users")
-    .upsert(
-      {
-        id: user.id,
-        email: user.email,
-        name: user.user_metadata.full_name ?? "",
-        phone: user.user_metadata.phone ?? null,
-        role,
-        profile_completed: false,
-        email_verified: Boolean(user.email_confirmed_at),
-      },
-      { onConflict: "id" },
-    );
-
-  if (error) {
-    throw error;
-  }
+export async function ensureAppUserRecord(user: User) {
+  // Auth creates accounts. Browsers must not upsert identity or privilege fields.
+  if (!(await getAppUserRecord(user.id))) throw new Error("No se encontro el perfil de la cuenta. Contacta al administrador.");
 }
 
 export async function signInWithEmail(email: string, password: string) {
@@ -267,19 +250,9 @@ export async function saveProfileSetup({ role, profileData }: ProfileSetupInput)
     throw new Error("No hay un usuario autenticado para guardar el perfil.");
   }
 
-  const { error: userErrorUpdate } = await client
-    .from("users")
-    .upsert(
-      {
-        id: userData.user.id,
-        email: userData.user.email,
-        name: userData.user.user_metadata.full_name,
-        phone: userData.user.user_metadata.phone,
-        role,
-        profile_completed: true,
-      },
-      { onConflict: "id" },
-    );
+  const { error: userErrorUpdate } = await client.from("users")
+    .update({ role, profile_completed: true })
+    .eq("id", userData.user.id).select("id").single();
 
   if (userErrorUpdate) {
     throw userErrorUpdate;

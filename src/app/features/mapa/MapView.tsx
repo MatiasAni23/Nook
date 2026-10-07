@@ -1,3 +1,4 @@
+import { demoPlaces } from "../../data/demoPlaces";
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -200,7 +201,7 @@ export function MapView() {
     setHasResolvedUserLocation(false);
     setIsLocatingUser(false);
 
-    if (error?.code === error.PERMISSION_DENIED) {
+    if (error?.code === 1) {
       setLocationError("Permiso de ubicacion bloqueado en el navegador.");
       return;
     }
@@ -284,10 +285,7 @@ export function MapView() {
     };
   }, []);
 
-  const mockPlaces = [
-    ...studyPlaces.map((place) => ({ ...place, category: "study" as const, images: [] })),
-    ...workPlaces.map((place) => ({ ...place, category: "work" as const, images: [] })),
-  ];
+  const mockPlaces = demoPlaces;
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
   const filteredPlaces = basePlaces.filter((place) => {
     return placeMatchesSearch(place, searchTerm) && placeMatchesTab(place, activeTab);

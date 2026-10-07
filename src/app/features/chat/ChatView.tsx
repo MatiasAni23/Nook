@@ -51,7 +51,7 @@ function ConversationListSkeleton() {
   );
 }
 
-function ChatThreadSkeleton() {
+function ChatThreadSkeleton({ userRole }: { userRole: string }) {
   return (
     <div className={`flex flex-col overflow-hidden bg-white ${userRole === "delegate" || userRole === "admin" ? "size-full" : "h-dvh max-h-dvh"}`}>
       <div className="border-b px-4 py-3 bg-white shadow-sm">
@@ -610,7 +610,7 @@ export function ChatView() {
   }
 
   if (!activePerson) {
-    return <ChatThreadSkeleton />;
+    return <ChatThreadSkeleton userRole={userRole} />;
   }
 
   return (
@@ -715,6 +715,7 @@ export function ChatView() {
         <div className="flex gap-2">
           <Input
             placeholder="Escribe un mensaje..."
+            maxLength={4000}
             value={messageText}
             onChange={(e) => handleMessageChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}

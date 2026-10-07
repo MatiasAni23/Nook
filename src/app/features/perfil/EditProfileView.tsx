@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
-import { ArrowLeft, Camera, Plus, Save, X } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { useLocation, useNavigate } from "react-router";
+import { ArrowLeft, Camera, Plus, Save, ShieldCheck, X } from "lucide-react";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -18,29 +22,47 @@ import {
 import {
   getInitials,
   updateCurrentUserProfile,
+  updateStudyProfileVisibility,
   uploadCurrentUserProfileImage,
 } from "../../services/currentUserService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
+import "./profile.css";
 
 export function EditProfileView() {
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const loadedProfileId = useRef<string | null>(null);
   const { currentUser, refreshCurrentUser } = useCurrentUser();
   const isStudent = currentUser?.role !== "worker";
 
   const [name, setName] = useState(currentUser?.name ?? "");
-  const [avatarUrl, setAvatarUrl] = useState(currentUser?.profile?.profile_image_url ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(
+    currentUser?.profile?.profile_image_url ?? "",
+  );
   const [bio, setBio] = useState(currentUser?.profile?.bio ?? "");
   const [career, setCareer] = useState(currentUser?.profile?.career ?? "");
-  const [regionId, setRegionId] = useState(currentUser?.profile?.region_id ?? "");
+  const [regionId, setRegionId] = useState(
+    currentUser?.profile?.region_id ?? "",
+  );
   const [cityId, setCityId] = useState(currentUser?.profile?.city_id ?? "");
-  const [institutionId, setInstitutionId] = useState(currentUser?.profile?.institution_id ?? "");
-  const [subjects, setSubjects] = useState<string[]>(currentUser?.profile?.subjects ?? []);
+  const [institutionId, setInstitutionId] = useState(
+    currentUser?.profile?.institution_id ?? "",
+  );
+  const [subjects, setSubjects] = useState<string[]>(
+    currentUser?.profile?.subjects ?? [],
+  );
   const [newSubject, setNewSubject] = useState("");
   const [company, setCompany] = useState(currentUser?.profile?.company ?? "");
-  const [position, setPosition] = useState(currentUser?.profile?.position ?? "");
-  const [industry, setIndustry] = useState(currentUser?.profile?.industry ?? "");
-  const [isIndependent, setIsIndependent] = useState(Boolean(currentUser?.profile?.is_independent));
+  const [position, setPosition] = useState(
+    currentUser?.profile?.position ?? "",
+  );
+  const [industry, setIndustry] = useState(
+    currentUser?.profile?.industry ?? "",
+  );
+  const [isIndependent, setIsIndependent] = useState(
+    Boolean(currentUser?.profile?.is_independent),
+  );
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [cities, setCities] = useState<CityOption[]>([]);
   const [institutions, setInstitutions] = useState<InstitutionOption[]>([]);
@@ -48,6 +70,8 @@ export function EditProfileView() {
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [studyProfileVisible, setStudyProfileVisible] = useState(false);
+  const [isSavingVisibility, setIsSavingVisibility] = useState(false);
 
   const selectedInstitution = useMemo(
     () => institutions.find((institution) => institution.id === institutionId),
@@ -64,11 +88,19 @@ export function EditProfileView() {
   const currentInstitutionType = currentUser?.profile?.institutions?.type ?? "";
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!hash) return;
+    const target = document.getElementById(hash.slice(1));
+    (target?.closest("section") ?? target)?.scrollIntoView({ block: "start" });
+  }, [hash, isStudent]);
+
+  useEffect(() => {
+    if (!currentUser || loadedProfileId.current === currentUser.id) return;
+    loadedProfileId.current = currentUser.id;
 
     setName(currentUser.name);
     setAvatarUrl(currentUser.profile?.profile_image_url ?? "");
     setBio(currentUser.profile?.bio ?? "");
+    setStudyProfileVisible(currentUser.profile?.study_profile_visible ?? false);
     setCareer(currentUser.profile?.career ?? "");
     setRegionId(currentUser.profile?.region_id ?? "");
     setCityId(currentUser.profile?.city_id ?? "");
@@ -93,7 +125,9 @@ export function EditProfileView() {
       })
       .catch((error) => {
         setErrorMessage(
-          error instanceof Error ? error.message : "No se pudieron cargar los catalogos.",
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar los catalogos.",
         );
       })
       .finally(() => setIsLoadingCatalogs(false));
@@ -109,7 +143,9 @@ export function EditProfileView() {
       .then(setCities)
       .catch((error) => {
         setErrorMessage(
-          error instanceof Error ? error.message : "No se pudieron cargar las comunas.",
+          error instanceof Error
+            ? error.message
+            : "No se pudieron cargar las comunas.",
         );
       });
   }, [isStudent, regionId]);
@@ -127,7 +163,9 @@ export function EditProfileView() {
     setSubjects(subjects.filter((item) => item !== subject));
   };
 
-  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
@@ -146,7 +184,9 @@ export function EditProfileView() {
       await refreshCurrentUser();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "No se pudo subir la foto de perfil.",
+        error instanceof Error
+          ? error.message
+          : "No se pudo subir la foto de perfil.",
       );
     } finally {
       setIsUploadingAvatar(false);
@@ -164,10 +204,14 @@ export function EditProfileView() {
       }
 
       if (isStudent && (!career.trim() || !regionId || !institutionId)) {
-        throw new Error("Completa nombre, carrera, region e institucion.");
+        throw new Error("Completa nombre, carrera, región e institución.");
       }
 
-      if (!isStudent && !isIndependent && (!position.trim() || !company.trim())) {
+      if (
+        !isStudent &&
+        !isIndependent &&
+        (!position.trim() || !company.trim())
+      ) {
         throw new Error("Completa tu cargo y empresa.");
       }
 
@@ -184,6 +228,7 @@ export function EditProfileView() {
               subjects,
               bio,
               profileImageUrl: avatarUrl,
+              studyProfileVisible,
             }
           : {
               company: isIndependent ? null : company,
@@ -198,43 +243,83 @@ export function EditProfileView() {
       await refreshCurrentUser();
       navigate("/app/profile");
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar el perfil.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo guardar el perfil.",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
+  const handleVisibilityChange = async (visible: boolean) => {
+    setIsSavingVisibility(true);
+    setErrorMessage("");
+    try {
+      await updateStudyProfileVisibility(visible);
+      setStudyProfileVisible(visible);
+      await refreshCurrentUser();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo cambiar la visibilidad.",
+      );
+    } finally {
+      setIsSavingVisibility(false);
+    }
+  };
+
   return (
-    <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto pb-24">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-4 py-4">
-          <button
-            onClick={() => navigate("/app/profile")}
-            className="flex size-10 items-center justify-center rounded-full bg-gray-100 text-gray-700"
-            aria-label="Volver"
-          >
-            <ArrowLeft className="size-5" />
-          </button>
-          <h1 className="text-lg" style={{ fontWeight: 700 }}>Editar perfil</h1>
-          <button
-            onClick={handleSave}
-            disabled={isSaving || isUploadingAvatar}
-            className="flex items-center gap-2 rounded-full bg-[#4F46E5] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            <Save className="size-4" />
-            {isSaving ? "Guardando" : "Guardar"}
-          </button>
+    <div className="profile-page profile-edit size-full overflow-y-auto bg-[#F8F9FC] text-[#25233B]">
+      <div className="pb-32">
+        <div className="sticky top-0 z-10 border-b border-[#E9EAF2] bg-white/95 backdrop-blur-md">
+          <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-4 py-3 sm:px-8 sm:py-4">
+            <button
+              type="button"
+              onClick={() => navigate("/app/profile")}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#E9EAF2] text-[#736F88] transition hover:bg-[#F7F6FC]"
+              aria-label="Volver al perfil"
+            >
+              <ArrowLeft className="size-5" />
+            </button>
+            <h1 className="text-base font-semibold sm:text-lg">
+              Editar perfil
+            </h1>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || isUploadingAvatar || isSavingVisibility}
+              className="flex min-h-11 items-center gap-2 rounded-xl bg-[#4F46E5] px-4 text-sm font-semibold text-white transition hover:bg-[#4338CA] disabled:opacity-60"
+            >
+              <Save className="size-4" />
+              {isSaving ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-5 px-4 py-5">
+        <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:px-8 sm:py-8">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Un perfil que se sienta tuyo
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-[#736F88]">
+              Actualiza tu información y elige qué quieres compartir.
+            </p>
+          </div>
           <section className="bg-white px-4 py-5 shadow-sm">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <Avatar className="size-24 border-4 border-white shadow-lg">
+                <Avatar className="size-20 border-4 border-white shadow-sm sm:size-24">
                   {avatarUrl && (
-                    <AvatarImage src={avatarUrl} alt={name} className="object-cover" />
+                    <AvatarImage
+                      src={avatarUrl}
+                      alt={name}
+                      className="object-cover"
+                    />
                   )}
-                  <AvatarFallback className="bg-[#4F46E5] text-3xl text-white">
+                  <AvatarFallback className="bg-[#E3E0FA] text-2xl font-semibold text-[#4F46E5]">
                     {getInitials(name)}
                   </AvatarFallback>
                 </Avatar>
@@ -256,8 +341,18 @@ export function EditProfileView() {
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-gray-500">Foto de perfil</p>
-                <p className="text-base font-semibold">{name || "Tu nombre"}</p>
+                <h2 className="text-base font-semibold">Tu foto de perfil</h2>
+                <p className="mt-1 text-xs leading-relaxed text-[#736F88]">
+                  Dale una cara a tu perfil para que puedan reconocerte.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingAvatar}
+                  className="mt-2 min-h-9 text-sm font-medium text-[#4F46E5] disabled:opacity-60"
+                >
+                  {avatarUrl ? "Cambiar foto" : "Subir una foto"}
+                </button>
                 {isUploadingAvatar && (
                   <p className="mt-1 text-xs text-gray-500">Subiendo foto...</p>
                 )}
@@ -266,12 +361,21 @@ export function EditProfileView() {
           </section>
 
           {errorMessage && (
-            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+            <div
+              role="alert"
+              className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
               {errorMessage}
             </div>
           )}
 
           <section className="space-y-4 bg-white px-4 py-5 shadow-sm">
+            <div>
+              <h2 className="text-base font-semibold">Sobre ti</h2>
+              <p className="mt-1 text-xs text-[#736F88]">
+                Lo esencial para presentarte a la comunidad.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="profile-name">Nombre completo</Label>
               <Input
@@ -289,32 +393,34 @@ export function EditProfileView() {
                 id="profile-bio"
                 value={bio}
                 onChange={(event) => setBio(event.target.value)}
-                placeholder="Cuentanos sobre ti"
+                placeholder="Cuéntanos qué estudias, en qué trabajas o qué te inspira…"
                 className="min-h-24 bg-gray-50"
               />
             </div>
           </section>
 
           {isStudent ? (
-            <section className="space-y-4 bg-white px-4 py-5 shadow-sm">
-              <div>
-                <h2 className="text-base" style={{ fontWeight: 700 }}>Datos academicos</h2>
-                <p className="text-sm text-gray-500">Selecciona tu institucion y ubicacion.</p>
+            <section className="grid gap-5 bg-white sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <h2 className="text-base font-semibold">Tu vida académica</h2>
+                <p className="mt-1 text-xs text-[#736F88]">
+                  Tu carrera, institución y ubicación de estudio.
+                </p>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="career">Carrera</Label>
                 <Input
                   id="career"
                   value={career}
                   onChange={(event) => setCareer(event.target.value)}
-                  placeholder="Ej: Ingenieria Civil Informatica"
+                  placeholder="Ej: Ingeniería Civil Informática"
                   className="h-11 bg-gray-50"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="region">Region</Label>
+                <Label htmlFor="region">Región</Label>
                 <select
                   id="region"
                   value={regionId}
@@ -327,7 +433,9 @@ export function EditProfileView() {
                   className="h-11 w-full rounded-lg border bg-gray-50 px-3 text-sm disabled:opacity-60"
                 >
                   <option value="">
-                    {isLoadingCatalogs ? "Cargando regiones..." : "Selecciona una region"}
+                    {isLoadingCatalogs
+                      ? "Cargando regiones…"
+                      : "Selecciona una región"}
                   </option>
                   {regionId && !hasSelectedRegion && currentRegionName && (
                     <option value={regionId}>{currentRegionName}</option>
@@ -354,7 +462,7 @@ export function EditProfileView() {
                 >
                   <option value="">
                     {!regionId
-                      ? "Selecciona primero una region"
+                      ? "Selecciona primero una región"
                       : cities.length === 0
                         ? "Sin comunas cargadas"
                         : "Selecciona una comuna"}
@@ -370,8 +478,8 @@ export function EditProfileView() {
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="institution">Institucion</Label>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="institution">Institución</Label>
                 <select
                   id="institution"
                   value={institutionId}
@@ -380,14 +488,20 @@ export function EditProfileView() {
                   className="h-11 w-full rounded-lg border bg-gray-50 px-3 text-sm disabled:opacity-60"
                 >
                   <option value="">
-                    {isLoadingCatalogs ? "Cargando instituciones..." : "Selecciona una institucion"}
+                    {isLoadingCatalogs
+                      ? "Cargando instituciones…"
+                      : "Selecciona una institución"}
                   </option>
-                  {institutionId && !hasSelectedInstitution && currentInstitutionName && (
-                    <option value={institutionId}>
-                      {currentInstitutionName}
-                      {currentInstitutionType ? ` - ${currentInstitutionType}` : ""}
-                    </option>
-                  )}
+                  {institutionId &&
+                    !hasSelectedInstitution &&
+                    currentInstitutionName && (
+                      <option value={institutionId}>
+                        {currentInstitutionName}
+                        {currentInstitutionType
+                          ? ` - ${currentInstitutionType}`
+                          : ""}
+                      </option>
+                    )}
                   {institutions.map((institution) => (
                     <option key={institution.id} value={institution.id}>
                       {institution.name} - {institution.type}
@@ -399,12 +513,16 @@ export function EditProfileView() {
           ) : (
             <section className="space-y-4 bg-white px-4 py-5 shadow-sm">
               <div>
-                <h2 className="text-base" style={{ fontWeight: 700 }}>Datos laborales</h2>
-                <p className="text-sm text-gray-500">Mantén actualizada tu informacion de trabajo.</p>
+                <h2 className="text-base font-semibold">Tu vida profesional</h2>
+                <p className="mt-1 text-xs text-[#736F88]">
+                  Cuéntanos en qué estás trabajando.
+                </p>
               </div>
 
               <label className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-3">
-                <span className="text-sm font-medium">Trabajo independiente</span>
+                <span className="text-sm font-medium">
+                  Trabajo independiente
+                </span>
                 <input
                   type="checkbox"
                   checked={isIndependent}
@@ -445,7 +563,7 @@ export function EditProfileView() {
                   id="industry"
                   value={industry}
                   onChange={(event) => setIndustry(event.target.value)}
-                  placeholder="Ej: Tecnologia"
+                  placeholder="Ej: Tecnología"
                   className="h-11 bg-gray-50"
                 />
               </div>
@@ -453,20 +571,78 @@ export function EditProfileView() {
           )}
 
           {isStudent && (
-            <section className="space-y-4 bg-white px-4 py-5 shadow-sm">
+            <section
+              id="profile-privacy"
+              className="space-y-4 bg-white px-4 py-5 shadow-sm"
+              aria-labelledby="edit-privacy-title"
+            >
+              <h2
+                id="edit-privacy-title"
+                className="flex items-center gap-2 text-base font-semibold"
+              >
+                <ShieldCheck
+                  className="size-4 text-[#8176B9]"
+                  aria-hidden="true"
+                />
+                Visibilidad y privacidad
+              </h2>
+              <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-[#E8E4F5] bg-[#F8F6FD] px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={studyProfileVisible}
+                  onChange={(event) => {
+                    void handleVisibilityChange(event.target.checked);
+                  }}
+                  disabled={isSavingVisibility || isSaving}
+                  className="size-5 shrink-0"
+                  aria-describedby="study-profile-sharing"
+                />
+                <span className="font-medium">
+                  Aparecer en encontrar estudiantes
+                </span>
+              </label>
+              <p role="status" className="text-xs font-medium text-[#655CC2]">
+                {isSavingVisibility
+                  ? "Actualizando visibilidad…"
+                  : studyProfileVisible
+                    ? "Tu perfil aparece en encontrar estudiantes."
+                    : "Tu perfil está fuera de la búsqueda de estudiantes."}
+              </p>
+              <p id="study-profile-sharing" className="text-sm text-gray-600">
+                Comparte tu nombre, foto, carrera, institución, materias y bio
+                con otras personas que tengan una cuenta en Pinwi. Tu correo,
+                teléfono y ubicación permanecen privados. Puedes desactivarlo
+                cuando quieras; este cambio se guarda al instante. En tus
+                conversaciones y reservas se seguirá mostrando tu nombre y foto.
+              </p>
+            </section>
+          )}
+
+          {isStudent && (
+            <section
+              id="profile-subjects"
+              className="space-y-4 bg-white px-4 py-5 shadow-sm"
+            >
               <div>
-                <h2 className="text-base" style={{ fontWeight: 700 }}>Materias</h2>
-                <p className="text-sm text-gray-500">Agrega las materias que quieres compartir.</p>
+                <h2 className="text-base font-semibold">Mis materias</h2>
+                <p className="mt-1 text-xs text-[#736F88]">
+                  Encuentra puntos en común con otros estudiantes.
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {subjects.map((subject) => (
-                  <Badge key={subject} className="bg-[#4F46E5] px-3 py-1 text-white">
-                    {subject}
+                  <Badge
+                    key={subject}
+                    className="max-w-full border border-[#E7E3F7] bg-[#F7F5FD] px-3 py-1 text-[#6A609A]"
+                  >
+                    <span className="min-w-0 whitespace-normal break-words">
+                      {subject}
+                    </span>
                     <button
                       type="button"
                       onClick={() => removeSubject(subject)}
-                      className="ml-2"
+                      className="ml-1 flex size-8 shrink-0 items-center justify-center rounded-lg hover:bg-[#EDE8FA]"
                       aria-label={`Quitar ${subject}`}
                     >
                       <X className="size-3" />
@@ -474,12 +650,15 @@ export function EditProfileView() {
                   </Badge>
                 ))}
                 {subjects.length === 0 && (
-                  <p className="text-sm text-gray-500">Todavia no hay materias agregadas.</p>
+                  <p className="text-sm text-gray-500">
+                    Todavía no has agregado materias.
+                  </p>
                 )}
               </div>
 
               <div className="flex gap-2">
                 <Input
+                  aria-label="Nueva materia"
                   value={newSubject}
                   onChange={(event) => setNewSubject(event.target.value)}
                   onKeyDown={(event) => {
@@ -494,7 +673,10 @@ export function EditProfileView() {
                 <button
                   type="button"
                   onClick={addSubject}
-                  className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#4F46E5] text-white"
+                  disabled={
+                    !newSubject.trim() || subjects.includes(newSubject.trim())
+                  }
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#4F46E5] text-white disabled:opacity-40"
                   aria-label="Agregar materia"
                 >
                   <Plus className="size-5" />

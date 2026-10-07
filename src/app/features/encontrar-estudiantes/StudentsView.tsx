@@ -21,8 +21,6 @@ interface StudentCard {
   bio: string;
 }
 
-const CACHE_KEY_PREFIX = "pinwi-students-cache-v1";
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function StudentsView() {
   const navigate = useNavigate();
@@ -36,60 +34,33 @@ export function StudentsView() {
   const referenceCareer = cachedUser?.profile?.career ?? "";
   const referenceUniversity = cachedUser?.profile?.university ?? "";
   const referenceSubjects = cachedUser?.profile?.subjects ?? [];
-  const cacheKey = `${CACHE_KEY_PREFIX}:${cachedUser?.id ?? "anon"}`;
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setPeople([]);
-      setPeopleError("Configura Supabase para ver estudiantes reales.");
+    let cancelled = false;
+    // Remove directory copies created before the profile-visibility controls.
+    try {
+      Object.keys(sessionStorage).filter((key) => key.startsWith("pinwi-students-cache-v1"))
+        .forEach((key) => sessionStorage.removeItem(key));
+    } catch { /* Storage may be disabled by the browser. */ }
+    setPeople([]);
+    if (!isSupabaseConfigured || !cachedUser?.id) {
+      setIsLoadingPeople(false);
       return;
     }
-
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached) as { timestamp: number; data: StudentCard[] };
-        if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
-          setPeople(parsed.data);
-          setPeopleError("");
-          return;
-        }
-      }
-    } catch {
-      sessionStorage.removeItem(cacheKey);
-    }
-
     setIsLoadingPeople(true);
     setPeopleError("");
-
-    getChatUsers({ role: "student" })
-      .then((users) => {
-        const nextPeople = users
-          .filter((user) => user.id !== cachedUser?.id)
-          .map((user) => ({
-            id: user.id,
-            name: user.name,
-            avatar: user.profile?.profile_image_url ?? "",
-            career: user.profile?.career ?? "Sin carrera",
-            university: user.profile?.university ?? "Sin institucion",
-            subjects: user.profile?.subjects ?? [],
-            bio: user.profile?.bio ?? "",
-          }));
-
-        setPeople(nextPeople);
-        sessionStorage.setItem(
-          cacheKey,
-          JSON.stringify({ timestamp: Date.now(), data: nextPeople }),
-        );
-      })
-      .catch((error) => {
-        setPeopleError(
-          error instanceof Error ? error.message : "No se pudieron cargar las personas.",
-        );
-        setPeople([]);
-      })
-      .finally(() => setIsLoadingPeople(false));
-  }, [cacheKey, cachedUser?.id]);
+    getChatUsers({ role: "student" }).then((users) => {
+      if (cancelled) return;
+      setPeople(users.filter((user) => user.id !== cachedUser.id).map((user) => ({
+        id: user.id, name: user.name, avatar: user.profile?.profile_image_url ?? "",
+        career: user.profile?.career ?? "", university: user.profile?.university ?? "",
+        subjects: user.profile?.subjects ?? [], bio: user.profile?.bio ?? "",
+      })));
+    }).catch((error) => {
+      if (!cancelled) setPeopleError(error instanceof Error ? error.message : "Error al cargar estudiantes.");
+    }).finally(() => { if (!cancelled) setIsLoadingPeople(false); });
+    return () => { cancelled = true; };
+  }, [cachedUser?.id]);
 
   const filteredStudents = people.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -127,6 +98,10 @@ export function StudentsView() {
           <h2 className="text-2xl mb-4" style={{ fontWeight: 700 }}>
             Encuentra compañeros de estudio
           </h2>
+          <p className="mb-4 text-sm text-gray-600">
+            Aquí aparecen quienes eligieron compartir su perfil académico.
+            Puedes activar o desactivar tu participación en <button type="button" onClick={() => navigate("/app/profile/edit")} className="font-medium text-[#4F46E5] underline">Editar perfil</button>.
+          </p>
 
           {/* Search bar */}
           <div className="relative mb-4">

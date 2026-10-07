@@ -52,21 +52,17 @@ export function DelegateReservations() {
     reservationId: string,
     newStatus: Extract<DelegateReservationStatus, "confirmed" | "rejected">,
   ) => {
-    const previousReservations = reservations;
+    if (savingReservationId) return;
     setSavingReservationId(reservationId);
     setErrorMessage("");
     setSuccessMessage("");
-    setReservations((current) =>
-      current.map((reservation) =>
-        reservation.id === reservationId ? { ...reservation, status: newStatus } : reservation,
-      ),
-    );
-
     try {
       await updateDelegateReservationStatus(reservationId, newStatus);
+      setReservations((current) => current.map((reservation) =>
+        reservation.id === reservationId ? { ...reservation, status: newStatus } : reservation));
       setSuccessMessage(newStatus === "confirmed" ? "Reserva confirmada." : "Reserva rechazada.");
     } catch (error) {
-      setReservations(previousReservations);
+      try { setReservations(await listCurrentDelegateReservations({ forceRefresh: true })); } catch { /* Keep the last confirmed state. */ }
       setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar la reserva.");
     } finally {
       setSavingReservationId(null);
@@ -293,7 +289,7 @@ export function DelegateReservations() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={savingReservationId === reservation.id}
+                            disabled={savingReservationId !== null}
                             onClick={() => handleStatusChange(reservation.id, "confirmed")}
                             className="flex-1 border-green-300 text-green-600 hover:bg-green-50 md:w-full"
                           >
@@ -303,7 +299,7 @@ export function DelegateReservations() {
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={savingReservationId === reservation.id}
+                            disabled={savingReservationId !== null}
                             onClick={() => handleStatusChange(reservation.id, "rejected")}
                             className="flex-1 border-red-300 text-red-600 hover:bg-red-50 md:w-full"
                           >
@@ -334,11 +330,11 @@ export function DelegateReservations() {
             <Card>
               <CardContent className="p-4">
                 <div className="mb-4 flex items-center justify-between">
-                  <button onClick={previousMonth} className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100">
+                  <button type="button" aria-label="Mes anterior" onClick={previousMonth} className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100">
                     <ChevronLeft className="size-5" />
                   </button>
                   <h4 className="font-semibold capitalize">{monthName}</h4>
-                  <button onClick={nextMonth} className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100">
+                  <button type="button" aria-label="Mes siguiente" onClick={nextMonth} className="flex size-8 items-center justify-center rounded-full hover:bg-gray-100">
                     <ChevronRight className="size-5" />
                   </button>
                 </div>
@@ -442,7 +438,7 @@ export function DelegateReservations() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={savingReservationId === reservation.id}
+                              disabled={savingReservationId !== null}
                               onClick={() => handleStatusChange(reservation.id, "confirmed")}
                               className="flex-1 border-green-300 text-green-600 hover:bg-green-50"
                             >
@@ -452,7 +448,7 @@ export function DelegateReservations() {
                             <Button
                               variant="outline"
                               size="sm"
-                              disabled={savingReservationId === reservation.id}
+                              disabled={savingReservationId !== null}
                               onClick={() => handleStatusChange(reservation.id, "rejected")}
                               className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
                             >

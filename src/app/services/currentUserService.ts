@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { getSharedProfiles } from "./sharedProfileService";
 
 const PROFILE_IMAGES_BUCKET = "profile-images";
 const UUID_PATTERN =
@@ -10,7 +11,10 @@ export interface CurrentUserProfile {
   name: string;
   role: "student" | "worker" | "admin" | "delegate";
   phone?: string | null;
+  status?: string;
+  delegateStatus?: string | null;
   profile: {
+    study_profile_visible?: boolean;
     university?: string | null;
     region_id?: string | null;
     institution_id?: string | null;
@@ -82,10 +86,8 @@ export interface ChatUser {
   profile: ChatUserProfile | null;
 }
 
-const chatUsersCache = new Map<string, { timestamp: number; users: ChatUser[] }>();
-const CHAT_USERS_CACHE_TTL_MS = 5 * 60 * 1000;
 let currentUserProfileCache: { timestamp: number; userId: string; profile: CurrentUserProfile | null } | null = null;
-let currentUserProfileRequest: Promise<CurrentUserProfile | null> | null = null;
+let profileCacheGeneration = 0;
 const CURRENT_USER_PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 const favoritePlacesCache = new Map<string, { timestamp: number; places: FavoritePlace[] }>();
 const favoritePlacesRequests = new Map<string, Promise<FavoritePlace[]>>();
@@ -93,8 +95,7 @@ const FAVORITE_PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
 export function clearCurrentUserServiceCaches() {
   currentUserProfileCache = null;
-  currentUserProfileRequest = null;
-  chatUsersCache.clear();
+  profileCacheGeneration += 1;
   favoritePlacesCache.clear();
   favoritePlacesRequests.clear();
 }
@@ -135,13 +136,23 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
     return null;
   }
 
-  const { data: appUser } = await supabase
+  const { data: appUser, error: appUserError } = await supabase
     .from("users")
-    .select("name, role, phone, avatar_url")
+    .select("name, role, status, phone, avatar_url")
     .eq("id", authData.user.id)
     .maybeSingle();
 
-  const { data: profile } = await supabase
+  if (appUserError) throw appUserError;
+  if (!appUser) throw new Error("No se encontro el perfil de la cuenta.");
+  let delegateStatus: string | null = null;
+  if (appUser.role === "delegate") {
+    const { data: delegate, error } = await supabase.from("delegates").select("status")
+      .eq("user_id", authData.user.id).maybeSingle();
+    if (error) throw error;
+    delegateStatus = delegate?.status ?? "pending";
+  }
+
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
     .select(`
       university,
@@ -156,6 +167,7 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
       industry,
       bio,
       profile_image_url,
+      study_profile_visible,
       regions:region_id(name, code),
       institutions:institution_id(name, type),
       cities:city_id(name, regions:region_id(name))
@@ -163,8 +175,12 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
     .eq("user_id", authData.user.id)
     .maybeSingle();
 
+  if (profileError) throw profileError;
+
   return {
     id: authData.user.id,
+    status: appUser.status,
+    delegateStatus,
     email: authData.user.email ?? "",
     name:
       appUser?.name ||
@@ -176,6 +192,12 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
     profile: profile
       ? {
           ...profile,
+          regions: Array.isArray(profile.regions) ? profile.regions[0] ?? null : profile.regions,
+          institutions: Array.isArray(profile.institutions) ? profile.institutions[0] ?? null : profile.institutions,
+          cities: (() => {
+            const city = Array.isArray(profile.cities) ? profile.cities[0] : profile.cities;
+            return city ? { ...city, regions: Array.isArray(city.regions) ? city.regions[0] ?? null : city.regions } : null;
+          })(),
           profile_image_url: profile.profile_image_url ?? appUser?.avatar_url ?? null,
         }
       : appUser?.avatar_url
@@ -199,28 +221,12 @@ export async function getCurrentUserProfile(options?: { forceRefresh?: boolean }
     return currentUserProfileCache.profile;
   }
 
-  if (!options?.forceRefresh && currentUserProfileRequest) {
-    return currentUserProfileRequest;
-  }
-
-  currentUserProfileRequest = fetchCurrentUserProfile()
-    .then((profile) => {
-      if (profile) {
-        currentUserProfileCache = {
-          timestamp: Date.now(),
-          userId: profile.id,
-          profile,
-        };
-      } else {
-        currentUserProfileCache = null;
-      }
-      return profile;
-    })
-    .finally(() => {
-      currentUserProfileRequest = null;
-    });
-
-  return currentUserProfileRequest;
+  const generation = profileCacheGeneration;
+  const profile = await fetchCurrentUserProfile();
+  const { data: latestSession } = await supabase.auth.getSession();
+  if (generation !== profileCacheGeneration || latestSession.session?.user.id !== sessionUserId) return null;
+  if (profile) currentUserProfileCache = { timestamp: Date.now(), userId: profile.id, profile };
+  return profile;
 }
 
 export async function updateCurrentUserProfile(input: {
@@ -263,6 +269,7 @@ export async function updateCurrentUserProfile(input: {
         industry: input.profileData.industry ?? null,
         bio: input.profileData.bio ?? null,
         profile_image_url: input.profileData.profileImageUrl ?? null,
+        study_profile_visible: input.role === "student" && input.profileData.studyProfileVisible === true,
       },
       { onConflict: "user_id" },
     );
@@ -278,6 +285,18 @@ export async function updateCurrentUserProfile(input: {
     if (avatarError) throw avatarError;
   }
 
+  currentUserProfileCache = null;
+}
+
+export async function updateStudyProfileVisibility(visible: boolean) {
+  if (!supabase) throw new Error("Supabase no está configurado.");
+  const { data, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!data.user) throw new Error("No hay un usuario autenticado.");
+  const { error } = await supabase.from("user_profiles")
+    .upsert({ user_id: data.user.id, study_profile_visible: visible }, { onConflict: "user_id" })
+    .select("user_id").single();
+  if (error) throw error;
   currentUserProfileCache = null;
 }
 
@@ -354,7 +373,7 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
   const existingRequest = favoritePlacesRequests.get(cacheKey);
   if (existingRequest) return existingRequest;
 
-  const request = supabase
+  const request = Promise.resolve(supabase
     .from("favorites")
     .select(`
       places:place_id(
@@ -373,7 +392,7 @@ export async function getCurrentUserFavoritePlaces(category?: "study" | "work") 
       )
     `)
     .eq("user_id", authData.user.id)
-    .order("created_at", { ascending: false })
+    .order("created_at", { ascending: false }))
     .then(({ data, error }) => {
       if (error) throw error;
 
@@ -399,73 +418,8 @@ export function getCachedCurrentUserFavoritePlaces(userId?: string, category?: "
 }
 
 export async function getChatUsers(options?: { role?: ChatUser["role"] }): Promise<ChatUser[]> {
-  if (!supabase) return [];
-
-  const cacheKey = options?.role ?? "all";
-  const cachedUsers = chatUsersCache.get(cacheKey);
-  if (cachedUsers && Date.now() - cachedUsers.timestamp < CHAT_USERS_CACHE_TTL_MS) {
-    return cachedUsers.users;
-  }
-
-  let query = supabase
-    .from("users")
-    .select(
-      `id,
-       name,
-       role,
-       avatar_url,
-       user_profiles(
-         career,
-         subjects,
-         university,
-         company,
-         position,
-         industry,
-         is_independent,
-         bio,
-         profile_image_url
-       )`,
-    )
-    .order("name", { ascending: true });
-
-  if (options?.role) {
-    query = query.eq("role", options.role);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-
-  const users = (data ?? []).map((row) => {
-    const profileValue = Array.isArray(row.user_profiles)
-      ? row.user_profiles[0]
-      : row.user_profiles;
-    const profileImageUrl = profileValue?.profile_image_url ?? row.avatar_url ?? null;
-
-    return {
-      id: String(row.id),
-      name: String(row.name ?? ""),
-      role: (row.role ?? "student") as ChatUser["role"],
-      profile: profileValue
-        ? {
-            career: profileValue.career ?? null,
-            subjects: profileValue.subjects ?? null,
-            university: profileValue.university ?? null,
-            company: profileValue.company ?? null,
-            position: profileValue.position ?? null,
-            industry: profileValue.industry ?? null,
-            is_independent: profileValue.is_independent ?? null,
-            bio: profileValue.bio ?? null,
-            profile_image_url: profileImageUrl,
-          }
-        : profileImageUrl
-          ? { profile_image_url: profileImageUrl }
-          : null,
-    };
-  });
-
-  chatUsersCache.set(cacheKey, { timestamp: Date.now(), users });
-  return users;
+  const users = await getSharedProfiles({ studentDirectory: options?.role === "student" });
+  return options?.role ? users.filter((user) => user.role === options.role) : users;
 }
 
 export async function getIsCurrentUserFavoritePlace(placeId: string) {

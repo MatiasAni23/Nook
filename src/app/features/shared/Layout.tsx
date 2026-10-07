@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { Map, User, Users, MessageCircle, Search } from "lucide-react";
 import { MessageNotificationBanner } from "./MessageNotificationBanner";
+import { useCurrentUser } from "../../context/CurrentUserContext";
 
 // Get user role from routes.tsx global state
 const getUserRole = (): 'student' | 'worker' | 'admin' => {
@@ -13,7 +14,8 @@ const getUserRole = (): 'student' | 'worker' | 'admin' => {
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const userRole = getUserRole();
+  const { currentUser } = useCurrentUser();
+  const userRole = currentUser?.role ?? getUserRole();
 
   // Navigation items based on user role
   const getNavItems = () => {

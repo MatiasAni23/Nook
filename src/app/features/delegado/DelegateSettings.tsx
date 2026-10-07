@@ -10,8 +10,10 @@ import { isSupabaseConfigured } from "../../lib/supabase";
 import { listCurrentDelegatePlaces, type DelegateAssignedPlace } from "../../services/adminManagementService";
 import { getCurrentUserProfile, type CurrentUserProfile } from "../../services/currentUserService";
 import { updateCurrentDelegateProfile } from "../../services/delegateService";
+import { useCurrentUser } from "../../context/CurrentUserContext";
 
 export function DelegateSettings() {
+  const { refreshCurrentUser } = useCurrentUser();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
   const [places, setPlaces] = useState<DelegateAssignedPlace[]>([]);
@@ -77,6 +79,7 @@ export function DelegateSettings() {
         name: formData.name,
         phone: formData.phone,
       });
+      await refreshCurrentUser();
       setCurrentUser((current) =>
         current
           ? {

@@ -102,7 +102,10 @@ export function DelegateMyPlaces() {
     return (
       <div className="size-full flex flex-col">
         <div className="flex-1 overflow-hidden">
-          <AdminAddPlace showPlanType={false} />
+          <AdminAddPlace showPlanType={false} onCreated={(place) => {
+            setMyPlaces((current) => [{ ...place, reservationsCount: 0 }, ...current]);
+            setView("list");
+          }} />
         </div>
         <div className="absolute top-4 left-4 z-10">
           <Button variant="outline" size="sm" onClick={() => setView("list")} className="bg-white">

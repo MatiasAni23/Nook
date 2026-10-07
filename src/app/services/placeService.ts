@@ -315,7 +315,7 @@ export function getCachedPlaces() {
 
 export async function listPlaces(options?: { forceRefresh?: boolean }): Promise<AppPlace[]> {
   const isFresh = placesCache && Date.now() - placesCache.timestamp < PLACES_CACHE_TTL_MS;
-  if (!options?.forceRefresh && isFresh) {
+  if (!options?.forceRefresh && isFresh && placesCache) {
     return placesCache.places;
   }
 
@@ -481,7 +481,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
       quietness_level: input.quietnessLevel,
       lighting_level: input.lightingLevel,
       status: "active",
-      verified: true,
+      verified: false,
       images: imageUrls,
       created_by: userData.user?.id ?? null,
     })
@@ -663,7 +663,7 @@ export async function deletePlace(placeId: string): Promise<void> {
   const { error } = await client
     .from("places")
     .update({ status: "inactive" })
-    .eq("id", placeId);
+    .eq("id", placeId).select("id").single();
 
   if (error) throw error;
 

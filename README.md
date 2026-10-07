@@ -56,13 +56,18 @@ VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
 VITE_SUPABASE_ANON_KEY=TU_ANON_KEY_O_PUBLISHABLE_KEY
 ```
 
-4. Ejecuta el schema completo listo para Supabase en `supabase/pinwi_schema_supabase.sql`.
+4. En una base **nueva y vacía**, ejecuta `supabase/schema/pinwi_schema_supabase.sql` y después los archivos de `supabase/migrations/` en orden. El schema completo borra las tablas: **no lo ejecutes en una base existente**.
+5. Para una base existente, aplica únicamente las migraciones incrementales. Los cambios actuales requieren `supabase/migrations/202610060001_delegate_integrity.sql` **antes de publicar el frontend**. Instrucciones y pruebas: [supabase/DELEGATES.md](supabase/DELEGATES.md).
 
-La autenticacion se maneja con Supabase Auth. Los datos publicos del usuario se guardan en `public.users` y el perfil extendido en `public.user_profiles`.
+El 6 de octubre de 2026 se vinculó este repositorio al proyecto de la app y se aplicó esa migración por consola. La estructura real, los resultados y los pendientes están en [supabase/REMOTE_REVIEW.md](supabase/REMOTE_REVIEW.md). La CLI permite consultar la base y publicar migraciones/funciones; sus comandos están en la guía de delegados.
+
+La autenticacion se maneja con Supabase Auth. La cuenta privada se guarda en `public.users` y el perfil extendido privado en `public.user_profiles`. Chats, reservas y directorio usan una RPC de perfiles compartidos con campos limitados. Aparecer en el directorio académico requiere activarlo desde Editar perfil.
+
+También se aplicó la migración `202610060002_private_profiles_messages.sql`: restringe perfiles y mensajes, habilita notificaciones en Realtime y evita registros de delegado incompletos. El frontend local ya está adaptado; publicar ambos cambios de la app antes de probar el recorrido alojado. Los SQL están ordenados en `supabase/schema/` y los inventarios reales en `supabase/schema/private/`, excluido de Git.
 
 No pongas la `service_role key` en el frontend. Solo se usa la anon key o publishable key.
 
-Notas de revision del schema: `supabase/SCHEMA_REVIEW.md`.
+Notas de revision del schema: `supabase/schema/SCHEMA_REVIEW.md`.
 
 ## Estructura principal
 

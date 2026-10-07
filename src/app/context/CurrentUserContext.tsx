@@ -65,7 +65,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     setIsLoadingCurrentUser(true);
 
     try {
-      const freshUser = await getCurrentUserProfile();
+      const freshUser = await getCurrentUserProfile({ forceRefresh: true });
       setCurrentUser(freshUser);
       return freshUser;
     } finally {
@@ -79,7 +79,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    refreshCurrentUser();
+    void refreshCurrentUser().catch(() => clearCurrentUser());
 
     if (!supabase) return;
 
@@ -90,7 +90,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       }
 
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        refreshCurrentUser();
+        void refreshCurrentUser().catch(() => clearCurrentUser());
       }
     });
 
@@ -105,7 +105,8 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const channel = supabase.channel("online-users", {
+    const client = supabase;
+    const channel = client.channel("online-users", {
       config: {
         presence: {
           key: currentUser.id,
@@ -127,7 +128,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      supabase.removeChannel(channel);
+      client.removeChannel(channel);
       setOnlineUserIds(new Set());
     };
   }, [currentUser?.id]);

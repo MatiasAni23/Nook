@@ -1,6 +1,8 @@
 -- =============================================
 -- PINWI - Database
 -- IMPORTANTE: este script elimina y vuelve a crear las tablas.
+-- Solo para una base vacia. Despues aplicar supabase/migrations/ en orden.
+-- Para una base existente usar unicamente las migraciones incrementales.
 -- =============================================
 
 BEGIN;
@@ -1731,7 +1733,7 @@ BEGIN
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
         NEW.raw_user_meta_data->>'phone',
-        COALESCE(NEW.raw_user_meta_data->>'role', 'student'),
+        CASE WHEN NEW.raw_user_meta_data->>'role' = 'worker' THEN 'worker' ELSE 'student' END,
         'active',
         FALSE,
         NEW.email_confirmed_at IS NOT NULL
@@ -1789,7 +1791,7 @@ SELECT
     au.email,
     COALESCE(au.raw_user_meta_data->>'full_name', ''),
     au.raw_user_meta_data->>'phone',
-    COALESCE(au.raw_user_meta_data->>'role', 'student'),
+    CASE WHEN au.raw_user_meta_data->>'role' = 'worker' THEN 'worker' ELSE 'student' END,
     'active',
     FALSE,
     au.email_confirmed_at IS NOT NULL

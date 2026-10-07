@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
+import { getSharedProfiles } from "./sharedProfileService";
 import { listCurrentDelegatePlaces, type DelegateAssignedPlace } from "./adminManagementService";
-import { getCurrentUserProfile, type CurrentUserProfile } from "./currentUserService";
+import { getCurrentUserProfile, clearCurrentUserServiceCaches, type CurrentUserProfile } from "./currentUserService";
 
 export type DelegateReservationStatus = "pending" | "confirmed" | "rejected" | "cancelled" | "completed";
 
@@ -26,13 +27,6 @@ export interface DelegateDashboardData {
   subscriptionActive: boolean;
 }
 
-const DELEGATE_CACHE_TTL_MS = 5 * 60 * 1000;
-
-let reservationsCache: { timestamp: number; userId: string; reservations: DelegateReservation[] } | null = null;
-let reservationsRequest: Promise<{ userId: string; reservations: DelegateReservation[] }> | null = null;
-let dashboardCache: { timestamp: number; userId: string; dashboard: DelegateDashboardData } | null = null;
-let dashboardRequest: Promise<{ userId: string; dashboard: DelegateDashboardData }> | null = null;
-
 function requireSupabase() {
   if (!supabase) {
     throw new Error("Faltan variables de Supabase en .env.");
@@ -49,7 +43,7 @@ function toReservationDates(value: unknown): Date[] {
   if (!Array.isArray(value)) return [];
   return value
     .map((date) => (typeof date === "string" ? new Date(`${date}T00:00:00`) : null))
-    .filter((date): date is Date => Boolean(date) && !Number.isNaN(date.getTime()));
+    .filter((date): date is Date => date !== null && !Number.isNaN(date.getTime()));
 }
 
 function normalizePaymentMethod(value: string | null | undefined, amount: number) {
@@ -63,29 +57,17 @@ function getRelatedSingle<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-export async function getCurrentDelegateSubscription(options?: { forceRefresh?: boolean }) {
+export async function getCurrentDelegateSubscription(_options?: { forceRefresh?: boolean }) {
   const client = requireSupabase();
-  const { data: userData, error: userError } = await client.auth.getUser();
-
-  if (userError) throw userError;
-  if (!userData.user) throw new Error("No hay un usuario autenticado.");
-
-  if (
-    !options?.forceRefresh &&
-    dashboardCache?.userId === userData.user.id &&
-    Date.now() - dashboardCache.timestamp < DELEGATE_CACHE_TTL_MS
-  ) {
-    return dashboardCache.dashboard.subscriptionActive;
-  }
-
-  const { data, error } = await client
-    .from("delegates")
-    .select("subscription_active")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-
+  const { data: auth, error: authError } = await client.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user) throw new Error("No hay un usuario autenticado.");
+  const { data, error } = await client.from("delegates").select("subscription_active, status, users:user_id(role, status)")
+    .eq("user_id", auth.user.id).maybeSingle();
   if (error) throw error;
-  return Boolean(data?.subscription_active);
+  const account = getRelatedSingle(data?.users);
+  return data?.status === "active" && account?.role === "delegate" &&
+    ["active", "verified"].includes(account.status) && Boolean(data.subscription_active);
 }
 
 async function fetchCurrentDelegateReservations(): Promise<{ userId: string; reservations: DelegateReservation[] }> {
@@ -116,7 +98,6 @@ async function fetchCurrentDelegateReservations(): Promise<{ userId: string; res
       total_amount,
       payment_method,
       created_at,
-      users:user_id(name, email),
       places:place_id(name)
     `,
     )
@@ -125,15 +106,16 @@ async function fetchCurrentDelegateReservations(): Promise<{ userId: string; res
 
   if (error) throw error;
 
+  const sharedProfiles = await getSharedProfiles({ ids: (data ?? []).map((row) => String(row.user_id)) });
+  const userNames = new Map(sharedProfiles.map((profile) => [profile.id, profile.name]));
   const reservations = (data ?? []).map((row) => {
     const amount = Number(row.total_amount ?? 0);
-    const reservedUser = getRelatedSingle(row.users);
     const place = getRelatedSingle(row.places);
 
     return {
       id: String(row.id),
       userId: String(row.user_id),
-      userName: String(reservedUser?.name ?? reservedUser?.email ?? "Usuario"),
+      userName: userNames.get(String(row.user_id)) ?? "Usuario",
       placeId: String(row.place_id),
       placeName: String(place?.name ?? "Lugar"),
       dates: toReservationDates(row.reservation_dates),
@@ -149,143 +131,35 @@ async function fetchCurrentDelegateReservations(): Promise<{ userId: string; res
   return { userId: userData.user.id, reservations };
 }
 
-export async function listCurrentDelegateReservations(options?: { forceRefresh?: boolean }) {
-  const client = requireSupabase();
-  const { data: userData, error: userError } = await client.auth.getUser();
-
-  if (userError) throw userError;
-  if (!userData.user) throw new Error("No hay un usuario autenticado.");
-
-  if (
-    !options?.forceRefresh &&
-    reservationsCache &&
-    reservationsCache.userId === userData.user.id &&
-    Date.now() - reservationsCache.timestamp < DELEGATE_CACHE_TTL_MS
-  ) {
-    return reservationsCache.reservations;
-  }
-
-  if (!options?.forceRefresh && reservationsRequest) {
-    const result = await reservationsRequest;
-    return result.reservations;
-  }
-
-  reservationsRequest = fetchCurrentDelegateReservations()
-    .then((result) => {
-      reservationsCache = {
-        timestamp: Date.now(),
-        userId: result.userId,
-        reservations: result.reservations,
-      };
-      return result;
-    })
-    .finally(() => {
-      reservationsRequest = null;
-    });
-
-  const result = await reservationsRequest;
-  return result.reservations;
+export async function listCurrentDelegateReservations(_options?: { forceRefresh?: boolean }) {
+  return (await fetchCurrentDelegateReservations()).reservations;
 }
 
 export async function getCurrentDelegateDashboard(options?: { forceRefresh?: boolean }): Promise<DelegateDashboardData> {
-  const client = requireSupabase();
-  const { data: sessionData } = await client.auth.getSession();
-  const sessionUserId = sessionData.session?.user.id;
-
-  if (
-    !options?.forceRefresh &&
-    sessionUserId &&
-    dashboardCache?.userId === sessionUserId &&
-    Date.now() - dashboardCache.timestamp < DELEGATE_CACHE_TTL_MS
-  ) {
-    return dashboardCache.dashboard;
-  }
-
-  if (!options?.forceRefresh && dashboardRequest) {
-    const result = await dashboardRequest;
-    return result.dashboard;
-  }
-
-  dashboardRequest = Promise.all([
-    getCurrentUserProfile(options),
-    listCurrentDelegatePlaces(options),
-    listCurrentDelegateReservations(options),
-    getCurrentDelegateSubscription(options),
-  ])
-    .then(([profile, places, reservations, subscriptionActive]) => {
-      const userId = profile?.id ?? sessionUserId;
-      if (!userId) throw new Error("No hay un usuario autenticado.");
-
-      const dashboard = { profile, places, reservations, subscriptionActive };
-      dashboardCache = {
-        timestamp: Date.now(),
-        userId,
-        dashboard,
-      };
-      return { userId, dashboard };
-    })
-    .finally(() => {
-      dashboardRequest = null;
-    });
-
-  const result = await dashboardRequest;
-  return result.dashboard;
+  const [profile, places, reservations, subscriptionActive] = await Promise.all([
+    getCurrentUserProfile({ forceRefresh: true }), listCurrentDelegatePlaces(options),
+    listCurrentDelegateReservations(options), getCurrentDelegateSubscription(options),
+  ]);
+  if (!profile) throw new Error("No hay un usuario autenticado.");
+  return { profile, places, reservations, subscriptionActive };
 }
 
-export async function getFreshCurrentDelegateDashboard(): Promise<DelegateDashboardData> {
-  const [profile, places, reservations] = await Promise.all([
-    getCurrentUserProfile({ forceRefresh: true }),
-    listCurrentDelegatePlaces({ forceRefresh: true }),
-    listCurrentDelegateReservations({ forceRefresh: true }),
-  ]);
-  const subscriptionActive = await getCurrentDelegateSubscription({ forceRefresh: true });
-
-  const dashboard = { profile, places, reservations, subscriptionActive };
-  if (profile) {
-    dashboardCache = {
-      timestamp: Date.now(),
-      userId: profile.id,
-      dashboard,
-    };
-  }
-  return dashboard;
+export async function getFreshCurrentDelegateDashboard() {
+  return getCurrentDelegateDashboard({ forceRefresh: true });
 }
 
 export async function updateDelegateReservationStatus(
   reservationId: string,
   status: Extract<DelegateReservationStatus, "confirmed" | "rejected" | "cancelled" | "completed">,
 ) {
-  const client = requireSupabase();
-  const { error } = await client
-    .from("reservations")
-    .update({ status })
-    .eq("id", reservationId);
-
+  const { error } = await requireSupabase().rpc("transition_delegate_reservation", {
+    target_reservation_id: reservationId, next_status: status,
+  });
   if (error) throw error;
-
-  if (reservationsCache) {
-    reservationsCache = {
-      ...reservationsCache,
-      reservations: reservationsCache.reservations.map((reservation) =>
-        reservation.id === reservationId ? { ...reservation, status } : reservation,
-      ),
-    };
-  }
-
-  if (dashboardCache) {
-    dashboardCache = {
-      ...dashboardCache,
-      dashboard: {
-        ...dashboardCache.dashboard,
-        reservations: dashboardCache.dashboard.reservations.map((reservation) =>
-          reservation.id === reservationId ? { ...reservation, status } : reservation,
-        ),
-      },
-    };
-  }
 }
 
 export async function updateCurrentDelegateProfile(input: { name: string; phone: string }) {
+  if (!input.name.trim()) throw new Error("El nombre no puede quedar vacio.");
   const client = requireSupabase();
   const { data: userData, error: userError } = await client.auth.getUser();
 
@@ -298,28 +172,13 @@ export async function updateCurrentDelegateProfile(input: { name: string; phone:
       name: input.name.trim(),
       phone: input.phone.trim() || null,
     })
-    .eq("id", userData.user.id);
+    .eq("id", userData.user.id).select("id").single();
 
   if (error) throw error;
 
-  if (dashboardCache?.dashboard.profile) {
-    dashboardCache = {
-      ...dashboardCache,
-      dashboard: {
-        ...dashboardCache.dashboard,
-        profile: {
-          ...dashboardCache.dashboard.profile,
-          name: input.name.trim(),
-          phone: input.phone.trim() || null,
-        },
-      },
-    };
-  }
+  clearCurrentUserServiceCaches();
 }
 
 export function clearDelegateServiceCache() {
-  reservationsCache = null;
-  reservationsRequest = null;
-  dashboardCache = null;
-  dashboardRequest = null;
+  // Retained for the shared sign-out cleanup API; delegate records are read fresh.
 }

@@ -132,6 +132,15 @@ function PrivateRoute({
     return <Navigate to="/" replace />;
   }
 
+  if ((currentUser.status && !["active", "verified"].includes(currentUser.status)) ||
+      (currentUser.role === "delegate" && currentUser.delegateStatus !== "active")) {
+    return <div className="min-h-dvh grid place-items-center p-6"><div className="max-w-md space-y-4 text-center">
+      <h1 className="text-xl font-semibold">Acceso pendiente o suspendido</h1>
+      <p>Tu cuenta no tiene acceso activo. Contacta al administrador para revisar su estado.</p>
+      <button type="button" className="rounded-lg bg-indigo-600 px-5 py-3 text-white" onClick={() => void logoutAndRedirect()}>Cerrar sesion</button>
+    </div></div>;
+  }
+
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
     return <Navigate to="/" replace />;
   }
@@ -157,7 +166,7 @@ function AuthWrapper() {
     setUserName(appUser?.name ?? fallbackName);
     setNeedsProfileSetup(!appUser?.profile_completed && role !== "admin" && role !== "delegate");
 
-    const profile = await getCurrentUserProfile();
+    const profile = await getCurrentUserProfile({ forceRefresh: true });
     if (profile) {
       setCurrentUser(profile);
     }

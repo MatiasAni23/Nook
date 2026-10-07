@@ -1,3 +1,4 @@
+import { demoPlaces } from "../../data/demoPlaces";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Edit, MapPin, Plus, Search, Star, Trash2, Wifi } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -77,10 +78,7 @@ export function AdminManagePlaces() {
     };
   }, []);
 
-  const mockPlaces = [
-    ...studyPlaces.map((place) => ({ ...place, category: "study" as const, planType: "basic" as const, images: [], amenities: [] })),
-    ...workPlaces.map((place) => ({ ...place, category: "work" as const, planType: "basic" as const, outlets: false, images: [], amenities: [] })),
-  ];
+  const mockPlaces = demoPlaces;
   const allPlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
 
   const filteredPlaces = allPlaces.filter((place) => {

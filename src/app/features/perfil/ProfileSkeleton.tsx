@@ -1,60 +1,30 @@
-import { Card, CardContent } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
 
 export function ProfileSkeleton() {
   return (
-    <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto pb-20">
-        <div className="bg-white px-4 pb-6 pt-8">
-          <div className="mb-6 flex items-center justify-between">
-            <Skeleton className="h-7 w-28" />
-            <Skeleton className="h-10 w-24 rounded-full" />
-          </div>
-
-          <div className="mb-6 flex items-center gap-4">
-            <Skeleton className="size-24 rounded-full" />
-            <div className="flex-1 space-y-3">
-              <Skeleton className="h-5 w-40" />
-              <Skeleton className="h-4 w-24" />
+    <div
+      className="size-full overflow-y-auto bg-[#F8F9FC]"
+      role="status"
+      aria-label="Cargando perfil"
+    >
+      <div className="mx-auto max-w-5xl space-y-6 px-4 pb-32 pt-8 sm:px-8 sm:pt-10">
+        <Skeleton className="h-10 w-40 rounded-xl" />
+        <div className="overflow-hidden rounded-3xl border border-[#E9EAF2] bg-white">
+          <Skeleton className="h-24 w-full rounded-none" />
+          <div className="space-y-5 px-6 pb-8">
+            <Skeleton className="-mt-10 size-24 rounded-full border-4 border-white" />
+            <Skeleton className="h-7 w-48 max-w-full" />
+            <Skeleton className="h-4 w-80 max-w-full" />
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-xl" />
+              ))}
             </div>
           </div>
-
-          <Skeleton className="mb-4 h-14 w-full" />
-          <div className="space-y-3">
-            <Skeleton className="h-5 w-56" />
-            <Skeleton className="h-5 w-48" />
-          </div>
         </div>
-
-        <div className="px-4 py-4">
-          <div className="grid grid-cols-3 gap-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <Card key={`profile-stat-skeleton-${index}`} className="border-0 bg-white shadow-sm">
-                <CardContent className="space-y-2 pb-3 pt-4 text-center">
-                  <Skeleton className="mx-auto h-7 w-10" />
-                  <Skeleton className="mx-auto h-3 w-20" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-3 px-4 pb-4">
-          <Skeleton className="h-6 w-36" />
-          {Array.from({ length: 2 }).map((_, index) => (
-            <Card key={`profile-list-skeleton-${index}`} className="overflow-hidden border-0 bg-white shadow-sm">
-              <CardContent className="p-3">
-                <div className="flex gap-3">
-                  <Skeleton className="size-20 rounded-xl" />
-                  <div className="flex-1 space-y-3">
-                    <Skeleton className="h-4 w-40" />
-                    <Skeleton className="h-3 w-32" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <Skeleton className="h-72 w-full rounded-3xl" />
+          <Skeleton className="h-52 w-full rounded-3xl" />
         </div>
       </div>
     </div>

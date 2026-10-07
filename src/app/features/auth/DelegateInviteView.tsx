@@ -159,7 +159,7 @@ export function DelegateInviteView() {
 
       if (existingUser && hasInviteSession) {
         await updateRecoveredPassword(password);
-        await ensureAppUserRecord(existingUser, "delegate");
+        await ensureAppUserRecord(existingUser);
         await claimDelegateInvitation(token);
         setStep("done");
         return;
@@ -170,12 +170,12 @@ export function DelegateInviteView() {
         email: invitation.email,
         phone: invitation.phone ?? "",
         password,
-        role: "delegate",
+        role: "student",
         emailRedirectTo: `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
       });
 
       if (session && user) {
-        await ensureAppUserRecord(user, "delegate");
+        await ensureAppUserRecord(user);
         await claimDelegateInvitation(token);
         setStep("done");
         return;
@@ -206,7 +206,7 @@ export function DelegateInviteView() {
     try {
       const { user } = await verifySignupCode(invitation.email, cleanCode);
       if (user) {
-        await ensureAppUserRecord(user, "delegate");
+        await ensureAppUserRecord(user);
       }
       await claimDelegateInvitation(token);
       setStep("done");

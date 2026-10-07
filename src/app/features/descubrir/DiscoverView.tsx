@@ -1,3 +1,4 @@
+import { demoPlaces } from "../../data/demoPlaces";
 import { BrandLogo } from "../../components/BrandLogo";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -176,25 +177,7 @@ export function DiscoverView() {
   };
 
   // Dataset local usado cuando Supabase no esta disponible.
-  const mockPlaces = useMemo(
-    () => [
-      ...studyPlaces.map((place) => ({
-        ...place,
-        category: "study" as const,
-        planType: "basic" as const,
-        images: [],
-        amenities: [],
-      })),
-      ...workPlaces.map((place) => ({
-        ...place,
-        category: "work" as const,
-        planType: "basic" as const,
-        images: [],
-        amenities: [],
-      })),
-    ],
-    [],
-  );
+  const mockPlaces = demoPlaces;
   const basePlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
 
   // La sección se filtra y luego se ordena por la distancia a la ubicación actual.

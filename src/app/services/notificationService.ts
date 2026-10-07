@@ -123,7 +123,8 @@ export async function markAllNotificationsAsRead() {
 export function subscribeToNotifications(userId: string, onChange: () => void) {
   if (!isSupabaseConfigured || !supabase) return () => undefined;
 
-  const channel = supabase.channel(`notifications-${userId}-${crypto.randomUUID()}`);
+  const client = supabase;
+  const channel = client.channel(`notifications-${userId}-${crypto.randomUUID()}`);
 
   channel.on(
     "postgres_changes",
@@ -134,6 +135,6 @@ export function subscribeToNotifications(userId: string, onChange: () => void) {
   channel.subscribe();
 
   return () => {
-    supabase.removeChannel(channel);
+    client.removeChannel(channel);
   };
 }

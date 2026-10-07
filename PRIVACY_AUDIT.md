@@ -1,6 +1,6 @@
 # Auditoría de Pinwi: privacidad, seguridad y preparación para diciembre
 
-Fecha: 6 de octubre de 2026. Alcance: revisión estática del repositorio, esquema SQL y funciones Edge, auditoría de dependencias y comprobación local de los documentos legales. No se accedió a cuentas reales, datos de usuarios, contratos de proveedores ni configuración del Supabase o alojamiento desplegados. No se ejecutaron pruebas de ataque ni migraciones sobre una base real.
+Fecha: 6 de octubre de 2026. Alcance inicial: revisión estática del repositorio, esquema SQL y funciones Edge, auditoría de dependencias y comprobación local de los documentos legales. En esa etapa no se accedió a cuentas reales, datos de usuarios, contratos de proveedores ni configuración del Supabase o alojamiento desplegados. La consulta posterior de estructura remota y la aplicación de la migración se documentan en [supabase/REMOTE_REVIEW.md](supabase/REMOTE_REVIEW.md); se consultaron metadatos y recuentos agregados, sin extraer datos personales de las cuentas.
 
 ## Resultado y referencia normativa
 
@@ -10,11 +10,35 @@ La Ley 21.719 reforma la Ley 19.628 y entra en vigor el **1 de diciembre de 2026
 
 Prioridades: **P0** bloquea el uso de datos reales; **P1** debe resolverse antes de publicación y de diciembre; **P2** mejora operativa. Una prioridad técnica no equivale a una declaración de infracción o sanción administrativa.
 
-## Hallazgos y acciones
+## Seguimiento de correcciones: 6 de octubre de 2026
+
+La evidencia original de abajo se conserva como fotografía de la auditoría inicial. Se preparó después la migración incremental `supabase/migrations/202610060001_delegate_integrity.sql` y se adaptó el frontend. La migración **ya se aplicó a Supabase remoto** mediante la CLI y quedó registrada como `202610060001`. Se comprobaron sus funciones, grants y políticas finales; se conservan los recuentos de registros y los roles/estados existentes. También se publicó la función de invitaciones en versión 10. A01 y A02 tienen corrección y pruebas de autorización; falta el recorrido autenticado completo con el frontend publicado. A04 tiene corregida la actualización de estados de reservas; mensajes, creación de reservas, precios y cobros siguen pendientes.
+
+La lógica de delegados ahora guarda rol/asignaciones de forma atómica, exige invitaciones con correo confirmado, conserva asignaciones en invitaciones adicionales y restaura el rol anterior al retirar a un delegado. Las cuentas pendientes, suspendidas o bloqueadas no pueden gestionar lugares. Se preserva la unidad de facturación de los espacios al editarlos.
+
+Verificación local: `npm run typecheck` pasó de 35 errores a cero; `npm test` ejecuta escenarios contra PostgreSQL aislado con RLS real, incluida una falla posterior al borrado de asignaciones para comprobar rollback y la conservación de los contadores de reseñas/favoritos al restringir permisos. `npm run build` compila y mantiene la advertencia de tamaño de bundle. Se corrigieron también el esqueleto del chat, promesas de consultas y tipos de los datos demo. React Router quedó en 7.18.4 y Vite en 6.4.4, con parches transitivos compatibles: `npm audit` informó cero vulnerabilidades tras la actualización. Esto no significa ausencia de fallos de seguridad en la app.
+
+La revisión de navegador comprobó el acceso demo y la navegación a lugares y reservas en escritorio y móvil, sin errores de ejecución; la vista móvil de lugares no presentó desbordamiento horizontal. Se hizo en un servidor local con Supabase desactivado explícitamente, por lo que no acredita el flujo remoto autenticado ni la entrega de invitaciones.
+
+La suite completa actual suma quince pruebas: catorce de PostgreSQL y una de los servicios reales con HTTP simulado que verifica el cambio de estudiante a delegado después de aceptar una invitación, sin conservar el rol anterior en caché. Las quince pasaron. Incluyen compatibilidad con el retorno antiguo de la RPC y controles sobre helpers adicionales encontrados en la base remota.
+
+Activación y límites: [supabase/DELEGATES.md](supabase/DELEGATES.md). La migración está aplicada; corresponde publicar el frontend actualizado y probar Auth/Storage/Brevo con cuentas de prueba, revisar cuentas privilegiadas existentes y el rol anterior de delegados históricos. La revisión remota confirmó políticas adicionales que exponen las filas completas de estudiantes, una cuenta con rol delegado sin su registro asociado y la ausencia de `notifications` en la publicación Realtime. Permanecen abiertos A03, los demás componentes de A04 y A05–A14 salvo los puntos técnicos indicados. La revisión legal y las obligaciones operativas no cambian.
+
+## Correcciones posteriores de perfiles, mensajes y notificaciones
+
+Se aplicó y registró en Supabase `202610060002_private_profiles_messages.sql`. La lectura de `users` y `user_profiles` quedó limitada a propietario/administrador activo; directorio, chats y reservas usan una RPC con campos limitados. El perfil académico está oculto por defecto y se activa o revoca expresamente desde Editar perfil, sin exigir completar otros campos. No se aceptaron elecciones en nombre de cuentas existentes. No hay registro jurídico completo de consentimientos/versiones; el control implementado es una preferencia funcional de visibilidad.
+
+Se protege la integridad del contenido y autoría de mensajes, se restringen las marcas por participante y se fijan los tiempos de lectura en servidor. Las notificaciones se publican en Realtime, con contenido protegido y lectura por destinatario. La cuenta de delegado incompleta recibió un registro pendiente sin permisos nuevos, y las futuras inconsistencias se rechazan al finalizar la transacción.
+
+Verificación: 29 pruebas aprobadas, TypeScript y build aprobados; interfaz de escritorio/móvil comprobada con HTTP interceptado. Se verificaron la estructura, permisos y denegaciones anónimas contra Supabase real, sin extraer datos personales. La entrega Realtime entre sesiones autenticadas y el frontend alojado requieren probarse después del deploy. Los resultados reales se guardan en `supabase/schema/private/`, ignorado por Git. Detalle actualizado: [supabase/REMOTE_REVIEW.md](supabase/REMOTE_REVIEW.md).
+
+Esto corrige la lectura de cuentas/perfiles de A03 y la integridad de mensajes de A04. A03 sigue abierto para reportes comunitarios; A04 para creación de reservas, precios y pagos. Permanecen los demás pendientes operativos y legales indicados en la auditoría.
+
+## Hallazgos y acciones originales
 
 ### A01 · P0 · Elevación de privilegios mediante el propio perfil
 
-Evidencia: `supabase/pinwi_schema_supabase.sql:973` concede INSERT y UPDATE de toda la tabla `users`; las políticas `users_insert_own` y `users_update_own` sólo comprueban el ID. `is_current_user_admin()` confía en `users.role`. El trigger `handle_new_auth_user`, línea 1734, y la sincronización final, línea 1792, toman el rol de metadatos modificables por el cliente. `authService.ts` también envía y actualiza el rol desde el navegador.
+Evidencia: `supabase/schema/pinwi_schema_supabase.sql:973` concede INSERT y UPDATE de toda la tabla `users`; las políticas `users_insert_own` y `users_update_own` sólo comprueban el ID. `is_current_user_admin()` confía en `users.role`. El trigger `handle_new_auth_user`, línea 1734, y la sincronización final, línea 1792, toman el rol de metadatos modificables por el cliente. `authService.ts` también envía y actualiza el rol desde el navegador.
 
 Consecuencia: con este esquema un usuario autenticado puede intentar asignarse `admin`, alterar estado o verificación y acceder a funciones privilegiadas. Ocultar botones en React no lo evita.
 

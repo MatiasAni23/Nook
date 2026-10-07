@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
     const { data: callerProfile, error: callerProfileError } = await adminClient
       .from("users")
-      .select("role")
+      .select("role, status")
       .eq("id", callerData.user.id)
       .maybeSingle();
 
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       console.error("Could not load caller profile", callerProfileError);
       return jsonResponse({ error: "caller_profile_failed", message: callerProfileError.message }, 500);
     }
-    if (callerProfile?.role !== "admin") {
+    if (callerProfile?.role !== "admin" || !["active", "verified"].includes(callerProfile.status)) {
       console.error("Caller is not admin", { userId: callerData.user.id, role: callerProfile?.role ?? null });
       return jsonResponse({ error: "forbidden" }, 403);
     }
