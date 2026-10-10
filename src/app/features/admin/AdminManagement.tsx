@@ -1,5 +1,5 @@
 ﻿import { useSearchParams } from "react-router";
-import { Users, UserCog, Headphones, Calendar, Flag } from "lucide-react";
+import { Users, UserCog, Headphones, Calendar, Flag, Globe } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -12,6 +12,7 @@ import { AdminSupport } from "./AdminSupport";
 import { AdminReservations } from "./AdminReservations";
 import { AdminReports } from "./AdminReports";
 import { AdminPageHeading } from "./AdminUi";
+import { AdminSiteSettings } from "./AdminSiteSettings";
 
 const sections = [
   {
@@ -54,6 +55,7 @@ const sections = [
     icon: Flag,
     Component: AdminReports,
   },
+  { value: "site", label: "Sitio público", description: "Redes y contacto", tone: "violet", icon: Globe, Component: AdminSiteSettings },
 ];
 
 export function AdminManagement() {

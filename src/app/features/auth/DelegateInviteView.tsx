@@ -382,7 +382,7 @@ export function DelegateInviteView() {
                 <h2 className="text-lg font-semibold">Cuenta de delegado activa</h2>
                 <p className="mt-1 text-sm text-gray-600">Ya puedes iniciar sesion y gestionar tus lugares asignados.</p>
               </div>
-              <Button onClick={() => navigate("/")} className="w-full bg-[#4F46E5] hover:bg-[#4338CA]">
+              <Button onClick={() => navigate("/iniciar-sesion")} className="w-full bg-[#4F46E5] hover:bg-[#4338CA]">
                 Continuar
               </Button>
             </div>

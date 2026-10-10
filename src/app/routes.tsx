@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, useLocation, useSearchParams } from "react-router";
 import { AdminHome } from "./features/admin/AdminHome";
 import { AdminLayout } from "./features/admin/AdminLayout";
 import { AdminManagement } from "./features/admin/AdminManagement";
@@ -27,6 +27,9 @@ import { PlaceDetails } from "./features/mapa/PlaceDetails";
 import { EditProfileView } from "./features/perfil/EditProfileView";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
 import { Layout } from "./features/shared/Layout";
+import { LandingPage } from "./features/landing/LandingPage";
+import { authLink, destinationAfterLogin, safeAppDestination, verificationLink } from "./features/auth/authNavigation";
+import { getDemoSession, setDemoSession } from "./services/demoSessionService";
 import { isSupabaseConfigured } from "./lib/supabase";
 import { LegalDocumentPage } from "./features/auth/LegalDocumentPage";
 import { clearAppCaches } from "./services/appCacheService";
@@ -75,6 +78,7 @@ function PrivateRoute({
   allowedRoles?: UserRole[];
   children: ReactNode;
 }) {
+  const location = useLocation();
   const { clearCurrentUser, currentUser, isLoadingCurrentUser } = useCurrentUser();
   const [hasSession, setHasSession] = useState<boolean | null>(
     isSupabaseConfigured ? null : true,
@@ -118,10 +122,15 @@ function PrivateRoute({
     }
   }, [currentUser?.role]);
 
-  if (!isSupabaseConfigured) return <>{children}</>;
+  if (!isSupabaseConfigured) {
+    const demo = getDemoSession();
+    if (!demo) return <Navigate to={authLink(location.pathname)} replace />;
+    if (allowedRoles && !allowedRoles.includes(demo.role)) return <Navigate to={destinationAfterLogin(demo.role)} replace />;
+    return <>{children}</>;
+  }
 
   if (hasSession === false) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={authLink(location.pathname)} replace />;
   }
 
   if (hasSession === null || (isLoadingCurrentUser && !currentUser)) {
@@ -129,7 +138,7 @@ function PrivateRoute({
   }
 
   if (!currentUser) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={authLink(location.pathname)} replace />;
   }
 
   if ((currentUser.status && !["active", "verified"].includes(currentUser.status)) ||
@@ -142,16 +151,18 @@ function PrivateRoute({
   }
 
   if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={destinationAfterLogin(currentUser.role)} replace />;
   }
 
   return <>{children}</>;
 }
 
 function AuthWrapper() {
+  const [params] = useSearchParams();
+  const demo = !isSupabaseConfigured ? getDemoSession() : null;
   const { clearCurrentUser, refreshCurrentUser, setCurrentUser } = useCurrentUser();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<UserRole>("student");
+  const [isAuthenticated, setIsAuthenticated] = useState(Boolean(demo));
+  const [userRole, setUserRole] = useState<UserRole>(demo?.role ?? "student");
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [userName, setUserName] = useState("");
   const [isInitializing, setIsInitializing] = useState(isSupabaseConfigured);
@@ -193,6 +204,8 @@ function AuthWrapper() {
   }, []);
 
   const handleDemoLogin = (email: string, password: string) => {
+    const role = email === "admin@pinwi.cl" && password === "admin123" ? "admin" : email === "delegado@demo.cl" && password === "delegado123" ? "delegate" : email === "trabajador@demo.cl" && password === "trabajador123" ? "worker" : "student";
+    setDemoSession(role);
     if (email === "admin@pinwi.cl" && password === "admin123") {
       setIsAuthenticated(true);
       setUserRole("admin");
@@ -250,7 +263,7 @@ function AuthWrapper() {
       return { email, needsEmailVerification: false };
     }
 
-    const { user, session } = await signUpWithEmail({ name, email, phone, password });
+    const { user, session } = await signUpWithEmail({ name, email, phone, password, emailRedirectTo: window.location.origin + verificationLink(params.get("continuar")) });
 
     if (!user) {
       throw new Error("No se pudo crear la cuenta.");
@@ -273,6 +286,8 @@ function AuthWrapper() {
   const handleProfileSetup = async (role: "student" | "worker", profileData: any) => {
     if (isSupabaseConfigured) {
       await saveProfileSetup({ role, profileData });
+    } else {
+      setDemoSession(role, userName);
     }
 
     setUserRole(role);
@@ -301,7 +316,7 @@ function AuthWrapper() {
   }
 
   if (!isAuthenticated) {
-    return <LoginView onLogin={handleLogin} onRegister={handleRegister} />;
+    return <LoginView key={params.get("registro") === "1" ? "register" : "login"} initialTab={params.get("registro") === "1" ? "register" : "login"} returnTo={safeAppDestination(params.get("continuar"))} onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
   if (needsProfileSetup) {
@@ -316,7 +331,7 @@ function AuthWrapper() {
     return <Navigate to="/delegate" replace />;
   }
 
-  return <Navigate to="/app/discover" replace />;
+  return <Navigate to={destinationAfterLogin(userRole, params.get("continuar"))} replace />;
 }
 
 export const router = createBrowserRouter([
@@ -330,6 +345,10 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
+    Component: LandingPage,
+  },
+  {
+    path: "/iniciar-sesion",
     Component: AuthWrapper,
   },
   {

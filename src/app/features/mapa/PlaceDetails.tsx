@@ -4,14 +4,10 @@ import {
   AlertTriangle,
   ArrowLeft,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   Briefcase,
   Clock,
   Coffee,
-  DollarSign,
   ExternalLink,
-  Heart,
   Lightbulb,
   Lock,
   MapPin,
@@ -26,13 +22,12 @@ import {
   Volume2,
   Wifi,
 } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { Textarea } from "../../components/ui/textarea";
 import { CachedImage, preloadCachedImage } from "../../components/ui/cached-image";
 import { ReportIssueModal } from "../shared/ReportIssueModal";
-import { getIssueIcon, getIssueLabel, placeIssues, studyPlaces, type IssueType, workPlaces } from "../../data/mockData";
+import { getIssueLabel, placeIssues, studyPlaces, type IssueType, workPlaces } from "../../data/mockData";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import {
   getIsCurrentUserFavoritePlace,
@@ -49,15 +44,9 @@ import {
   listPlaceReports,
 } from "../../services/placeReportService";
 import type { DetailNavigationState } from "./navigationState";
-
-const fallbackAmenities = [
-  { key: "wifi", name: "WiFi de alta velocidad" },
-  { key: "outlets", name: "Enchufes disponibles" },
-  { key: "coffee_tea", name: "Alimentos" },
-  { key: "meeting_room", name: "Sala de reunion" },
-  { key: "screen", name: "Pantalla disponible" },
-  { key: "lockers", name: "Lockers disponibles" },
-];
+import { PlaceGallery } from "./PlaceGallery";
+import { getPlaceTypeLabel } from "./placeFilters";
+import "./place-details.css";
 
 function getAmenityLabel(key?: string, name?: string) {
   if (key === "coffee_tea") return "Alimentos";
@@ -74,10 +63,10 @@ type DisplayScheduleDay = {
 const weekDays = [
   { label: "Lunes", shortLabel: "Lun", aliases: ["Lun", "Lunes"] },
   { label: "Martes", shortLabel: "Mar", aliases: ["Mar", "Martes"] },
-  { label: "Miercoles", shortLabel: "Mie", aliases: ["Mie", "Miercoles", "Miércoles"] },
+  { label: "Miércoles", shortLabel: "Mie", aliases: ["Mie", "Miercoles", "Miércoles"] },
   { label: "Jueves", shortLabel: "Jue", aliases: ["Jue", "Jueves"] },
   { label: "Viernes", shortLabel: "Vie", aliases: ["Vie", "Viernes"] },
-  { label: "Sabado", shortLabel: "Sab", aliases: ["Sab", "Sabado", "Sábado"] },
+  { label: "Sábado", shortLabel: "Sab", aliases: ["Sab", "Sabado", "Sábado"] },
   { label: "Domingo", shortLabel: "Dom", aliases: ["Dom", "Domingo"] },
 ];
 
@@ -109,32 +98,13 @@ function normalizeSchedule(hours?: string | null): DisplayScheduleDay[] {
   });
 }
 
-function getScheduleSummary(schedule: DisplayScheduleDay[]) {
-  const groups: Array<{ start: DisplayScheduleDay; end: DisplayScheduleDay; time: string; isOpen: boolean }> = [];
-
-  schedule.forEach((day) => {
-    const lastGroup = groups[groups.length - 1];
-    if (lastGroup && lastGroup.time === day.time && lastGroup.isOpen === day.isOpen) {
-      lastGroup.end = day;
-      return;
-    }
-
-    groups.push({ start: day, end: day, time: day.time, isOpen: day.isOpen });
-  });
-
-  return groups.map((group) => {
-    const days = group.start === group.end
-      ? group.start.shortLabel
-      : `${group.start.shortLabel} - ${group.end.shortLabel}`;
-    return `${days}: ${group.time}`;
-  });
-}
-
 export function PlaceDetails() {
   const { placeId } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useCurrentUser();
   const location = useLocation();
+  const [isCompactLayout, setIsCompactLayout] = useState(() => window.matchMedia("(max-width: 899px)").matches);
+  const reportsSectionRef = useRef<HTMLElement>(null);
   const navigationState = location.state as DetailNavigationState | null;
   const backPath = navigationState?.from ?? "/app/discover";
   const studyPlace = studyPlaces.find((item) => item.id === placeId);
@@ -163,6 +133,14 @@ export function PlaceDetails() {
   );
   const selectedImage = currentPlaceImages[activeImageIndex];
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 899px)");
+    const updateLayout = () => setIsCompactLayout(mediaQuery.matches);
+    mediaQuery.addEventListener("change", updateLayout);
+    updateLayout();
+    return () => mediaQuery.removeEventListener("change", updateLayout);
+  }, []);
+
   const handlePlaceContact = async () => {
     if (!placeId || !currentUser?.id || !contactMessage.trim()) return;
     setIsSendingContact(true);
@@ -190,7 +168,16 @@ export function PlaceDetails() {
   };
 
   useEffect(() => {
-    if (initialPlace || !placeId || !isSupabaseConfigured) return;
+    if (initialPlace) {
+      setPlace(initialPlace);
+      setIsLoadingPlace(false);
+      return;
+    }
+    if (!placeId || !isSupabaseConfigured) {
+      setPlace(null);
+      setIsLoadingPlace(false);
+      return;
+    }
 
     let isMounted = true;
     setIsLoadingPlace(true);
@@ -219,6 +206,7 @@ export function PlaceDetails() {
 
   useEffect(() => {
     let isMounted = true;
+    setIsFavorite(false);
 
     async function loadFavoriteState() {
       if (!isSupabaseConfigured || !placeId) return;
@@ -381,37 +369,6 @@ export function PlaceDetails() {
     setIssuesMessage("Confirmacion guardada.");
   };
 
-  const getPlaceImage = (id: string) => {
-    const gradients = [
-      "from-gray-400 to-gray-600",
-      "from-blue-400 to-blue-600",
-      "from-green-400 to-green-600",
-      "from-orange-400 to-orange-600",
-      "from-indigo-400 to-indigo-600",
-      "from-pink-400 to-pink-600",
-      "from-cyan-400 to-cyan-600",
-      "from-red-400 to-red-600",
-    ];
-    const index = Math.abs(id.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0)) % gradients.length;
-    return gradients[index];
-  };
-
-  const calculateDistance = (lat: number, lng: number) => {
-    const userLat = -33.4569;
-    const userLng = -70.6483;
-    const R = 6371;
-    const dLat = ((lat - userLat) * Math.PI) / 180;
-    const dLng = ((lng - userLng) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((userLat * Math.PI) / 180) *
-        Math.cos((lat * Math.PI) / 180) *
-        Math.sin(dLng / 2) *
-        Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return (R * c).toFixed(1);
-  };
-
   const getAmenityIcon = (key: string) => {
     switch (key) {
       case "wifi":
@@ -447,22 +404,6 @@ export function PlaceDetails() {
     }).format(price);
   };
 
-  const goToPreviousImage = () => {
-    setActiveImageIndex((currentIndex) => {
-      const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
-      if (imageCount <= 1) return currentIndex;
-      return currentIndex === 0 ? imageCount - 1 : currentIndex - 1;
-    });
-  };
-
-  const goToNextImage = () => {
-    setActiveImageIndex((currentIndex) => {
-      const imageCount = Array.isArray(place?.images) ? place.images.length : 0;
-      if (imageCount <= 1) return currentIndex;
-      return currentIndex === imageCount - 1 ? 0 : currentIndex + 1;
-    });
-  };
-
   const handleOpenDirections = () => {
     const address = place?.address?.trim();
     const destination = address && address.length > 0 && address !== `${place?.lat},${place?.lng}`
@@ -475,7 +416,8 @@ export function PlaceDetails() {
   };
 
   const renderRatingDots = (value?: number | null) => {
-    const filledDots = Math.max(0, Math.min(5, Math.round(value ?? 0)));
+    if (value == null || !Number.isFinite(value)) return <span className="place-muted">Sin información</span>;
+    const filledDots = Math.max(0, Math.min(5, Math.round(value)));
 
     return (
       <div className="flex items-center gap-1.5" aria-label={`${filledDots} de 5`}>
@@ -492,7 +434,6 @@ export function PlaceDetails() {
   };
 
   const schedule = useMemo(() => normalizeSchedule(place?.hours), [place?.hours]);
-  const scheduleSummary = useMemo(() => getScheduleSummary(schedule), [schedule]);
 
   if (isLoadingPlace) {
     return (
@@ -518,7 +459,6 @@ export function PlaceDetails() {
     );
   }
 
-  const isWorkPlace = place.category === "work" || !!workPlace;
   const placeImages = currentPlaceImages;
   const heroImage = displayedImage ?? selectedImage;
   const explicitAmenities = [
@@ -537,390 +477,219 @@ export function PlaceDetails() {
           ...savedAmenities,
           ...availableExplicitAmenities.filter((amenity) => !savedAmenityKeys.has(amenity.key)),
         ]
-      : availableExplicitAmenities.length > 0
-        ? availableExplicitAmenities
-      : fallbackAmenities;
+      : availableExplicitAmenities;
   const uniqueIncludedAmenities = includedAmenities.filter((amenity: any, index, amenities) => {
     const normalizedKey = String(amenity.key ?? amenity.name).toLowerCase();
     return amenities.findIndex((item: any) => String(item.key ?? item.name).toLowerCase() === normalizedKey) === index;
   });
-  const capacityText = place.capacityMax || place.capacity
-    ? `${place.capacityMin ?? 1} - ${place.capacityMax ?? place.capacity}`
-    : "1 - 20";
+  const maximumCapacity = place.capacityMax || place.capacity;
+  const capacityText = maximumCapacity
+    ? place.capacityMin ? `${place.capacityMin} – ${maximumCapacity} personas` : `Hasta ${maximumCapacity} personas`
+    : "Sin información";
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
-  const priceText = hasValidPrice ? "De pago" : "Gratis";
+  const priceText = hasValidPrice ? formatPrice(place.pricePerHour) : "Gratis";
   const websiteUrl = typeof place.websiteUrl === "string" ? place.websiteUrl.trim() : "";
-  const weekdaySchedule = schedule.slice(0, 5);
-  const weekendSchedule = schedule.slice(5);
+  const locationText = place.zone || place.address || "Ver ubicación";
+  const hasSchedule = Boolean(String(place.hours ?? "").trim());
+
+  const placeHeading = (
+    <header className="place-details-heading">
+      <span className="place-type-label">{getPlaceTypeLabel(place.type)}</span>
+      <h1>{place.name}</h1>
+      <div className="place-heading-meta">
+        <span><MapPin size={15} aria-hidden="true" />{locationText}</span>
+        {place.rating > 0 && place.reviews > 0 ? (
+          <span className="place-rating"><Star size={14} aria-hidden="true" />{place.rating.toLocaleString("es-CL", { maximumFractionDigits: 1 })}<span>· {place.reviews} valoraciones</span></span>
+        ) : <span>Sin valoraciones todavía</span>}
+        {issues.length > 0 && (
+          <button
+            type="button"
+            className="place-report-notice"
+            onClick={() => {
+              reportsSectionRef.current?.scrollIntoView({
+                behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+                block: "start",
+              });
+              reportsSectionRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            <AlertTriangle size={14} aria-hidden="true" />
+            {issues.length} {issues.length === 1 ? "reporte" : "reportes"} · Ver avisos
+          </button>
+        )}
+      </div>
+    </header>
+  );
+
+  const placeDescription = (
+    place.description && (
+      <section className="place-section" aria-labelledby="place-description-heading">
+        <h2 id="place-description-heading">Sobre este lugar</h2>
+        <p className="place-description">{place.description}</p>
+      </section>
+    )
+  );
+
+  const placeVisitPanel = (
+    <section className="place-visit-panel">
+      <span className="place-panel-label">{hasValidPrice ? "Precio de acceso" : "Acceso al lugar"}</span>
+      <p className="place-access-price">{priceText}{hasValidPrice && <span> / hora</span>}</p>
+      <div className="place-capacity"><Users size={16} aria-hidden="true" /><span>{capacityText}</span></div>
+      <div className="place-visit-location">
+        <MapPin size={18} aria-hidden="true" />
+        <div><h2>Ubicación</h2><p>{place.address || place.zone || "Dirección no informada"}</p>{place.address && place.zone && <span>{place.zone}</span>}</div>
+      </div>
+      <button type="button" className="place-primary-action" onClick={handleOpenDirections}><ExternalLink size={16} aria-hidden="true" />Cómo llegar</button>
+      {currentUser?.role === "worker" && (
+        <button type="button" className="place-secondary-action" onClick={() => { setContactMessageStatus(""); setShowContactDialog(true); }}><MessageCircle size={16} aria-hidden="true" />Contactar al lugar</button>
+      )}
+      {websiteUrl && (
+        <a className="place-website-link" href={websiteUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden="true" />Visitar sitio web</a>
+      )}
+    </section>
+  );
+
+  const placeSchedule = (
+    <section className="place-schedule-panel" aria-labelledby="place-schedule-heading">
+      <div className="place-schedule-heading">
+        <Calendar size={18} aria-hidden="true" />
+        <h2 id="place-schedule-heading">Horarios de atención</h2>
+      </div>
+      {hasSchedule ? (
+        <div className="place-schedule-days">
+          {schedule.map((day) => (
+            <div key={day.shortLabel} className={day.isOpen ? "" : "is-closed"}><span>{day.label}</span><span>{day.time}</span></div>
+          ))}
+        </div>
+      ) : <p className="place-muted">El lugar aún no ha indicado sus horarios.</p>}
+    </section>
+  );
+
+  const placeInformation = (
+    <>
+      <section className="place-section" aria-labelledby="place-amenities-heading">
+        <h2 id="place-amenities-heading">Servicios incluidos</h2>
+        {uniqueIncludedAmenities.length > 0 ? (
+          <div className="place-amenities">
+            {uniqueIncludedAmenities.map((amenity: { key?: string; name?: string }, index: number) => {
+              const AmenityIcon = getAmenityIcon(amenity.key ?? "");
+              return (
+                <div key={(amenity.key ?? amenity.name) + "-" + index} className="place-amenity">
+                  <AmenityIcon size={18} strokeWidth={1.7} aria-hidden="true" />
+                  <span>{getAmenityLabel(amenity.key, amenity.name)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="place-muted">El lugar aún no ha indicado sus servicios.</p>}
+      </section>
+
+      <section className="place-section" aria-labelledby="place-atmosphere-heading">
+        <h2 id="place-atmosphere-heading">Ambiente</h2>
+        <div className="place-atmosphere">
+          <div><span><Volume2 size={18} aria-hidden="true" />Silencio</span>{renderRatingDots(place.quietness)}</div>
+          <div><span><Lightbulb size={18} aria-hidden="true" />Iluminación</span>{renderRatingDots(place.lighting)}</div>
+        </div>
+      </section>
+
+      {Array.isArray(place.spaces) && place.spaces.length > 0 && (
+        <section className="place-section" aria-labelledby="place-spaces-heading">
+          <h2 id="place-spaces-heading">Espacios del lugar</h2>
+          <div className="place-spaces-grid">
+            {place.spaces.map((space: AppPlace["spaces"][number]) => (
+              <article key={space.id} className="place-space">
+                <div className="place-space-image">
+                  {space.imageUrl ? <CachedImage src={space.imageUrl} alt={space.name} className="size-full object-cover" /> : <Briefcase size={28} strokeWidth={1.4} aria-hidden="true" />}
+                </div>
+                <div className="place-space-info">
+                  <h3>{space.name}</h3>
+                  <p><Users size={14} aria-hidden="true" />{space.capacity} personas</p>
+                  <span>{space.pricePerHour > 0 ? formatPrice(space.pricePerHour) + " / " + (space.billingUnit === "day" ? "día" : space.billingUnit === "week" ? "semana" : space.billingUnit === "month" ? "mes" : "hora") : "Gratis"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section id="place-reports" ref={reportsSectionRef} tabIndex={-1} className="place-section" aria-labelledby="place-reports-heading">
+        <div className="place-section-header">
+          <h2 id="place-reports-heading">Reportes de la comunidad</h2>
+          <button type="button" className="place-text-button" onClick={() => setShowReportModal(true)}>Reportar problema</button>
+        </div>
+        {issuesMessage && <p className="place-feedback" role="status">{issuesMessage}</p>}
+        {issues.length === 0 ? (
+          <p className="place-muted">No hay reportes disponibles para este lugar.</p>
+        ) : (
+          <div className="place-reports-list">
+            {issues.slice(0, 3).map((issue) => {
+              const minutesAgo = Math.max(0, Math.floor((Date.now() - issue.timestamp.getTime()) / 60000));
+              const timeAgo = minutesAgo < 60 ? "Hace " + minutesAgo + " min" : "Hace " + Math.floor(minutesAgo / 60) + " h";
+              return (
+                <article key={issue.id} className="place-report">
+                  <span className="place-report-icon" aria-hidden="true"><AlertTriangle size={18} /></span>
+                  <div>
+                    <div className="place-report-heading"><h3>{getIssueLabel(issue.type)}</h3><span>{timeAgo}</span></div>
+                    {issue.description && <p>{issue.description}</p>}
+                    <button
+                      type="button"
+                      onClick={() => handleUpvote(issue.id)}
+                      disabled={issue.hasConfirmed || confirmingIssueIds.includes(issue.id)}
+                      className="place-report-confirm"
+                    >
+                      <ThumbsUp size={13} aria-hidden="true" />
+                      {confirmingIssueIds.includes(issue.id) ? "Confirmando…" : issue.upvotes + " personas confirman"}
+                      {issue.hasConfirmed && " · Confirmado"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </>
+  );
 
   return (
-    <div className="size-full flex flex-col bg-white">
-      <div className="flex-1 overflow-auto pb-28">
-        <div className="relative h-72 bg-gradient-to-br from-gray-300 to-gray-500">
-          {heroImage ? (
-            <CachedImage src={heroImage} alt={place.name} className="absolute inset-0 size-full object-cover" />
-          ) : (
-            <div className={`absolute inset-0 bg-gradient-to-br ${getPlaceImage(place.id)}`} />
-          )}
+    <div className="place-details">
+      <div className="place-details-scroll">
+        <div className="place-details-container">
+          <PlaceGallery
+            key={place.id}
+            name={place.name}
+            images={placeImages}
+            displayedImage={heroImage}
+            activeIndex={activeImageIndex}
+            isCompactLayout={isCompactLayout}
+            onSelect={setActiveImageIndex}
+            onBack={() => navigate(backPath)}
+            isFavorite={isFavorite}
+            isSavingFavorite={isSavingFavorite}
+            onToggleFavorite={handleToggleFavorite}
+          />
 
-          <button
-            onClick={() => navigate(backPath)}
-            className="absolute top-4 left-4 size-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50"
-          >
-            <ArrowLeft className="size-5 text-gray-700" />
-          </button>
-          <button
-            onClick={handleToggleFavorite}
-            disabled={isSavingFavorite}
-            className="absolute top-4 right-4 size-10 rounded-full bg-white shadow-lg flex items-center justify-center hover:bg-gray-50"
-          >
-            <Heart className={`size-5 ${isFavorite ? "fill-red-500 text-red-500" : "text-gray-700"}`} />
-          </button>
-
-          {placeImages.length > 1 && (
-            <>
-              <button
-                onClick={goToPreviousImage}
-                className="absolute left-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white"
-                aria-label="Imagen anterior"
-              >
-                <ChevronLeft className="size-5 text-gray-700" />
-              </button>
-              <button
-                onClick={goToNextImage}
-                className="absolute right-4 top-1/2 size-10 -translate-y-1/2 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white"
-                aria-label="Imagen siguiente"
-              >
-                <ChevronRight className="size-5 text-gray-700" />
-              </button>
-              <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
-                {placeImages.map((image, index) => (
-                  <button
-                    key={`${image}-${index}`}
-                    onClick={() => setActiveImageIndex(index)}
-                    className={`size-2 rounded-full transition-all ${
-                      activeImageIndex === index
-                        ? "w-5 bg-[#C4B5FD] shadow-sm"
-                        : "bg-white/45 ring-1 ring-white/30"
-                    }`}
-                    aria-label={`Ver imagen ${index + 1}`}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="absolute bottom-4 right-4 px-3 py-1 rounded-full bg-black/70 text-white text-sm font-medium">
-            {placeImages.length > 0 ? `${activeImageIndex + 1}/${placeImages.length}` : "1/1"}
-          </div>
-        </div>
-
-        <div className="px-4 py-4 space-y-4">
-          <div>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <h1 className="text-2xl" style={{ fontWeight: 700 }}>{place.name}</h1>
-              <div className="flex shrink-0 items-center gap-2">
-                {websiteUrl && (
-                  <button
-                    type="button"
-                    onClick={() => window.open(websiteUrl, "_blank", "noopener,noreferrer")}
-                    className="flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-[#4F46E5] transition-all hover:border-[#4F46E5] hover:bg-white"
-                    aria-label="Abrir sitio web"
-                  >
-                    <ExternalLink className="size-3.5" />
-                    Web
-                  </button>
-                )}
-                <div className="flex items-center gap-1">
-                  <Star className="size-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">{place.rating}</span>
-                  <span className="text-sm text-gray-500">({place.reviews})</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              <MapPin className="size-4 text-red-500" />
-              <span>{place.zone ?? place.address ?? "Santiago"} - {calculateDistance(place.lat, place.lng)} km</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <Card className="bg-gray-50 border-0">
-              <CardContent className="pt-4 pb-3 px-3 text-center">
-                <Calendar className="size-6 text-[#4F46E5] mx-auto mb-2" />
-                <p className="text-xs font-semibold mb-1">Horario</p>
-                <div className="space-y-0.5 text-xs text-gray-600 leading-tight">
-                  {scheduleSummary.map((summary) => (
-                    <p key={summary}>{summary}</p>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-50 border-0">
-              <CardContent className="pt-4 pb-3 px-3 text-center">
-                <Users className="size-6 text-[#4F46E5] mx-auto mb-2" />
-                <p className="text-xs font-semibold mb-1">Capacidad</p>
-                <p className="text-xs text-gray-600 leading-tight">{capacityText}<br />personas</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-50 border-0">
-              <CardContent className="pt-4 pb-3 px-3 text-center">
-                <DollarSign className="size-6 text-[#4F46E5] mx-auto mb-2" />
-                <p className="text-xs font-semibold mb-1">Acceso</p>
-                <p className="text-xs text-gray-600 leading-tight">{priceText}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {currentUser?.role === "worker" && (
-            <button
-              type="button"
-              onClick={() => { setContactMessageStatus(""); setShowContactDialog(true); }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-4 py-3 text-sm font-semibold text-white hover:bg-[#4338CA]"
-            >
-              <MessageCircle className="size-4" /> Contactar al lugar
-            </button>
-          )}
-
-          {place.description && (
-            <div>
-              <h3 className="text-lg mb-2" style={{ fontWeight: 700 }}>Descripcion</h3>
-              <p className="text-sm leading-relaxed text-gray-700">{place.description}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Card className="bg-gray-50 border-0">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <MapPin className="mt-0.5 size-5 shrink-0 text-[#4F46E5]" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold">Direccion</p>
-                      <p className="text-sm text-gray-600">{place.address}</p>
-                      {place.zone && <p className="text-xs text-gray-500">{place.zone}</p>}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleOpenDirections}
-                    className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#4F46E5] px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-[#4338CA]"
-                  >
-                    <ExternalLink className="size-3.5" />
-                    Como llegar
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-50 border-0">
-              <CardContent className="p-4">
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold">Ambiente</p>
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Volume2 className="size-4 text-[#4F46E5]" />
-                        <span>Silencio</span>
-                      </div>
-                      {renderRatingDots(place.quietness)}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Lightbulb className="size-4 text-[#4F46E5]" />
-                        <span>Iluminacion</span>
-                      </div>
-                      {renderRatingDots(place.lighting)}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div>
-            <h3 className="text-lg mb-3" style={{ fontWeight: 700 }}>Servicios incluidos</h3>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-              {uniqueIncludedAmenities.map((amenity: any, amenityIndex) => {
-                const AmenityIcon = getAmenityIcon(amenity.key);
-                const amenityLabel = getAmenityLabel(amenity.key, amenity.name);
-                return (
-                  <div key={`${amenity.key ?? amenity.name}-${amenityIndex}`} className="flex flex-col items-center">
-                    <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                      <AmenityIcon className="size-6 text-gray-700" />
-                    </div>
-                    <p className="text-xs text-center text-gray-700 leading-tight">{amenityLabel}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg" style={{ fontWeight: 700 }}>
-                <AlertTriangle className="size-5 inline mr-2 text-orange-500" />
-                Reportes de la comunidad
-              </h3>
-              <button
-                onClick={() => setShowReportModal(true)}
-                className="text-sm text-[#4F46E5] font-semibold hover:underline"
-              >
-                Reportar problema
-              </button>
-            </div>
-
-            {issuesMessage && (
-              <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-                {issuesMessage}
-              </div>
-            )}
-
-            {issues.length === 0 ? (
-              <Card className="bg-green-50 border-green-200">
-                <CardContent className="pt-4 text-center">
-                  <p className="text-sm text-green-700">No hay problemas reportados</p>
-                </CardContent>
-              </Card>
+          <div className="place-content-grid">
+            {placeHeading}
+            {isCompactLayout ? (
+              <>
+                {placeVisitPanel}
+                {placeDescription}
+                {placeSchedule}
+                <div className="place-main-content">{placeInformation}</div>
+              </>
             ) : (
-              <div className="space-y-2">
-                {issues.slice(0, 3).map((issue) => {
-                  const minutesAgo = Math.floor((new Date().getTime() - issue.timestamp.getTime()) / 60000);
-                  const timeAgo = minutesAgo < 60 ? `Hace ${minutesAgo} min` : `Hace ${Math.floor(minutesAgo / 60)}h`;
-
-                  return (
-                    <Card key={issue.id} className="bg-orange-50 border-orange-200">
-                      <CardContent className="pt-3 pb-3">
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">{getIssueIcon(issue.type)}</span>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm">{getIssueLabel(issue.type)}</span>
-                              <span className="text-xs text-gray-500">- {timeAgo}</span>
-                            </div>
-                            {issue.description && <p className="text-sm text-gray-700 mb-2">{issue.description}</p>}
-                            <button
-                              onClick={() => handleUpvote(issue.id)}
-                              disabled={issue.hasConfirmed || confirmingIssueIds.includes(issue.id)}
-                              className={`flex items-center gap-1 text-xs ${
-                                issue.hasConfirmed
-                                  ? "text-[#4F46E5]"
-                                  : "text-gray-600 hover:text-[#4F46E5]"
-                              } disabled:cursor-default`}
-                            >
-                              <ThumbsUp className={`size-3 ${issue.hasConfirmed ? "fill-[#4F46E5]" : ""}`} />
-                              <span>
-                                {confirmingIssueIds.includes(issue.id)
-                                  ? "Confirmando..."
-                                  : `${issue.upvotes} personas confirman`}
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+              <>
+                <div className="place-main-content">
+                  {placeDescription}
+                  {placeInformation}
+                </div>
+                <aside className="place-sidebar" aria-label="Información para visitar el lugar">
+                  {placeVisitPanel}
+                  {placeSchedule}
+                </aside>
+              </>
             )}
-          </div>
-
-          {Array.isArray(place?.spaces) && place.spaces.length > 0 && (
-            <div>
-              <h3 className="mb-3 text-lg" style={{ fontWeight: 700 }}>Espacios del lugar</h3>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {place.spaces.map((space: { id: string; name: string; capacity: number; pricePerHour: number; billingUnit: "hour" | "day" | "week" | "month"; imageUrl: string }) => (
-                  <Card key={space.id} className="w-36 shrink-0 overflow-hidden border-0 bg-white shadow-md">
-                    <div className="aspect-[4/3] bg-pink-100">
-                      <CachedImage src={space.imageUrl} alt={space.name} className="size-full object-cover" />
-                    </div>
-                    <CardContent className="p-3">
-                      <p className="truncate text-sm font-semibold text-gray-900">{space.name}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                        <Users className="size-3.5" /> Capacidad: {space.capacity}
-                      </p>
-                      <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-[#4F46E5]">
-                        <DollarSign className="size-3.5" /> {space.pricePerHour > 0 ? `$${space.pricePerHour.toLocaleString("es-CL")} / ${space.billingUnit === "day" ? "día" : space.billingUnit === "week" ? "semana" : space.billingUnit === "month" ? "mes" : "hora"}` : "Gratis"}
-                      </p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 via-white to-blue-50 p-4 shadow-sm">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#4F46E5] text-white shadow-sm">
-                <Calendar className="size-5" />
-              </div>
-              <div>
-                <h3 className="text-lg leading-tight" style={{ fontWeight: 700 }}>Horarios disponibles</h3>
-                <p className="text-xs text-gray-500">{schedule.filter((day) => day.isOpen).length} dias abiertos</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_0.72fr]">
-              <div className="rounded-lg border border-purple-100 bg-white p-3 shadow-sm">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4F46E5]">Lunes a viernes</p>
-                <div className="divide-y divide-gray-100">
-                  {weekdaySchedule.map((day) => (
-                    <div key={day.shortLabel} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{day.label}</p>
-                        <div className={`mt-0.5 flex items-center gap-1.5 text-xs ${day.isOpen ? "text-gray-500" : "text-gray-400"}`}>
-                          <Clock className="size-3.5 shrink-0" />
-                          <span>{day.time}</span>
-                        </div>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          day.isOpen
-                            ? "bg-purple-100 text-[#4F46E5]"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {day.isOpen ? "Abierto" : "Cerrado"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-purple-100 bg-white p-3 shadow-sm">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4F46E5]">Fin de semana</p>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                  {weekendSchedule.map((day) => (
-                    <div
-                      key={day.shortLabel}
-                      className={`rounded-lg border px-3 py-3 ${
-                        day.isOpen
-                          ? "border-purple-100 bg-purple-50/70"
-                          : "border-gray-100 bg-gray-50"
-                      }`}
-                    >
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-gray-900">{day.label}</span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                            day.isOpen
-                              ? "bg-white text-[#4F46E5]"
-                              : "bg-white text-gray-500"
-                          }`}
-                        >
-                          {day.isOpen ? "Abierto" : "Cerrado"}
-                        </span>
-                      </div>
-                      <div className={`flex items-center gap-2 text-sm ${day.isOpen ? "text-gray-700" : "text-gray-400"}`}>
-                        <Clock className="size-4 shrink-0" />
-                        <span className="font-medium">{day.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

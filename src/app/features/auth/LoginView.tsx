@@ -10,8 +10,11 @@ import { Label } from "../../components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import type { RegisterResult } from "../../services/authService";
 import { LegalDocumentsDialog, type LegalDocument } from "./LegalDocumentsDialog";
+import { verificationLink } from "./authNavigation";
 
 interface LoginViewProps {
+  initialTab?: "login" | "register";
+  returnTo?: string;
   onLogin: (email: string, password: string) => Promise<void> | void;
   onRegister?: (
     name: string,
@@ -197,10 +200,10 @@ function HeroDecor() {
   );
 }
 
-export function LoginView({ onLogin, onRegister }: LoginViewProps) {
+export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo }: LoginViewProps) {
   const navigate = useNavigate();
   const prefersReducedMotion = useReducedMotion();
-  const [activeTab, setActiveTab] = useState("login");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
@@ -239,7 +242,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
   };
 
   const handleTabChange = (value: string) => {
-    setActiveTab(value);
+    setActiveTab(value === "register" ? "register" : "login");
     setErrorMessage("");
     setIsSubmitting(false);
 
@@ -315,7 +318,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
         );
 
         if (result.needsEmailVerification) {
-          navigate(`/verify-account?email=${encodeURIComponent(result.email)}`);
+          navigate(verificationLink(returnTo, result.email));
           return;
         }
       }
@@ -367,6 +370,7 @@ export function LoginView({ onLogin, onRegister }: LoginViewProps) {
           >
             <div>
               <div className="mb-6 lg:mb-7">
+                <button type="button" onClick={() => navigate("/")} className="mb-4 min-h-9 rounded-md text-sm text-[#675378] underline-offset-4 hover:underline">Volver a Pinwi</button>
                 <div className="mb-5 md:hidden">
                   <BrandLogo />
                 </div>

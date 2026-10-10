@@ -19,6 +19,10 @@ Este proyecto viene de un diseno de Figma exportado como React + Vite. La primer
 
 ## Comandos
 
+La ruta `/` presenta la landing con un mapa público. Las fichas y el resto de la app requieren iniciar sesión en `/iniciar-sesion`; el modo demo también exige entrar por ese flujo. Las redes y WhatsApp del footer se gestionan en **Administración → Gestión → Sitio público**.
+
+La conexión del mapa público y del footer requiere la migración incremental local documentada en `docs-local/supabase/PUBLIC_LANDING.md`, antes de publicar este frontend. Los SQL y esa documentación están excluidos de Git; no se despliegan al compilar la aplicación.
+
 Instalar dependencias:
 
 ```bash

@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { clearAdminDataCaches } from "./adminDataCache";
+import { clearPublicMapCache } from "./publicMapService";
 
 export type PlaceCategory = "study" | "work";
 
@@ -124,6 +125,7 @@ let placesRequest: Promise<AppPlace[]> | null = null;
 let placesCacheGeneration = 0;
 
 export function clearPlacesCache() {
+  clearPublicMapCache();
   clearAdminDataCaches();
   placesCacheGeneration += 1;
   placesCache = null;

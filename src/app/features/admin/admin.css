@@ -1,3 +1,7 @@
+.admin-site-settings .management-section-heading { margin-bottom: 24px; }
+.admin-site-settings fieldset:disabled { opacity: .7; }
+.admin-site-settings .admin-primary-button { display: inline-flex; min-height: 44px; align-items: center; gap: 8px; border-radius: 10px; padding: 10px 16px; background: #6450a1; color: #fff; font-size: 14px; font-weight: 500; }
+.admin-site-settings .admin-primary-button:disabled { cursor: wait; }
 .admin-page {
   --admin-ink: #25233b;
   --admin-muted: #777487;
@@ -690,7 +694,7 @@
 }
 .management-section-nav {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
   height: auto;
@@ -1026,6 +1030,7 @@
   border: 1px solid #eeeaf3;
 }
 @media (max-width: 1150px) {
+  .management-section-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .management-section-nav [data-slot="tabs-trigger"] {
     flex-direction: column;
     gap: 10px;
@@ -1075,9 +1080,6 @@
     min-height: 76px;
     flex-direction: row;
     padding: 13px;
-  }
-  .management-section-nav [data-slot="tabs-trigger"]:last-child {
-    grid-column: 1 / -1;
   }
   .management-workbench {
     padding: 20px 16px;

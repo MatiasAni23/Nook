@@ -250,6 +250,10 @@
 .map-list-message { min-height: 80px; padding: 16px 2px; color: #777484; font-size: 13px; }
 .map-list-message button { min-height: 32px; margin-top: 8px; color: #65579d; text-decoration: underline; text-underline-offset: 3px; }
 
+@media (min-width: 900px) {
+  .map-page { padding-bottom: 0; }
+}
+
 @media (max-width: 639px) {
   .map-toolbar { padding: 12px 16px 10px; }
   .map-result-count { display: none; }

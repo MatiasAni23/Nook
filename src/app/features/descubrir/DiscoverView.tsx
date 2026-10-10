@@ -23,6 +23,7 @@ import {
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
 import { DiscoverBackground } from "./DiscoverBackground";
+import { DiscoverDesktop, DiscoverDesktopSkeleton } from "./DiscoverDesktop";
 import { getDistanceInKm, sortPlacesByDistance, type Coordinates } from "../mapa/proximity";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "../../components/ui/carousel";
 
@@ -44,9 +45,10 @@ export function DiscoverView() {
 
   // Estado de busqueda, notificaciones y carga de lugares.
   const [searchTerm, setSearchTerm] = useState("");
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia("(min-width: 900px)").matches);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
-  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>(() => isSupabaseConfigured ? getCachedPlaces() ?? [] : []);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(() => isSupabaseConfigured && !getCachedPlaces());
   const [placesError, setPlacesError] = useState("");
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [recommendedCarouselApi, setRecommendedCarouselApi] = useState<CarouselApi | null>(null);
@@ -61,6 +63,14 @@ export function DiscoverView() {
   const displayName = cachedUser?.name ?? (isWorker ? currentWorker.name : currentUser.name);
   const profileImageUrl = cachedUser?.profile?.profile_image_url ?? null;
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 900px)");
+    const updateLayout = () => setIsDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener("change", updateLayout);
+    updateLayout();
+    return () => mediaQuery.removeEventListener("change", updateLayout);
+  }, []);
+
   // Carga lugares desde Supabase cuando esta configurado; si no, la vista usa mockData.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -71,13 +81,12 @@ export function DiscoverView() {
     setIsLoadingPlaces(!cachedPlaces);
     setPlacesError("");
 
-    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
+    listPlaces()
       .then((places) => {
         if (isMounted) setDbPlaces(places);
       })
       .catch((error) => {
         if (isMounted) {
-          setDbPlaces([]);
           setPlacesError(error instanceof Error ? error.message : "No se pudieron cargar los lugares.");
         }
       })
@@ -200,19 +209,38 @@ export function DiscoverView() {
 
   // Avanza el carrusel sin impedir que la persona lo deslice manualmente.
   useEffect(() => {
-    if (!recommendedCarouselApi || recommendedPlaces.length === 0) return;
+    if (isDesktop || !recommendedCarouselApi || recommendedPlaces.length === 0) return;
 
     const intervalId = window.setInterval(() => recommendedCarouselApi.scrollNext(), 5_000);
     return () => window.clearInterval(intervalId);
-  }, [recommendedCarouselApi, recommendedPlaces.length]);
+  }, [isDesktop, recommendedCarouselApi, recommendedPlaces.length]);
 
   if ((isLoadingCurrentUser && !cachedUser) || isLoadingPlaces) {
-    return <DiscoverSkeleton />;
+    return isDesktop ? <div className="discover-desktop-scroll"><DiscoverDesktopSkeleton /></div> : <DiscoverSkeleton />;
   }
 
   return (
     <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto pb-20">
+      {isDesktop ? (
+        <div className="discover-desktop-scroll">
+          <DiscoverDesktop
+            name={displayName}
+            profileImageUrl={profileImageUrl}
+            isWorker={isWorker}
+            unreadCount={unreadCount}
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            places={filteredPlaces}
+            recommendedPlaces={recommendedPlaces}
+            userLocation={userLocation}
+            placesError={placesError}
+            onOpenPlace={place => navigate(place.category === "work" ? `/app/workplace/${place.id}` : `/app/place/${place.id}`, { state: getDetailNavigationState("/app/discover") })}
+            onOpenProfile={() => navigate("/app/profile")}
+            onOpenMap={() => navigate("/app")}
+            onOpenNotifications={() => setShowNotifications(true)}
+          />
+        </div>
+      ) : <div className="flex-1 overflow-auto pb-20">
         {/* Bloque superior: marca, acceso a notificaciones/perfil y saludo del usuario. */}
         <div className="bg-white pb-4">
           <div className="discover-hero relative overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-[#7C3AED] via-[#5B4AEE] to-[#4F46E5] px-4 pb-16 pt-12 text-white sm:px-6 md:px-8 lg:px-10">
@@ -452,7 +480,7 @@ export function DiscoverView() {
             );
           })}
         </div>
-      </div>
+      </div>}
 
       {showNotifications && (
         <NotificationsPanel

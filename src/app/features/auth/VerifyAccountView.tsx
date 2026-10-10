@@ -2,6 +2,7 @@ import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { authLink, verificationLink } from "./authNavigation";
 import { motion } from "motion/react";
 import { ArrowLeft, CheckCircle2, KeyRound, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -69,7 +70,7 @@ export function VerifyAccountView() {
     setSuccessMessage("");
 
     try {
-      await resendSignupVerificationCode(email.trim());
+      await resendSignupVerificationCode(email.trim(), window.location.origin + verificationLink(searchParams.get("continuar")));
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");
     } catch (error) {
       setErrorMessage(getVerificationErrorMessage(error));
@@ -120,7 +121,7 @@ export function VerifyAccountView() {
           <div className="relative px-5 pb-6 pt-6 sm:px-6">
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={() => navigate(authLink(searchParams.get("continuar") ?? undefined))}
               className="mb-6 inline-flex w-fit items-center gap-2 rounded-xl px-2 py-1 text-sm font-black text-slate-400 transition hover:bg-[#EEF2FF] hover:text-[#4F46E5]"
             >
               <ArrowLeft className="size-4" />
@@ -234,7 +235,7 @@ export function VerifyAccountView() {
                     </p>
                   </div>
                   <Button
-                    onClick={() => navigate("/")}
+                    onClick={() => navigate(authLink(searchParams.get("continuar") ?? undefined))}
                   className="h-12 w-full rounded-2xl bg-[#4F46E5] font-black text-white shadow-[0_14px_24px_rgba(79,70,229,0.24)] hover:bg-[#4338CA]"
                   >
                     Continuar

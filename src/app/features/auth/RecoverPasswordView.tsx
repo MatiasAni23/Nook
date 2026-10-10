@@ -231,7 +231,7 @@ export function RecoverPasswordView() {
     try {
       // Verifying a recovery code creates a temporary Supabase session.
       await signOut();
-      navigate("/", { replace: true });
+      navigate("/iniciar-sesion", { replace: true });
     } catch (error) {
       setErrorMessage(getRecoveryErrorMessage(error));
     } finally {
