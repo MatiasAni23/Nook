@@ -8,7 +8,7 @@ Este archivo orienta a los asistentes de programación que trabajan en este repo
 - El proyecto proviene de una exportación de Figma y combina funcionalidades conectadas a Supabase con datos y recorridos demo. Verificar la implementación de cada pantalla antes de asumir que una funcionalidad está completa.
 - Stack actual: React 18, TypeScript 5 en modo estricto, Vite 6, React Router 7 y Tailwind CSS 4. La interfaz reutiliza componentes shadcn/Radix, Lucide y Recharts. Google Maps usa `@vis.gl/react-google-maps`.
 - Backend: Supabase Auth, PostgreSQL con RLS, Storage, Realtime y funciones Edge en Deno. Las invitaciones por correo integran Brevo desde el servidor.
-- Usar `package.json`, `package-lock.json`, la configuración y el código como referencia del estado local. Algunos textos de `README.md`, `DATABASE_STRUCTURE.md`, `LISTADO_TAREAS_EDT.md` y las auditorías describen etapas anteriores o trabajo pendiente.
+- Usar `package.json`, `package-lock.json`, la configuración y el código como referencia del estado local. Algunos textos de `README.md` y los informes locales de `docs-local/` describen etapas anteriores o trabajo pendiente.
 
 ## Documentación y Expo
 
@@ -33,9 +33,10 @@ Este archivo orienta a los asistentes de programación que trabajan en este repo
 | `src/app/lib/supabase.ts` | Cliente Supabase y detección de configuración. |
 | `src/app/data/` | Datos mock/demo; algunos servicios también reutilizan sus tipos. |
 | `src/styles/` y `assets/` | Estilos globales, tokens, fuentes e imágenes de marca. |
-| `supabase/migrations/` | Cambios SQL incrementales versionados. |
+| `supabase/migrations/` | Cambios SQL incrementales con fecha; sólo locales, excluidos de Git. |
 | `supabase/functions/` | Funciones Edge de invitaciones y recuperación de contraseña. |
-| `supabase/schema/` | Esquema inicial, consultas de inspección y documentación. |
+| `supabase/schema/` | Esquema inicial y consultas de inspección; sólo locales, excluidos de Git. |
+| `docs-local/` | Resúmenes, auditorías y documentación de modelos de datos; excluidos de Git y de despliegues. |
 | `tests/*.test.mjs` | Pruebas de permisos, privacidad y servicios. |
 
 ## Comandos y configuración local
@@ -53,7 +54,7 @@ Usar npm y conservar `package-lock.json`. Existe configuración de pnpm, pero el
 
 - No hay un script de lint configurado. No afirmar que se ejecutó uno ni instalar herramientas sólo para simular esa comprobación.
 - Variables del frontend: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` o `VITE_SUPABASE_ANON_KEY`, y `VITE_GOOGLE_MAPS_API_KEY`. La clave publishable tiene prioridad sobre la anon.
-- `README.md` menciona `.env.example`, pero actualmente ese archivo no está presente. No dar por hecho que se puede copiar ni generar ejemplos a partir de credenciales reales.
+- No hay `.env.example`: crear `.env` sólo con la configuración local autorizada. No generar ejemplos a partir de credenciales reales.
 - Sin configuración Supabase, varias rutas y pantallas permiten modo demo. Ese comportamiento no acredita autenticación ni autorización de producción. No convertir errores del backend configurado en éxitos simulados.
 - `CheckoutView.tsx` usa datos mock y una alerta; todavía no crea ni cobra una reserva real. No presentar ese recorrido como integración de pagos terminada.
 
@@ -79,13 +80,13 @@ Usar npm y conservar `package-lock.json`. Existe configuración de pnpm, pero el
 
 ## Supabase, permisos y datos privados
 
-- Antes de modificar permisos o SQL, leer `supabase/DELEGATES.md` y `supabase/schema/README.md`. Consultar `PRIVACY_AUDIT.md` para problemas conocidos y `supabase/REMOTE_REVIEW.md` para antecedentes de despliegue; sus fechas no prueban el estado remoto actual.
+- Antes de modificar permisos o SQL, consultar, si están disponibles, `docs-local/supabase/DELEGATES.md`, `docs-local/supabase/schema/README.md`, `docs-local/PRIVACY_AUDIT.md` y `docs-local/supabase/REMOTE_REVIEW.md`. Son documentos locales que no se incluyen al clonar el repositorio; sus fechas no prueban el estado remoto actual. Si faltan, revisar la implementación y solicitar los SQL locales necesarios antes de cambiar la base de datos.
 - La autorización debe validarse en RLS, RPC o funciones del servidor. Las rutas privadas y los controles visuales no bastan. No confiar en metadatos de registro o estado del navegador para otorgar roles privilegiados.
 - Mantener privadas las cuentas de `public.users` y los perfiles de `public.user_profiles`. Para identidades de otras personas, reutilizar `sharedProfileService` y la RPC `get_shared_profiles`; no abrir tablas privadas para solucionar una pantalla. El directorio académico es voluntario y revocable.
 - Un delegado necesita cuenta y registro de delegado activos y sólo puede gestionar lugares de su alcance. Mantener las operaciones de roles/asignaciones atómicas y los cambios de estado de reservas restringidos en el servidor.
 - Al modificar mensajes o notificaciones, conservar el acceso por participantes/destinatario y la integridad del contenido. Las confirmaciones de lectura no deben permitir reescribir mensajes, incluidos los históricos.
 - Todo valor `VITE_*` llega al navegador. Nunca colocar allí claves `service_role`, tokens administrativos, claves de Brevo ni contraseñas. No imprimir `.env`, enlaces con tokens ni datos personales en logs, respuestas o documentación.
-- Conservar las exclusiones y restricciones para `supabase/schema/private/`, `supabase/.temp/` y respaldos. No versionar ni incluir esos archivos en paquetes públicos.
+- Conservar las exclusiones de `docs-local/`, `supabase/schema/`, `supabase/migrations/`, todos los archivos SQL, el estado de la CLI y los respaldos. No agregarlos a Git, ni con `git add -f`, ni incluirlos en despliegues. Los modelos, diagramas y documentación de la base de datos deben permanecer en `docs-local/`, aunque tengan otra extensión.
 - `supabase/schema/pinwi_schema_supabase.sql` contiene borrados destructivos: usarlo sólo para bases vacías o descartables, como los fixtures locales de pruebas. No ejecutarlo sobre una base con datos existentes.
 - Para cambios de esquema, crear una migración incremental nueva con versión posterior; no reescribir migraciones aplicadas. Si cambian permisos o funciones usadas por el frontend, documentar el orden de despliegue.
 - Preparar y validar los cambios localmente. Aplicar migraciones remotas, publicar funciones/frontend o enviar invitaciones sólo dentro de una solicitud que autorice esas acciones; modificar código local no implica desplegarlo.
@@ -93,8 +94,9 @@ Usar npm y conservar `package-lock.json`. Existe configuración de pnpm, pero el
 
 ## Verificación y entrega
 
+- No crear archivos Markdown de resumen por rutina: entregar el resumen en el chat. Cuando una tarea requiera un informe, guardarlo en `docs-local/`, conservando subcarpetas por tema. Mantener `README.md`, `AGENTS.md`, `CLAUDE.md`, las instrucciones de `guidelines/` y `ATTRIBUTIONS.md` en sus ubicaciones; son documentación esencial, instrucciones y atribuciones del repositorio.
 - Para cambios de TypeScript/React, ejecutar `npm run typecheck` y `npm run build`. Si cambia lógica de servicios, sesión, permisos, mensajes o SQL, ejecutar también `npm test` y ampliar las pruebas de regresión cuando corresponda.
-- La suite usa PGlite para probar SQL y RLS con identidades distintas, y Vite con HTTP simulado para probar servicios. No requiere cuentas reales y no demuestra el funcionamiento de Supabase Auth, Storage, Realtime o Brevo desplegados. Las funciones Deno no están incluidas en el `typecheck` del frontend.
+- La suite usa PGlite para probar SQL y RLS con identidades distintas, y Vite con HTTP simulado para probar servicios. Las pruebas SQL necesitan los archivos locales de `supabase/schema/` y `supabase/migrations/`; un clon nuevo no los incluye. No requiere cuentas reales y no demuestra el funcionamiento de Supabase Auth, Storage, Realtime o Brevo desplegados. Las funciones Deno no están incluidas en el `typecheck` del frontend.
 - Para cambios visuales, comprobar el recorrido afectado en navegador móvil y escritorio si hay herramientas disponibles. Informar qué se comprobó y si se usó modo demo, servicios simulados o backend real.
 - Para cambios únicamente de documentación, revisar contenido, rutas y `git diff --check`; no es necesario recompilar la app.
 - Al terminar, explicar brevemente qué cambió, cómo se verificó y qué limitaciones quedan. Distinguir fallos previos de regresiones y no declarar pruebas o despliegues que no se realizaron.

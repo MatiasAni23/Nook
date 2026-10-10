@@ -48,7 +48,7 @@ npm run build
 El frontend usa `@supabase/supabase-js`.
 
 1. Crea un proyecto en Supabase.
-2. Copia `.env.example` como `.env`.
+2. Crea un archivo local `.env` (no se incluye en Git).
 3. Completa:
 
 ```bash
@@ -56,18 +56,20 @@ VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
 VITE_SUPABASE_ANON_KEY=TU_ANON_KEY_O_PUBLISHABLE_KEY
 ```
 
-4. En una base **nueva y vacía**, ejecuta `supabase/schema/pinwi_schema_supabase.sql` y después los archivos de `supabase/migrations/` en orden. El schema completo borra las tablas: **no lo ejecutes en una base existente**.
-5. Para una base existente, aplica únicamente las migraciones incrementales. Los cambios actuales requieren `supabase/migrations/202610060001_delegate_integrity.sql` **antes de publicar el frontend**. Instrucciones y pruebas: [supabase/DELEGATES.md](supabase/DELEGATES.md).
+4. Obtén los archivos SQL locales del responsable del proyecto. Los esquemas y las migraciones no se publican en este repositorio.
+5. En una base nueva y vacía, prepara el esquema inicial y aplica las migraciones en orden. El esquema inicial borra tablas: **no lo ejecutes en una base existente**. Para una base existente, aplica únicamente migraciones incrementales y verifica las necesarias antes de publicar el frontend.
 
-El 6 de octubre de 2026 se vinculó este repositorio al proyecto de la app y se aplicó esa migración por consola. La estructura real, los resultados y los pendientes están en [supabase/REMOTE_REVIEW.md](supabase/REMOTE_REVIEW.md). La CLI permite consultar la base y publicar migraciones/funciones; sus comandos están en la guía de delegados.
-
-La autenticacion se maneja con Supabase Auth. La cuenta privada se guarda en `public.users` y el perfil extendido privado en `public.user_profiles`. Chats, reservas y directorio usan una RPC de perfiles compartidos con campos limitados. Aparecer en el directorio académico requiere activarlo desde Editar perfil.
-
-También se aplicó la migración `202610060002_private_profiles_messages.sql`: restringe perfiles y mensajes, habilita notificaciones en Realtime y evita registros de delegado incompletos. El frontend local ya está adaptado; publicar ambos cambios de la app antes de probar el recorrido alojado. Los SQL están ordenados en `supabase/schema/` y los inventarios reales en `supabase/schema/private/`, excluido de Git.
+La autenticación se maneja con Supabase Auth. Aparecer en el directorio académico requiere activarlo desde Editar perfil. Las instrucciones operativas y las revisiones de la base de datos se conservan sólo en la documentación local.
 
 No pongas la `service_role key` en el frontend. Solo se usa la anon key o publishable key.
 
-Notas de revision del schema: `supabase/schema/SCHEMA_REVIEW.md`.
+## Documentación y archivos locales
+
+Los resúmenes, auditorías y modelos de datos se guardan en `docs-local/`, conservando subcarpetas por tema. Esta carpeta está excluida de Git y de los despliegues; no aparece al clonar el repositorio. Los informes de administración y privacidad, y las guías de Supabase, están allí si dispones de la copia local.
+
+Los SQL mantienen sus rutas locales en `supabase/schema/`, `supabase/migrations/` y la raíz para no cambiar las herramientas que los utilizan. Esas carpetas y cualquier archivo SQL también están excluidos de Git y de los despliegues. Las pruebas de base de datos necesitan esos archivos locales; las pruebas de servicios, el frontend y su compilación no los utilizan.
+
+`README.md`, `AGENTS.md`, `CLAUDE.md`, las instrucciones de `guidelines/` y `ATTRIBUTIONS.md` permanecen en el repositorio. Los resúmenes de tareas se entregan en el chat; sólo se crea un informe local cuando es necesario.
 
 ## Estructura principal
 
@@ -104,13 +106,13 @@ estudiante@demo.cl / estudiante123
 
 ## Nota
 
-La auditoría de privacidad y seguridad del 6 de octubre de 2026 está en [PRIVACY_AUDIT.md](PRIVACY_AUDIT.md). Incluye brechas verificadas en el repositorio y el orden de corrección para la entrada en vigor de la Ley 21.719. Los documentos públicos de desarrollo están en `/terminos` y `/privacidad`; su contenido compartido está en `src/app/features/auth/legalDocuments.ts`. Son borradores y aún requieren identidad del responsable, contacto y procedimientos operativos antes de publicar una versión definitiva.
+La auditoría de privacidad y seguridad se conserva en `docs-local/PRIVACY_AUDIT.md`, si dispones de la documentación local. Los documentos públicos de desarrollo están en `/terminos` y `/privacidad`; su contenido compartido está en `src/app/features/auth/legalDocuments.ts`. Son borradores y aún requieren identidad del responsable, contacto y procedimientos operativos antes de publicar una versión definitiva.
 
 Por ahora varias pantallas usan datos mock y logica demo. La idea es reemplazar eso despues por autenticacion, base de datos y servicios reales.
 
 ## Panel de administración
 
-El estado actual, los fallos corregidos y lo pendiente para próximas etapas están en [ESTADO_ADMIN.md](ESTADO_ADMIN.md).
+El informe local de avances y pendientes está en `docs-local/ESTADO_ADMIN.md`, si dispones de la documentación local.
 
 Las vistas de inicio, lugares, estadísticas y gestión comparten el estilo del perfil: tarjetas blancas, bordes suaves y un acento violeta. La navegación de escritorio permanece a la derecha; en móvil se usa una barra inferior. Sus estilos están limitados al panel en `src/app/features/admin/admin.css`.
 

@@ -39,6 +39,13 @@ supabase/.temp/
 .local/supabase-audit/
 supabase/schema/private/
 
+# Local reports, data models and SQL (keep on disk, never publish)
+/docs-local/
+/supabase/schema/
+/supabase/migrations/
+*.[sS][qQ][lL]
+*.[sS][qQ][lL].*
+
 # typescript
 *.tsbuildinfo
 
