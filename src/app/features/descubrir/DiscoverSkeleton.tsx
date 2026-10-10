@@ -1,24 +1,25 @@
 import { Card, CardContent } from "../../components/ui/card";
 import { Skeleton } from "../../components/ui/skeleton";
+import { DiscoverBackground } from "./DiscoverBackground";
 
 export function DiscoverSkeleton() {
   return (
     <div className="size-full flex flex-col bg-gray-50">
       <div className="flex-1 overflow-auto pb-20">
         <div className="bg-white pb-4">
-          <div className="rounded-b-[1.75rem] bg-[#5B4AEE] px-4 pb-16 pt-12 sm:px-6 md:px-8 lg:px-10">
-            <div className="mb-7 flex items-center justify-between">
-              <Skeleton className="h-9 w-28 bg-white/20" />
+          <div className="discover-hero relative overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-[#7C3AED] via-[#5B4AEE] to-[#4F46E5] px-4 pb-16 pt-12 sm:px-6 md:px-8 lg:px-10">
+            <DiscoverBackground />
+            <div className="relative z-10 mb-7 flex items-center justify-between">
+              <Skeleton className="h-12 w-28 bg-white/20" />
               <div className="flex items-center gap-2">
                 <Skeleton className="size-9 rounded-xl bg-white/20" />
                 <Skeleton className="size-10 rounded-full bg-white/20" />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-24 bg-white/20" />
-              <Skeleton className="h-7 w-48 bg-white/20" />
-              <Skeleton className="h-4 w-56 bg-white/20" />
+            <div className="relative z-10 space-y-1">
+              <Skeleton className="h-8 w-48 bg-white/20" />
+              <Skeleton className="h-5 w-56 bg-white/20" />
             </div>
           </div>
 

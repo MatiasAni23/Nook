@@ -52,8 +52,8 @@ export function Layout() {
 
       {/* Floating circular navigation */}
       <nav
-        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border border-[#E8EAF7] bg-white px-2 py-2 sm:gap-1.5 sm:px-2.5"
-        aria-label="Navegacion principal"
+        className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 items-end gap-1 rounded-[2rem] border-[1.5px] border-[#B9A4EF] bg-[#EEE8FF] px-2 py-2 shadow-[0_8px_24px_rgba(91,58,166,0.14),0_2px_5px_rgba(91,58,166,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] sm:gap-1.5 sm:px-2.5"
+        aria-label="Navegación principal"
       >
         {navItems.map(({ path, icon: Icon, label }) => {
           const isActive =
@@ -65,7 +65,7 @@ export function Layout() {
             <motion.button
               key={path}
               type="button"
-              className="group flex w-[3.75rem] flex-col items-center gap-1 outline-none"
+              className="group flex w-[3.75rem] flex-col items-center gap-1 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#9F87D0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#EEE8FF]"
               onClick={() => navigate(path)}
               aria-label={label}
               aria-current={isActive ? "page" : undefined}
@@ -76,8 +76,8 @@ export function Layout() {
               <motion.span
                 className={`relative grid size-[2.625rem] place-items-center rounded-full border transition-colors duration-300 ${
                   isActive
-                    ? 'border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_10px_18px_rgba(79,70,229,0.26)]'
-                    : 'border-[#E8EAF7] bg-white text-[#6D5DD3] shadow-none group-hover:border-[#D7DBF5] group-hover:bg-white group-hover:text-[#4F46E5]'
+                    ? 'border-[#4F46E5] bg-[#4F46E5] text-white shadow-[0_5px_12px_rgba(79,70,229,0.20)]'
+                    : 'border-[#DCCDF5] bg-white text-[#7961A3] shadow-none group-hover:border-[#B9A4EF] group-hover:bg-[#FCFAFF] group-hover:text-[#4F46E5]'
                 }`}
                 animate={{
                   scale: isActive ? 1.08 : 1,
@@ -98,7 +98,7 @@ export function Layout() {
               </motion.span>
               <span
                 className={`w-full truncate text-center text-[10px] font-semibold leading-none transition-colors duration-300 ${
-                  isActive ? 'text-[#4F46E5]' : 'text-[#7C70C9] group-hover:text-[#4F46E5]'
+                  isActive ? 'text-[#4F46E5]' : 'text-[#6C548F] group-hover:text-[#4F46E5]'
                 }`}
               >
                 {label}

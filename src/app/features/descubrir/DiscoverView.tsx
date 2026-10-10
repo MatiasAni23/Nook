@@ -22,6 +22,7 @@ import {
 } from "../mapa/placeFilters";
 import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
+import { DiscoverBackground } from "./DiscoverBackground";
 import { getDistanceInKm, sortPlacesByDistance, type Coordinates } from "../mapa/proximity";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "../../components/ui/carousel";
 
@@ -214,10 +215,8 @@ export function DiscoverView() {
       <div className="flex-1 overflow-auto pb-20">
         {/* Bloque superior: marca, acceso a notificaciones/perfil y saludo del usuario. */}
         <div className="bg-white pb-4">
-          <div className="relative overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-[#7C3AED] via-[#5B4AEE] to-[#4F46E5] px-4 pb-16 pt-12 text-white shadow-[0_18px_38px_rgba(79,70,229,0.20)] sm:px-6 md:px-8 lg:px-10">
-            <div className="pointer-events-none absolute -right-20 -top-24 size-60 rounded-full border border-white/[0.07] bg-white/[0.025]" />
-            <div className="pointer-events-none absolute right-10 top-11 size-28 rounded-full border border-white/[0.06] bg-white/[0.025]" />
-            <div className="pointer-events-none absolute left-28 bottom-3 size-28 rounded-full border border-white/[0.04]" />
+          <div className="discover-hero relative overflow-hidden rounded-b-[1.75rem] bg-gradient-to-br from-[#7C3AED] via-[#5B4AEE] to-[#4F46E5] px-4 pb-16 pt-12 text-white sm:px-6 md:px-8 lg:px-10">
+            <DiscoverBackground />
 
             <div className="relative z-10 mb-7 flex items-center justify-between">
               <BrandLogo tone="light" />
@@ -236,7 +235,7 @@ export function DiscoverView() {
                 <button type="button" onClick={() => navigate("/app/profile")} aria-label="Ir al perfil">
                   <Avatar className="size-10 border border-white/20 shadow-[0_8px_18px_rgba(49,46,129,0.16)]">
                     {profileImageUrl && <AvatarImage src={profileImageUrl} alt={displayName} className="object-cover" />}
-                    <AvatarFallback className="bg-white/18 text-xs font-black text-white">
+                    <AvatarFallback className="bg-[#44467F] text-xs font-semibold text-white">
                       {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>
@@ -245,11 +244,11 @@ export function DiscoverView() {
             </div>
 
             <div className="relative z-10">
-              <h2 className="text-2xl font-black leading-tight">
+              <h2 className="text-2xl font-semibold leading-tight">
                 Hola, {getFirstName(displayName)}
               </h2>
-              <p className="mt-1 text-sm font-bold text-white/80">
-                {isWorker ? "Donde quieres trabajar hoy?" : "Donde quieres estudiar hoy?"}
+              <p className="mt-1 text-sm text-white/90">
+                {isWorker ? "¿Dónde quieres trabajar hoy?" : "¿Dónde quieres estudiar hoy?"}
               </p>
             </div>
           </div>

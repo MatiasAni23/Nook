@@ -1,0 +1,42 @@
+.discover-hero {
+  background-color: #5b4aee;
+  box-shadow: 0 10px 28px rgb(50 47 100 / 10%);
+}
+
+.discover-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.discover-background-routes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: #e5e7ff;
+  opacity: 0.11;
+  mask-image: linear-gradient(to bottom, transparent, #000 60%);
+}
+
+.discover-background-city {
+  position: absolute;
+  right: -24px;
+  bottom: -36px;
+  width: min(72%, 780px);
+  min-width: 500px;
+  height: auto;
+  opacity: 0.4;
+  mask-image: linear-gradient(to right, transparent 5%, rgb(0 0 0 / 25%) 32%, #000 70%);
+}
+
+.discover-hero :is(button, input):focus-visible {
+  outline: 3px solid #e0ddff;
+  outline-offset: 4px;
+}
+
+@media (max-width: 639px) {
+  .discover-background-city { right: -88px; bottom: -22px; min-width: 470px; opacity: 0.35; }
+  .discover-background-routes { opacity: 0.08; }
+}
