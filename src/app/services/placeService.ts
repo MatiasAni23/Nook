@@ -123,6 +123,8 @@ const PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 let placesCache: { timestamp: number; places: AppPlace[] } | null = null;
 let placesRequest: Promise<AppPlace[]> | null = null;
 let placesCacheGeneration = 0;
+const placeDetailsCache = new Map<string, { timestamp: number; place: AppPlace }>();
+const placeDetailsRequests = new Map<string, Promise<AppPlace | null>>();
 
 export function clearPlacesCache() {
   clearPublicMapCache();
@@ -130,6 +132,8 @@ export function clearPlacesCache() {
   placesCacheGeneration += 1;
   placesCache = null;
   placesRequest = null;
+  placeDetailsCache.clear();
+  placeDetailsRequests.clear();
 }
 
 type PlaceRow = {
@@ -380,9 +384,21 @@ export async function listPlaces(options?: {
 }
 
 export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
-  const generation = placesCacheGeneration;
   const cachedPlace = placesCache?.places.find((place) => place.id === placeId);
   if (cachedPlace && getPlacesCacheRemaining() > 0) return cachedPlace;
+  const detail = placeDetailsCache.get(placeId);
+  if (detail && Date.now() - detail.timestamp < PLACES_CACHE_TTL_MS) return detail.place;
+  const pending = placeDetailsRequests.get(placeId);
+  if (pending) return pending;
+  const request = fetchPlaceById(placeId).finally(() => {
+    if (placeDetailsRequests.get(placeId) === request) placeDetailsRequests.delete(placeId);
+  });
+  placeDetailsRequests.set(placeId, request);
+  return request;
+}
+
+async function fetchPlaceById(placeId: string): Promise<AppPlace | null> {
+  const generation = placesCacheGeneration;
 
   const client = requireSupabase();
   const { data, error } = await client
@@ -437,6 +453,7 @@ export async function getPlaceById(placeId: string): Promise<AppPlace | null> {
   if (generation !== placesCacheGeneration) return null;
 
   const place = toAppPlace(data as PlaceRow);
+  placeDetailsCache.set(placeId, { timestamp: Date.now(), place });
   if (placesCache) {
     placesCache = {
       timestamp: placesCache.timestamp,

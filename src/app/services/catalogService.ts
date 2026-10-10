@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { createAdminDataCache } from "./adminDataCache";
 
 export interface RegionOption {
   id: string;
@@ -19,9 +20,18 @@ export interface InstitutionOption {
   type: string;
 }
 
+// Reference data also uses the five-minute, memory-only cache cleared on account changes.
+const regionsCache = createAdminDataCache<RegionOption[]>();
+const citiesCaches = new Map<string, ReturnType<typeof createAdminDataCache<CityOption[]>>>();
+const institutionsCaches = new Map<string, ReturnType<typeof createAdminDataCache<InstitutionOption[]>>>();
+
 export async function getRegions(): Promise<RegionOption[]> {
   if (!supabase) return [];
+  return regionsCache.read(fetchRegions);
+}
 
+async function fetchRegions(): Promise<RegionOption[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("regions")
     .select("id, name, code")
@@ -34,7 +44,16 @@ export async function getRegions(): Promise<RegionOption[]> {
 
 export async function getCitiesByRegion(regionId: string): Promise<CityOption[]> {
   if (!supabase || !regionId) return [];
+  let cache = citiesCaches.get(regionId);
+  if (!cache) {
+    cache = createAdminDataCache<CityOption[]>();
+    citiesCaches.set(regionId, cache);
+  }
+  return cache.read(() => fetchCitiesByRegion(regionId));
+}
 
+async function fetchCitiesByRegion(regionId: string): Promise<CityOption[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("cities")
     .select("id, region_id, name")
@@ -48,7 +67,17 @@ export async function getCitiesByRegion(regionId: string): Promise<CityOption[]>
 
 export async function getInstitutions(cityId?: string): Promise<InstitutionOption[]> {
   if (!supabase) return [];
+  const key = cityId ?? "all";
+  let cache = institutionsCaches.get(key);
+  if (!cache) {
+    cache = createAdminDataCache<InstitutionOption[]>();
+    institutionsCaches.set(key, cache);
+  }
+  return cache.read(() => fetchInstitutions(cityId));
+}
 
+async function fetchInstitutions(cityId?: string): Promise<InstitutionOption[]> {
+  if (!supabase) return [];
   let query = supabase
     .from("institutions")
     .select("id, city_id, name, type")

@@ -88,14 +88,20 @@ export interface ChatUser {
 
 let currentUserProfileCache: { timestamp: number; userId: string; profile: CurrentUserProfile | null } | null = null;
 let profileCacheGeneration = 0;
+const currentUserProfileRequests = new Map<string, Promise<CurrentUserProfile | null>>();
 const CURRENT_USER_PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
 const favoritePlacesCache = new Map<string, { timestamp: number; places: FavoritePlace[] }>();
 const favoritePlacesRequests = new Map<string, Promise<FavoritePlace[]>>();
 const FAVORITE_PLACES_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export function clearCurrentUserServiceCaches() {
+function invalidateCurrentUserProfile() {
   currentUserProfileCache = null;
   profileCacheGeneration += 1;
+  currentUserProfileRequests.clear();
+}
+
+export function clearCurrentUserServiceCaches() {
+  invalidateCurrentUserProfile();
   favoritePlacesCache.clear();
   favoritePlacesRequests.clear();
 }
@@ -136,25 +142,13 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
     return null;
   }
 
-  const { data: appUser, error: appUserError } = await supabase
-    .from("users")
-    .select("name, role, status, phone, avatar_url")
-    .eq("id", authData.user.id)
-    .maybeSingle();
-
-  if (appUserError) throw appUserError;
-  if (!appUser) throw new Error("No se encontro el perfil de la cuenta.");
-  let delegateStatus: string | null = null;
-  if (appUser.role === "delegate") {
-    const { data: delegate, error } = await supabase.from("delegates").select("status")
-      .eq("user_id", authData.user.id).maybeSingle();
-    if (error) throw error;
-    delegateStatus = delegate?.status ?? "pending";
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select(`
+  const [appUserResult, profileResult] = await Promise.all([
+    supabase.from("users")
+      .select("name, role, status, phone, avatar_url")
+      .eq("id", authData.user.id).maybeSingle(),
+    supabase
+      .from("user_profiles")
+      .select(`
       university,
       region_id,
       institution_id,
@@ -171,11 +165,23 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
       regions:region_id(name, code),
       institutions:institution_id(name, type),
       cities:city_id(name, regions:region_id(name))
-    `)
-    .eq("user_id", authData.user.id)
-    .maybeSingle();
+      `)
+      .eq("user_id", authData.user.id)
+      .maybeSingle(),
+  ]);
 
+  const { data: appUser, error: appUserError } = appUserResult;
+  const { data: profile, error: profileError } = profileResult;
+  if (appUserError) throw appUserError;
+  if (!appUser) throw new Error("No se encontro el perfil de la cuenta.");
   if (profileError) throw profileError;
+  let delegateStatus: string | null = null;
+  if (appUser.role === "delegate") {
+    const { data: delegate, error } = await supabase.from("delegates").select("status")
+      .eq("user_id", authData.user.id).maybeSingle();
+    if (error) throw error;
+    delegateStatus = delegate?.status ?? "pending";
+  }
 
   return {
     id: authData.user.id,
@@ -208,9 +214,11 @@ async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {
 
 export async function getCurrentUserProfile(options?: { forceRefresh?: boolean }): Promise<CurrentUserProfile | null> {
   if (!supabase) return null;
+  const client = supabase;
 
-  const { data: sessionData } = await supabase.auth.getSession();
+  const { data: sessionData } = await client.auth.getSession();
   const sessionUserId = sessionData.session?.user.id;
+  if (!sessionUserId) return null;
 
   if (
     !options?.forceRefresh &&
@@ -221,12 +229,21 @@ export async function getCurrentUserProfile(options?: { forceRefresh?: boolean }
     return currentUserProfileCache.profile;
   }
 
+  const pending = currentUserProfileRequests.get(sessionUserId);
+  if (pending) return pending;
   const generation = profileCacheGeneration;
-  const profile = await fetchCurrentUserProfile();
-  const { data: latestSession } = await supabase.auth.getSession();
-  if (generation !== profileCacheGeneration || latestSession.session?.user.id !== sessionUserId) return null;
-  if (profile) currentUserProfileCache = { timestamp: Date.now(), userId: profile.id, profile };
-  return profile;
+  const request = fetchCurrentUserProfile()
+    .then(async profile => {
+      const { data: latestSession } = await client.auth.getSession();
+      if (generation !== profileCacheGeneration || latestSession.session?.user.id !== sessionUserId || profile?.id !== sessionUserId) return null;
+      currentUserProfileCache = { timestamp: Date.now(), userId: profile.id, profile };
+      return profile;
+    })
+    .finally(() => {
+      if (currentUserProfileRequests.get(sessionUserId) === request) currentUserProfileRequests.delete(sessionUserId);
+    });
+  currentUserProfileRequests.set(sessionUserId, request);
+  return request;
 }
 
 export async function updateCurrentUserProfile(input: {
@@ -285,7 +302,7 @@ export async function updateCurrentUserProfile(input: {
     if (avatarError) throw avatarError;
   }
 
-  currentUserProfileCache = null;
+  invalidateCurrentUserProfile();
 }
 
 export async function updateStudyProfileVisibility(visible: boolean) {
@@ -297,7 +314,7 @@ export async function updateStudyProfileVisibility(visible: boolean) {
     .upsert({ user_id: data.user.id, study_profile_visible: visible }, { onConflict: "user_id" })
     .select("user_id").single();
   if (error) throw error;
-  currentUserProfileCache = null;
+  invalidateCurrentUserProfile();
 }
 
 export async function uploadCurrentUserProfileImage(file: File) {
@@ -343,7 +360,7 @@ export async function uploadCurrentUserProfileImage(file: File) {
 
   if (userError) throw userError;
 
-  currentUserProfileCache = null;
+  invalidateCurrentUserProfile();
   return imageUrl;
 }
 
