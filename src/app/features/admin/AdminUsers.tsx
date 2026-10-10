@@ -1,12 +1,38 @@
+import { normalizeAdminSearch } from "./AdminUi";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import {
+  ManagementSectionHeading,
+  ManagementAvatar,
+  ManagementEmpty,
+  ManagementDataNotice,
+} from "./AdminUi";
+import { useAdminData } from "./useAdminData";
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Ban, Briefcase, CalendarDays, GraduationCap, Search, Shield, UserCheck, UserX } from "lucide-react";
+import {
+  MoreHorizontal,
+  Ban,
+  Briefcase,
+  GraduationCap,
+  Search,
+  Shield,
+  UserCheck,
+  UserX,
+} from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
+
 import { Input } from "../../components/ui/input";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import {
+  getCachedManagedUsers,
+  getManagedUsersCacheRemaining,
   listManagedUsers,
   updateManagedUserStatus,
   type ManagedUser,
@@ -17,233 +43,288 @@ import {
 type RoleFilter = "all" | ManagedUserRole;
 type StatusFilter = "all" | ManagedUserStatus;
 
+const usersSource = {
+  peek: getCachedManagedUsers,
+  remaining: getManagedUsersCacheRemaining,
+  load: listManagedUsers,
+};
+
 export function AdminUsers() {
-  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [users, setUsers] = useState<ManagedUser[]>(
+    getCachedManagedUsers() ?? [],
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    data: loadedUsers,
+    isLoading,
+    error: loadError,
+    isRefreshing,
+    refresh,
+  } = useAdminData(usersSource, isSupabaseConfigured);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setErrorMessage("Supabase no esta configurado. Revisa VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY.");
-      return;
-    }
-
-    let isMounted = true;
-    setIsLoading(true);
-    setErrorMessage("");
-
-    listManagedUsers()
-      .then((loadedUsers) => {
-        if (isMounted) setUsers(loadedUsers);
-      })
-      .catch((error) => {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los usuarios.");
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
+    setUsers(loadedUsers ?? []);
+  }, [loadedUsers]);
   const filteredUsers = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch = normalizeAdminSearch(searchTerm);
 
     return users.filter((user) => {
       const matchesSearch =
         !normalizedSearch ||
-        user.name.toLowerCase().includes(normalizedSearch) ||
-        user.email.toLowerCase().includes(normalizedSearch);
+        normalizeAdminSearch(user.name).includes(normalizedSearch) ||
+        normalizeAdminSearch(user.email).includes(normalizedSearch);
       const matchesRole = roleFilter === "all" || user.role === roleFilter;
-      const matchesStatus = statusFilter === "all" || user.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" || user.status === statusFilter;
 
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [roleFilter, searchTerm, statusFilter, users]);
 
-  const handleStatusChange = async (userId: string, newStatus: ManagedUserStatus) => {
-    const previousUsers = users;
+  const handleStatusChange = async (
+    userId: string,
+    newStatus: ManagedUserStatus,
+  ) => {
+    if (updatingUserId !== null) return;
     setUpdatingUserId(userId);
     setErrorMessage("");
-    setUsers((current) => current.map((user) => (user.id === userId ? { ...user, status: newStatus } : user)));
-
     try {
       await updateManagedUserStatus(userId, newStatus);
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === userId ? { ...user, status: newStatus } : user,
+        ),
+      );
     } catch (error) {
-      setUsers(previousUsers);
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo actualizar el estado del usuario.");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el estado del usuario.",
+      );
     } finally {
       setUpdatingUserId(null);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg" style={{ fontWeight: 700 }}>
-          Usuarios de la Aplicacion
-        </h3>
-        <p className="text-sm text-gray-600">{filteredUsers.length} usuarios registrados</p>
+    <div className="management-section">
+      <ManagementSectionHeading
+        title="Usuarios"
+        count={users.length}
+        description="Cuentas de estudiantes y trabajadores de la comunidad."
+      />
+      <div className="management-toolbar">
+        <div className="relative">
+          <Search size={16} className="management-search-icon" />
+          <Input
+            aria-label="Buscar usuarios"
+            placeholder="Buscar por nombre o correo…"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="pl-10 h-10"
+          />
+        </div>
+        <span>{filteredUsers.length} resultados</span>
       </div>
-
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
-        <Input
-          placeholder="Buscar por nombre o email..."
-          value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
-          className="pl-10"
+      <div className="management-filters">
+        <FilterGroup label="Perfil">
+          <FilterButton
+            active={roleFilter === "all"}
+            onClick={() => setRoleFilter("all")}
+          >
+            Todos
+          </FilterButton>
+          <FilterButton
+            active={roleFilter === "student"}
+            onClick={() => setRoleFilter("student")}
+          >
+            Estudiantes
+          </FilterButton>
+          <FilterButton
+            active={roleFilter === "worker"}
+            onClick={() => setRoleFilter("worker")}
+          >
+            Trabajadores
+          </FilterButton>
+        </FilterGroup>
+        <div className="management-status-filter">
+          <label htmlFor="managed-user-status">Estado</label>
+          <select
+            id="managed-user-status"
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as StatusFilter)
+            }
+          >
+            {(
+              [
+                "all",
+                "verified",
+                "active",
+                "pending",
+                "suspended",
+                "blocked",
+              ] as StatusFilter[]
+            ).map((status) => (
+              <option key={status} value={status}>
+                {status === "all"
+                  ? "Todos los estados"
+                  : getStatusLabel(status)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <ManagementDataNotice
+        error={errorMessage || loadError}
+        isRefreshing={isRefreshing}
+        onRetry={() => {
+          setErrorMessage("");
+          refresh();
+        }}
+      />
+      {isLoading ? (
+        <div className="management-empty" role="status">
+          Cargando usuarios…
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <ManagementEmpty
+          title={
+            searchTerm || roleFilter !== "all" || statusFilter !== "all"
+              ? "No encontramos usuarios"
+              : "Todavía no hay usuarios"
+          }
+          description="Las cuentas de la comunidad aparecerán en este listado."
         />
-      </div>
-
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="space-y-3">
-            <FilterGroup label="Tipo de usuario">
-              <FilterButton active={roleFilter === "all"} onClick={() => setRoleFilter("all")}>
-                Todos
-              </FilterButton>
-              <FilterButton active={roleFilter === "student"} onClick={() => setRoleFilter("student")}>
-                Estudiantes
-              </FilterButton>
-              <FilterButton active={roleFilter === "worker"} onClick={() => setRoleFilter("worker")}>
-                Trabajadores
-              </FilterButton>
-            </FilterGroup>
-
-            <FilterGroup label="Estado">
-              {(["all", "verified", "active", "pending", "suspended", "blocked"] as StatusFilter[]).map((status) => (
-                <FilterButton key={status} active={statusFilter === status} onClick={() => setStatusFilter(status)}>
-                  {status === "all" ? "Todos" : getStatusLabel(status)}
-                </FilterButton>
-              ))}
-            </FilterGroup>
+      ) : (
+        <div className="management-list">
+          <div className="management-list-head" aria-hidden="true">
+            <span>Persona</span>
+            <span>Perfil</span>
+            <span>Estado</span>
+            <span className="text-right">Acciones</span>
           </div>
-        </CardContent>
-      </Card>
-
-      {errorMessage && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {errorMessage}
-        </div>
-      )}
-
-      {isLoading && (
-        <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">Cargando usuarios...</div>
-      )}
-
-      {!isLoading && filteredUsers.length === 0 && (
-        <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
-          No hay usuarios que coincidan con los filtros.
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {filteredUsers.map((user) => (
-          <Card key={user.id}>
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <h4 className="font-semibold">{user.name}</h4>
-                      <Badge className={getRoleColor(user.role)}>{getRoleLabel(user.role)}</Badge>
-                      <Badge className={getStatusColor(user.status)}>{getStatusLabel(user.status)}</Badge>
-                    </div>
-                    <div className="space-y-1 text-sm text-gray-600">
-                      <p>{user.email}</p>
-                      {user.role === "student" && user.university && (
-                        <p className="flex items-center gap-2">
-                          <GraduationCap className="size-3" />
-                          {user.university}
-                        </p>
-                      )}
-                      {user.role === "worker" && user.company && (
-                        <p className="flex items-center gap-2">
-                          <Briefcase className="size-3" />
-                          {user.company}
-                        </p>
-                      )}
-                      <div className="flex gap-4 pt-1 flex-wrap">
-                        <span className="flex items-center gap-1">
-                          <CalendarDays className="size-3" />
-                          Registrado: {user.registeredDate.toLocaleDateString("es-CL")}
-                        </span>
-                        <span>{user.reservationsCount} reservas</span>
-                        <span>{user.reportsCount} reportes</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  {user.status !== "verified" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingUserId === user.id}
-                      onClick={() => handleStatusChange(user.id, "verified")}
-                      className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                    >
-                      <Shield className="size-3 mr-1" />
-                      Verificar
-                    </Button>
-                  )}
-                  {user.status !== "suspended" && user.status !== "blocked" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingUserId === user.id}
-                      onClick={() => handleStatusChange(user.id, "suspended")}
-                      className="text-orange-600 border-orange-300 hover:bg-orange-50"
-                    >
-                      <UserX className="size-3 mr-1" />
-                      Suspender
-                    </Button>
-                  )}
-                  {user.status !== "active" && user.status !== "verified" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingUserId === user.id}
-                      onClick={() => handleStatusChange(user.id, "active")}
-                      className="text-green-600 border-green-300 hover:bg-green-50"
-                    >
-                      <UserCheck className="size-3 mr-1" />
-                      Activar
-                    </Button>
-                  )}
-                  {user.status !== "blocked" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={updatingUserId === user.id}
-                      onClick={() => handleStatusChange(user.id, "blocked")}
-                      className="text-red-600 border-red-300 hover:bg-red-50"
-                    >
-                      <Ban className="size-3 mr-1" />
-                      Bloquear
-                    </Button>
-                  )}
+          {filteredUsers.map((user) => (
+            <article key={user.id} className="management-person-row">
+              <div className="management-identity">
+                <ManagementAvatar
+                  name={user.name}
+                  tone={user.role === "student" ? "violet" : "sage"}
+                />
+                <div className="min-w-0">
+                  <h3>{user.name}</h3>
+                  <p>{user.email}</p>
+                  <small>
+                    Registro · {user.registeredDate.toLocaleDateString("es-CL")}
+                  </small>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              <div className="management-assignment">
+                <span
+                  className={`admin-pill category-${user.role === "student" ? "study" : "work"}`}
+                >
+                  {user.role === "student" ? (
+                    <GraduationCap size={12} />
+                  ) : (
+                    <Briefcase size={12} />
+                  )}
+                  {getRoleLabel(user.role)}
+                </span>
+                <p>
+                  {user.role === "student"
+                    ? user.university || "Sin institución"
+                    : user.company || "Sin empresa"}
+                </p>
+                <small>
+                  {user.reservationsCount} reservas · {user.reportsCount}{" "}
+                  reportes
+                </small>
+              </div>
+              <div className="management-status">
+                <Badge className={getStatusColor(user.status)}>
+                  {getStatusLabel(user.status)}
+                </Badge>
+              </div>
+              <div className="management-actions">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="admin-icon-button action-view"
+                      disabled={updatingUserId !== null || isRefreshing}
+                      aria-label={`Acciones para ${user.name}`}
+                      title="Gestionar cuenta"
+                    >
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="admin-dialog">
+                    {user.status !== "verified" && (
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleStatusChange(user.id, "verified")
+                        }
+                      >
+                        <Shield size={15} />
+                        Verificar cuenta
+                      </DropdownMenuItem>
+                    )}
+                    {user.status !== "active" && user.status !== "verified" && (
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void handleStatusChange(user.id, "active")
+                        }
+                      >
+                        <UserCheck size={15} />
+                        Activar cuenta
+                      </DropdownMenuItem>
+                    )}
+                    {user.status !== "suspended" &&
+                      user.status !== "blocked" && (
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            void handleStatusChange(user.id, "suspended")
+                          }
+                        >
+                          <UserX size={15} />
+                          Suspender cuenta
+                        </DropdownMenuItem>
+                      )}
+                    {user.status !== "blocked" && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-red-600"
+                          onSelect={() =>
+                            void handleStatusChange(user.id, "blocked")
+                          }
+                        >
+                          <Ban size={15} />
+                          Bloquear cuenta
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
-function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
+function FilterGroup({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <div>
       <label className="text-sm font-medium mb-2 block">{label}</label>
@@ -262,7 +343,12 @@ function FilterButton({
   onClick: () => void;
 }) {
   return (
-    <Button variant={active ? "default" : "outline"} size="sm" onClick={onClick} className={active ? "bg-[#4F46E5]" : ""}>
+    <Button
+      aria-pressed={active}
+      variant={active ? "default" : "outline"}
+      size="sm"
+      onClick={onClick}
+    >
       {children}
     </Button>
   );
@@ -271,15 +357,15 @@ function FilterButton({
 function getStatusColor(status: ManagedUserStatus) {
   switch (status) {
     case "verified":
-      return "bg-blue-100 text-blue-700 border-blue-300";
+      return "bg-slate-50 text-slate-600 border-slate-200";
     case "active":
-      return "bg-green-100 text-green-700 border-green-300";
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "pending":
-      return "bg-yellow-100 text-yellow-700 border-yellow-300";
+      return "bg-amber-50 text-amber-700 border-amber-200";
     case "suspended":
       return "bg-orange-100 text-orange-700 border-orange-300";
     case "blocked":
-      return "bg-red-100 text-red-700 border-red-300";
+      return "bg-red-50 text-red-700 border-red-200";
   }
 }
 
@@ -305,5 +391,7 @@ function getRoleLabel(role: ManagedUserRole) {
 }
 
 function getRoleColor(role: ManagedUserRole) {
-  return role === "student" ? "bg-purple-100 text-purple-700" : "bg-cyan-100 text-cyan-700";
+  return role === "student"
+    ? "bg-[#f0effb] text-[#6f6c80]"
+    : "bg-gray-100 text-gray-600";
 }

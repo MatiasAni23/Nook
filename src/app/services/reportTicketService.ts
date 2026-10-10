@@ -1,7 +1,12 @@
 import type { IssueType } from "../data/mockData";
 import { supabase } from "../lib/supabase";
+import { createAdminDataCache, clearAdminDataCaches } from "./adminDataCache";
 
-export type ReportTicketStatus = "pending" | "reviewing" | "resolved" | "dismissed";
+export type ReportTicketStatus =
+  | "pending"
+  | "reviewing"
+  | "resolved"
+  | "dismissed";
 
 export interface ReportTicketDelegate {
   id: string;
@@ -38,7 +43,9 @@ function requireSupabase() {
 }
 
 function normalizeStatus(status: unknown): ReportTicketStatus {
-  return ["pending", "reviewing", "resolved", "dismissed"].includes(String(status))
+  return ["pending", "reviewing", "resolved", "dismissed"].includes(
+    String(status),
+  )
     ? (status as ReportTicketStatus)
     : "pending";
 }
@@ -46,7 +53,9 @@ function normalizeStatus(status: unknown): ReportTicketStatus {
 function normalizeReport(row: any): ReportTicket {
   const place = Array.isArray(row.places) ? row.places[0] : row.places;
   const reporter = Array.isArray(row.users) ? row.users[0] : row.users;
-  const delegateAssignments = Array.isArray(place?.delegate_places) ? place.delegate_places : [];
+  const delegateAssignments = Array.isArray(place?.delegate_places)
+    ? place.delegate_places
+    : [];
 
   return {
     id: String(row.id),
@@ -63,9 +72,13 @@ function normalizeReport(row: any): ReportTicket {
     reporterEmail: String(reporter?.email ?? ""),
     delegates: delegateAssignments
       .map((assignment: any) => {
-        const delegate = Array.isArray(assignment.delegates) ? assignment.delegates[0] : assignment.delegates;
+        const delegate = Array.isArray(assignment.delegates)
+          ? assignment.delegates[0]
+          : assignment.delegates;
         if (!delegate) return null;
-        const delegateUser = Array.isArray(delegate.users) ? delegate.users[0] : delegate.users;
+        const delegateUser = Array.isArray(delegate.users)
+          ? delegate.users[0]
+          : delegate.users;
 
         return {
           id: String(delegate.id),
@@ -108,7 +121,11 @@ const REPORT_TICKET_SELECT = `
   )
 `;
 
-export async function listAdminReportTickets(): Promise<ReportTicket[]> {
+const adminReportCache = createAdminDataCache<ReportTicket[]>();
+export const getCachedAdminReportTickets = adminReportCache.peek;
+export const getAdminReportsCacheRemaining = adminReportCache.remaining;
+
+async function fetchAdminReportTickets(): Promise<ReportTicket[]> {
   const client = requireSupabase();
   const { data, error } = await client
     .from("place_reports")
@@ -118,6 +135,10 @@ export async function listAdminReportTickets(): Promise<ReportTicket[]> {
   if (error) throw error;
 
   return (data ?? []).map(normalizeReport);
+}
+
+export function listAdminReportTickets(options?: { forceRefresh?: boolean }) {
+  return adminReportCache.read(fetchAdminReportTickets, options);
 }
 
 export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
@@ -143,7 +164,9 @@ export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
 
   if (assignmentsError) throw assignmentsError;
 
-  const placeIds = (assignments ?? []).map((assignment) => String(assignment.place_id));
+  const placeIds = (assignments ?? []).map((assignment) =>
+    String(assignment.place_id),
+  );
   if (placeIds.length === 0) return [];
 
   const { data, error } = await client
@@ -158,7 +181,10 @@ export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
   return (data ?? []).map(normalizeReport);
 }
 
-export async function updateReportTicketStatus(reportId: string, status: ReportTicketStatus): Promise<ReportTicket> {
+export async function updateReportTicketStatus(
+  reportId: string,
+  status: ReportTicketStatus,
+): Promise<ReportTicket> {
   const client = requireSupabase();
   const { data, error } = await client
     .from("place_reports")
@@ -169,5 +195,6 @@ export async function updateReportTicketStatus(reportId: string, status: ReportT
 
   if (error) throw error;
 
+  clearAdminDataCaches();
   return normalizeReport(data);
 }

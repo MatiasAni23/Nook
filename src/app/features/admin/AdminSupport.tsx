@@ -1,23 +1,45 @@
+import { normalizeAdminSearch } from "./AdminUi";
+import { ManagementSectionHeading, ManagementEmpty } from "./AdminUi";
 import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "../../components/ui/dialog";
 import { Search, MessageCircle, X, Send, Clock } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Textarea } from "../../components/ui/textarea";
 import { Badge } from "../../components/ui/badge";
-import { mockSupportTickets, type SupportTicket, type TicketMessage } from "../../data/managementData";
+import {
+  mockSupportTickets,
+  type SupportTicket,
+  type TicketMessage,
+} from "../../data/managementData";
 
 export function AdminSupport() {
   const [tickets, setTickets] = useState(mockSupportTickets);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(
+    null,
+  );
   const [replyMessage, setReplyMessage] = useState("");
-  const [statusFilter, setStatusFilter] = useState<'all' | SupportTicket['status']>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | SupportTicket["status"]
+  >("all");
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.userName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter;
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesSearch =
+      normalizeAdminSearch(ticket.subject).includes(
+        normalizeAdminSearch(searchTerm),
+      ) ||
+      normalizeAdminSearch(ticket.userName).includes(
+        normalizeAdminSearch(searchTerm),
+      );
+    const matchesStatus =
+      statusFilter === "all" || ticket.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -26,91 +48,126 @@ export function AdminSupport() {
 
     const newMessage: TicketMessage = {
       id: `m${Date.now()}`,
-      from: 'support',
-      name: 'Soporte Pinwi',
+      from: "support",
+      name: "Soporte Pinwi",
       message: replyMessage,
       timestamp: new Date(),
     };
 
-    setTickets(tickets.map(t =>
-      t.id === selectedTicket.id
-        ? {
-            ...t,
-            messages: [...t.messages, newMessage],
-            updatedAt: new Date(),
-            status: 'in_review',
-          }
-        : t
-    ));
+    setTickets(
+      tickets.map((t) =>
+        t.id === selectedTicket.id
+          ? {
+              ...t,
+              messages: [...t.messages, newMessage],
+              updatedAt: new Date(),
+              status: "in_review",
+            }
+          : t,
+      ),
+    );
 
     setSelectedTicket({
       ...selectedTicket,
       messages: [...selectedTicket.messages, newMessage],
+      status: "in_review",
+      updatedAt: newMessage.timestamp,
     });
 
     setReplyMessage("");
   };
 
-  const handleStatusChange = (ticketId: string, newStatus: SupportTicket['status']) => {
-    setTickets(tickets.map(t =>
-      t.id === ticketId ? { ...t, status: newStatus, updatedAt: new Date() } : t
-    ));
+  const handleStatusChange = (
+    ticketId: string,
+    newStatus: SupportTicket["status"],
+  ) => {
+    setTickets(
+      tickets.map((t) =>
+        t.id === ticketId
+          ? { ...t, status: newStatus, updatedAt: new Date() }
+          : t,
+      ),
+    );
     if (selectedTicket?.id === ticketId) {
       setSelectedTicket({ ...selectedTicket, status: newStatus });
     }
   };
 
-  const getCategoryIcon = (category: SupportTicket['category']) => {
+  const getCategoryIcon = (category: SupportTicket["category"]) => {
     switch (category) {
-      case 'technical': return '🔧';
-      case 'billing': return '💳';
-      case 'report': return '⚠️';
-      case 'suggestion': return '💡';
-      case 'other': return '📋';
+      case "technical":
+        return "🔧";
+      case "billing":
+        return "💳";
+      case "report":
+        return "⚠️";
+      case "suggestion":
+        return "💡";
+      case "other":
+        return "📋";
     }
   };
 
-  const getCategoryLabel = (category: SupportTicket['category']) => {
+  const getCategoryLabel = (category: SupportTicket["category"]) => {
     switch (category) {
-      case 'technical': return 'Técnico';
-      case 'billing': return 'Facturación';
-      case 'report': return 'Reporte';
-      case 'suggestion': return 'Sugerencia';
-      case 'other': return 'Otro';
+      case "technical":
+        return "Técnico";
+      case "billing":
+        return "Facturación";
+      case "report":
+        return "Reporte";
+      case "suggestion":
+        return "Sugerencia";
+      case "other":
+        return "Otro";
     }
   };
 
-  const getStatusColor = (status: SupportTicket['status']) => {
+  const getStatusColor = (status: SupportTicket["status"]) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'in_review': return 'bg-blue-100 text-blue-700 border-blue-300';
-      case 'resolved': return 'bg-green-100 text-green-700 border-green-300';
-      case 'closed': return 'bg-gray-100 text-gray-700 border-gray-300';
+      case "pending":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "in_review":
+        return "bg-slate-50 text-slate-600 border-slate-200";
+      case "resolved":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "closed":
+        return "bg-gray-100 text-gray-700 border-gray-300";
     }
   };
 
-  const getStatusLabel = (status: SupportTicket['status']) => {
+  const getStatusLabel = (status: SupportTicket["status"]) => {
     switch (status) {
-      case 'pending': return 'Pendiente';
-      case 'in_review': return 'En revisión';
-      case 'resolved': return 'Resuelto';
-      case 'closed': return 'Cerrado';
+      case "pending":
+        return "Pendiente";
+      case "in_review":
+        return "En revisión";
+      case "resolved":
+        return "Resuelto";
+      case "closed":
+        return "Cerrado";
     }
   };
 
-  const getPriorityColor = (priority: SupportTicket['priority']) => {
+  const getPriorityColor = (priority: SupportTicket["priority"]) => {
     switch (priority) {
-      case 'low': return 'bg-gray-100 text-gray-700';
-      case 'medium': return 'bg-orange-100 text-orange-700';
-      case 'high': return 'bg-red-100 text-red-700';
+      case "low":
+        return "bg-gray-100 text-gray-700";
+      case "medium":
+        return "bg-orange-100 text-orange-700";
+      case "high":
+        return "bg-red-100 text-red-700";
     }
   };
 
-  const getPriorityLabel = (priority: SupportTicket['priority']) => {
+  const getPriorityLabel = (priority: SupportTicket["priority"]) => {
     switch (priority) {
-      case 'low': return 'Baja';
-      case 'medium': return 'Media';
-      case 'high': return 'Alta';
+      case "low":
+        return "Baja";
+      case "medium":
+        return "Media";
+      case "high":
+        return "Alta";
     }
   };
 
@@ -121,7 +178,7 @@ export function AdminSupport() {
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 1) return "Ahora";
     if (diffMins < 60) return `Hace ${diffMins} min`;
     if (diffHours < 24) return `Hace ${diffHours}h`;
     return `Hace ${diffDays}d`;
@@ -130,10 +187,11 @@ export function AdminSupport() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h3 className="text-lg" style={{ fontWeight: 700 }}>Centro de Soporte</h3>
-        <p className="text-sm text-gray-600">{filteredTickets.length} tickets</p>
-      </div>
+      <ManagementSectionHeading
+        title="Soporte"
+        count={tickets.length}
+        description="Consultas de la comunidad, organizadas por estado y prioridad."
+      />
 
       {/* Search and Filters */}
       <div className="space-y-3">
@@ -149,34 +207,50 @@ export function AdminSupport() {
 
         <div className="flex gap-2 flex-wrap">
           <Button
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            variant={statusFilter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('all')}
-            className={statusFilter === 'all' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("all")}
+            className={
+              statusFilter === "all"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Todos
           </Button>
           <Button
-            variant={statusFilter === 'pending' ? 'default' : 'outline'}
+            variant={statusFilter === "pending" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('pending')}
-            className={statusFilter === 'pending' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("pending")}
+            className={
+              statusFilter === "pending"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Pendientes
           </Button>
           <Button
-            variant={statusFilter === 'in_review' ? 'default' : 'outline'}
+            variant={statusFilter === "in_review" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('in_review')}
-            className={statusFilter === 'in_review' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("in_review")}
+            className={
+              statusFilter === "in_review"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             En revisión
           </Button>
           <Button
-            variant={statusFilter === 'resolved' ? 'default' : 'outline'}
+            variant={statusFilter === "resolved" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('resolved')}
-            className={statusFilter === 'resolved' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("resolved")}
+            className={
+              statusFilter === "resolved"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Resueltos
           </Button>
@@ -184,18 +258,43 @@ export function AdminSupport() {
       </div>
 
       {/* Tickets List */}
-      <div className="space-y-3">
+      {filteredTickets.length === 0 && (
+        <ManagementEmpty
+          title="No encontramos consultas"
+          description="Prueba otra búsqueda o cambia el filtro de estado."
+        />
+      )}
+      <div className="management-record-grid">
         {filteredTickets.map((ticket) => (
-          <Card key={ticket.id} className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardContent className="p-4" onClick={() => setSelectedTicket(ticket)}>
+          <Card
+            key={ticket.id}
+            className="management-record cursor-pointer hover:border-[#c7c4df] transition-colors"
+          >
+            <CardContent
+              role="button"
+              tabIndex={0}
+              aria-label={`Abrir consulta: ${ticket.subject}`}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedTicket(ticket);
+                }
+              }}
+              className="p-4"
+              onClick={() => setSelectedTicket(ticket)}
+            >
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-lg">{getCategoryIcon(ticket.category)}</span>
+                      <span className="management-section-icon tone-blue">
+                        <MessageCircle size={17} strokeWidth={1.5} />
+                      </span>
                       <h4 className="font-semibold">{ticket.subject}</h4>
                     </div>
-                    <p className="text-sm text-gray-600">De: {ticket.userName}</p>
+                    <p className="text-sm text-gray-600">
+                      De: {ticket.userName}
+                    </p>
                   </div>
                   <div className="text-right space-y-1">
                     <Badge className={getStatusColor(ticket.status)}>
@@ -212,7 +311,9 @@ export function AdminSupport() {
                   <Badge variant="outline" className="text-xs">
                     {getCategoryLabel(ticket.category)}
                   </Badge>
-                  <Badge className={`text-xs ${getPriorityColor(ticket.priority)}`}>
+                  <Badge
+                    className={`text-xs ${getPriorityColor(ticket.priority)}`}
+                  >
                     {getPriorityLabel(ticket.priority)}
                   </Badge>
                   <span className="text-xs text-gray-500">
@@ -227,30 +328,51 @@ export function AdminSupport() {
 
       {/* Ticket Detail Modal */}
       {selectedTicket && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <Card className="w-full max-w-3xl max-h-[90vh] flex flex-col">
-            <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <Dialog
+          open={Boolean(selectedTicket)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTicket(null);
+              setReplyMessage("");
+            }
+          }}
+        >
+          <DialogContent className="admin-dialog flex max-h-[90dvh] flex-col overflow-hidden p-0 sm:max-w-3xl [&>button]:hidden">
+            <DialogDescription className="sr-only">
+              Consulta de soporte de {selectedTicket.userName}. Los mensajes de
+              esta vista son de demostración.
+            </DialogDescription>
+            <CardContent className="p-6 min-h-0 flex-1 overflow-auto flex flex-col">
               {/* Header */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">{getCategoryIcon(selectedTicket.category)}</span>
-                    <h3 className="text-xl font-semibold">{selectedTicket.subject}</h3>
+                    <span className="text-2xl">
+                      {getCategoryIcon(selectedTicket.category)}
+                    </span>
+                    <DialogTitle className="text-xl font-medium">
+                      {selectedTicket.subject}
+                    </DialogTitle>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge className={getStatusColor(selectedTicket.status)}>
                       {getStatusLabel(selectedTicket.status)}
                     </Badge>
-                    <Badge className={getPriorityColor(selectedTicket.priority)}>
+                    <Badge
+                      className={getPriorityColor(selectedTicket.priority)}
+                    >
                       Prioridad {getPriorityLabel(selectedTicket.priority)}
                     </Badge>
-                    <span className="text-sm text-gray-600">De: {selectedTicket.userName}</span>
+                    <span className="text-sm text-gray-600">
+                      De: {selectedTicket.userName}
+                    </span>
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setSelectedTicket(null)}
+                  aria-label="Cerrar consulta"
                 >
                   <X className="size-5" />
                 </Button>
@@ -261,19 +383,25 @@ export function AdminSupport() {
                 {selectedTicket.messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.from === 'user' ? 'justify-start' : 'justify-end'}`}
+                    className={`flex ${message.from === "user" ? "justify-start" : "justify-end"}`}
                   >
-                    <div className={`max-w-[80%] rounded-lg p-3 ${
-                      message.from === 'user'
-                        ? 'bg-white border'
-                        : 'bg-[#4F46E5] text-white'
-                    }`}>
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        message.from === "user"
+                          ? "bg-white border"
+                          : "bg-[#4F46E5] text-white"
+                      }`}
+                    >
                       <p className="text-sm font-medium mb-1">{message.name}</p>
                       <p className="text-sm">{message.message}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.from === 'user' ? 'text-gray-500' : 'text-white/70'
-                      }`}>
-                        {message.timestamp.toLocaleString('es-CL')}
+                      <p
+                        className={`text-xs mt-1 ${
+                          message.from === "user"
+                            ? "text-gray-500"
+                            : "text-white/70"
+                        }`}
+                      >
+                        {message.timestamp.toLocaleString("es-CL")}
                       </p>
                     </div>
                   </div>
@@ -283,14 +411,16 @@ export function AdminSupport() {
               {/* Reply */}
               <div className="space-y-3">
                 <Textarea
+                  aria-label="Respuesta a la consulta"
                   placeholder="Escribe tu respuesta..."
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
                   rows={3}
                 />
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={handleReply}
+                    disabled={!replyMessage.trim()}
                     className="bg-[#4F46E5] hover:bg-[#4338CA]"
                   >
                     <Send className="size-4 mr-2" />
@@ -298,14 +428,18 @@ export function AdminSupport() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => handleStatusChange(selectedTicket.id, 'resolved')}
+                    onClick={() =>
+                      handleStatusChange(selectedTicket.id, "resolved")
+                    }
                     className="text-green-600 border-green-300"
                   >
                     Marcar como Resuelto
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => handleStatusChange(selectedTicket.id, 'closed')}
+                    onClick={() =>
+                      handleStatusChange(selectedTicket.id, "closed")
+                    }
                     className="text-gray-600"
                   >
                     Cerrar Ticket
@@ -313,8 +447,8 @@ export function AdminSupport() {
                 </div>
               </div>
             </CardContent>
-          </Card>
-        </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

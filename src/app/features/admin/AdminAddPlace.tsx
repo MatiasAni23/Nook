@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { APIProvider, Map, useMap, type MapCameraChangedEvent } from "@vis.gl/react-google-maps";
 import {
   ArrowLeft,
@@ -35,6 +35,7 @@ import { Slider } from "../../components/ui/slider";
 import { Switch } from "../../components/ui/switch";
 import { PlaceSpacesEditor, arePlaceSpacesValid, validPlaceSpaces, type PlaceSpaceDraft } from "../shared/PlaceSpacesEditor";
 import { isSupabaseConfigured } from "../../lib/supabase";
+import { validatePlaceCapacity, validatePlaceImages } from "./placeFormValidation";
 import {
   createPlace,
   type AppPlace,
@@ -175,6 +176,7 @@ function CenterMapPin() {
 }
 
 export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminAddPlaceProps) {
+  const errorRef = useRef<HTMLDivElement>(null);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<PlaceCategory>("study");
   const [type, setType] = useState<PlaceType>("library");
@@ -204,6 +206,12 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!errorMessage) return;
+    errorRef.current?.focus({ preventScroll: true });
+    errorRef.current?.scrollIntoView({ block: "center" });
+  }, [errorMessage]);
 
   useEffect(() => {
     const previews = imageFiles.map((file) => URL.createObjectURL(file));
@@ -247,6 +255,9 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
   };
 
   const getParsedCoordinates = (): ParsedCoordinates => {
+    if (!latitudeInput.trim() || !longitudeInput.trim()) {
+      return { error: "Completa la latitud y la longitud del lugar." };
+    }
     const latitude = Number(latitudeInput);
     const longitude = Number(longitudeInput);
 
@@ -305,7 +316,14 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
   };
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
+    const files = Array.from(event.target.files ?? []);
+    const imageError = validatePlaceImages(files);
+    if (imageError) {
+      setErrorMessage(imageError);
+      event.target.value = "";
+      return;
+    }
+    setErrorMessage("");
     setImageFiles((current) => [...current, ...files].slice(0, 8));
     event.target.value = "";
   };
@@ -387,6 +405,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
   };
 
   const handleSubmit = async () => {
+    if (isSaving) return;
     setErrorMessage("");
 
     const parsedCoordinates = getParsedCoordinates();
@@ -395,8 +414,14 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
       return;
     }
 
-    if (!name || !type || !description || !address) {
-      setErrorMessage("Completa nombre, tipo, direccion, descripcion y horario.");
+    if (!name.trim() || !type || !description.trim() || !address.trim()) {
+      setErrorMessage("Completa nombre, dirección y descripción del lugar.");
+      return;
+    }
+
+    const capacityError = validatePlaceCapacity(capacityMin, capacityMax);
+    if (capacityError) {
+      setErrorMessage(capacityError);
       return;
     }
 
@@ -410,12 +435,12 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
 
     const hasOpenDay = dailySchedule.some((day) => day.isOpen);
     if (!hasOpenDay) {
-      setErrorMessage("Deja al menos un dia abierto para el lugar.");
+      setErrorMessage("Deja al menos un día abierto para el lugar.");
       return;
     }
 
     if (accessType === "reservation" && (!pricePerHour || Number(pricePerHour) <= 0)) {
-      setErrorMessage("Ingresa un precio por hora valido para lugares de paga.");
+      setErrorMessage("Ingresa un precio por hora válido para lugares de paga.");
       return;
     }
 
@@ -433,12 +458,12 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
 
     try {
       const place = await createPlace({
-        name,
+        name: name.trim(),
         type,
         category,
         planType,
-        description,
-        address,
+        description: description.trim(),
+        address: address.trim(),
         zone: zone || null,
         websiteUrl,
         latitude: parsedCoordinates.position.lat,
@@ -470,7 +495,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
   const fallbackOffsetY = (defaultPosition.lat - pinPosition.lat) * 3000;
 
   return (
-    <div className="size-full flex flex-col bg-gray-50">
+    <fieldset disabled={isSaving} className="admin-form size-full min-w-0 flex flex-col border-0">
       <div className="flex-1 overflow-auto p-4 pb-32">
         <div className="space-y-4">
           <div>
@@ -480,113 +505,26 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
                   type="button"
                   size="icon"
                   onClick={onBack}
-                  className="size-10 shrink-0 rounded-xl bg-[#4F46E5] text-white shadow-[0_10px_20px_rgba(79,70,229,0.20)] hover:bg-[#4338CA]"
+                  className="size-10 shrink-0 rounded-xl border border-[#e9eaf2] bg-white text-gray-500 hover:bg-gray-50"
                   aria-label="Volver a listado"
                 >
                   <ArrowLeft className="size-5" />
                 </Button>
               )}
-              <h2 className="text-2xl" style={{ fontWeight: 700 }}>Agregar Nuevo Lugar</h2>
+              <h1 className="text-2xl">Nuevo lugar</h1>
             </div>
-            <p className="text-gray-600">Completa la informacion del espacio y fija su ubicacion.</p>
+            <p className="text-gray-600">Los campos con * son obligatorios. Completa la ficha y revisa su ubicación.</p>
           </div>
 
           {errorMessage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div ref={errorRef} role="alert" tabIndex={-1} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {errorMessage}
             </div>
           )}
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MapPin className="size-5 text-[#4F46E5]" />
-                Ubicacion en el mapa
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-72 overflow-hidden rounded-lg border bg-gray-100">
-                {googleMapsApiKey ? (
-                  <APIProvider apiKey={googleMapsApiKey}>
-                    <Map
-                      defaultCenter={pinPosition}
-                      defaultZoom={14}
-                      mapId="pinwi-admin-place-map"
-                      gestureHandling="greedy"
-                      disableDefaultUI
-                      onClick={handleGoogleMapClick}
-                      onCameraChanged={handleGoogleCameraChanged}
-                      className="absolute inset-0"
-                    >
-                      <RecenterAdminMap center={mapCenterRequest} />
-                    </Map>
-                  </APIProvider>
-                ) : (
-                  <div
-                    className="absolute inset-0 cursor-crosshair bg-gradient-to-br from-blue-100 via-white to-green-100"
-                    onClick={handleFallbackMapClick}
-                  >
-                    <div
-                      className="absolute z-20 transition-all duration-200"
-                      style={{
-                        left: `calc(50% + ${fallbackOffsetX}px)`,
-                        top: `calc(50% + ${fallbackOffsetY}px)`,
-                        transform: "translate(-50%, -100%)",
-                      }}
-                    >
-                      <MapPin className="size-10 fill-red-500 text-red-600 drop-shadow-lg" />
-                    </div>
-                  </div>
-                )}
-
-                {googleMapsApiKey && (
-                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-full">
-                    <CenterMapPin />
-                  </div>
-                )}
-                <p className="absolute top-3 left-3 rounded-lg bg-white/90 px-3 py-2 text-sm shadow-md">
-                  {googleMapsApiKey ? "Mueve el mapa para posicionar el pin" : "Haz clic para posicionar el pin"}
-                </p>
-                <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-white/90 px-3 py-2 text-xs shadow-md">
-                  <p><span className="font-semibold">Lat:</span> {formatCoordinate(pinPosition.lat)}</p>
-                  <p><span className="font-semibold">Lng:</span> {formatCoordinate(pinPosition.lng)}</p>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitud exacta</Label>
-                  <Input
-                    id="latitude"
-                    inputMode="decimal"
-                    value={latitudeInput}
-                    onChange={(e) => setLatitudeInput(e.target.value)}
-                    onBlur={applyCoordinateInputs}
-                    placeholder="-33.4569000000"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitud exacta</Label>
-                  <Input
-                    id="longitude"
-                    inputMode="decimal"
-                    value={longitudeInput}
-                    onChange={(e) => setLongitudeInput(e.target.value)}
-                    onBlur={applyCoordinateInputs}
-                    placeholder="-70.6483000000"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-lg">Espacios del lugar</CardTitle></CardHeader>
-            <CardContent><PlaceSpacesEditor spaces={spaces} onChange={setSpaces} /></CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Informacion basica</CardTitle>
+              <CardTitle className="text-lg">Información del lugar</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -596,9 +534,9 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Categoria *</Label>
+                  <Label htmlFor="place-category">Categoría *</Label>
                   <Select value={category} onValueChange={(value) => setCategory(value as PlaceCategory)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="place-category">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -609,9 +547,9 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Tipo de lugar *</Label>
+                  <Label htmlFor="place-type">Tipo de lugar *</Label>
                   <Select value={type} onValueChange={(value) => setType(value as PlaceType)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="place-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -624,9 +562,9 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
               </div>
 
               {showPlanType && <div className="space-y-2">
-                <Label>Plan del lugar *</Label>
+                <Label htmlFor="place-plan">Plan del lugar *</Label>
                 <Select value={planType} onValueChange={(value) => setPlanType(value as PlacePlanType)}>
-                  <SelectTrigger>
+                  <SelectTrigger id="place-plan">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -641,7 +579,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="address">Direccion *</Label>
+                  <Label htmlFor="address">Dirección *</Label>
                   <Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ej: Av. Providencia 1234" />
                 </div>
 
@@ -654,7 +592,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
               <div className="space-y-2">
                 <Label htmlFor="websiteUrl" className="flex items-center gap-2">
                   <ExternalLink className="size-4 text-[#4F46E5]" />
-                  Pagina web
+                  Página web
                 </Label>
                 <Input
                   id="websiteUrl"
@@ -666,7 +604,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Descripcion *</Label>
+                <Label htmlFor="description">Descripción *</Label>
                 <Textarea
                   id="description"
                   value={description}
@@ -690,6 +628,7 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
                       <div className="col-span-2 flex items-center justify-between gap-3 sm:col-span-1 sm:justify-start">
                         <span className="text-sm font-medium text-gray-800">{day.label}</span>
                         <Switch
+                          aria-label={`Abierto el ${day.label.toLowerCase()}`}
                           checked={day.isOpen}
                           onCheckedChange={(checked) => updateScheduleDay(day.key, { isOpen: checked })}
                         />
@@ -784,6 +723,95 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <MapPin className="size-5 text-[#4F46E5]" />
+                Ubicación
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="relative h-72 overflow-hidden rounded-lg border bg-gray-100">
+                {googleMapsApiKey ? (
+                  <APIProvider apiKey={googleMapsApiKey}>
+                    <Map
+                      defaultCenter={pinPosition}
+                      defaultZoom={14}
+                      mapId="pinwi-admin-place-map"
+                      gestureHandling="greedy"
+                      disableDefaultUI
+                      onClick={handleGoogleMapClick}
+                      onCameraChanged={handleGoogleCameraChanged}
+                      className="absolute inset-0"
+                    >
+                      <RecenterAdminMap center={mapCenterRequest} />
+                    </Map>
+                  </APIProvider>
+                ) : (
+                  <div
+                    className="absolute inset-0 cursor-crosshair bg-[#f1f2f7]"
+                    onClick={handleFallbackMapClick}
+                  >
+                    <div
+                      className="absolute z-20 transition-all duration-200"
+                      style={{
+                        left: `calc(50% + ${fallbackOffsetX}px)`,
+                        top: `calc(50% + ${fallbackOffsetY}px)`,
+                        transform: "translate(-50%, -100%)",
+                      }}
+                    >
+                      <MapPin className="size-10 fill-red-500 text-red-600 drop-shadow-lg" />
+                    </div>
+                  </div>
+                )}
+
+                {googleMapsApiKey && (
+                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-full">
+                    <CenterMapPin />
+                  </div>
+                )}
+                <p className="absolute top-3 left-3 rounded-lg bg-white/90 px-3 py-2 text-sm shadow-md">
+                  {googleMapsApiKey ? "Mueve el mapa para posicionar el pin" : "Haz clic para posicionar el pin"}
+                </p>
+                <div className="absolute bottom-3 left-3 right-3 rounded-lg bg-white/90 px-3 py-2 text-xs shadow-md">
+                  <p><span className="font-semibold">Lat:</span> {formatCoordinate(pinPosition.lat)}</p>
+                  <p><span className="font-semibold">Lng:</span> {formatCoordinate(pinPosition.lng)}</p>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="latitude">Latitud exacta</Label>
+                  <Input
+                    id="latitude"
+                    inputMode="decimal"
+                    value={latitudeInput}
+                    onChange={(e) => setLatitudeInput(e.target.value)}
+                    onBlur={applyCoordinateInputs}
+                    placeholder="-33.4569000000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="longitude">Longitud exacta</Label>
+                  <Input
+                    id="longitude"
+                    inputMode="decimal"
+                    value={longitudeInput}
+                    onChange={(e) => setLongitudeInput(e.target.value)}
+                    onBlur={applyCoordinateInputs}
+                    placeholder="-70.6483000000"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3"><CardTitle className="text-lg">Espacios del lugar</CardTitle></CardHeader>
+            <CardContent><PlaceSpacesEditor spaces={spaces} onChange={setSpaces} /></CardContent>
+          </Card>
+
+
 
           <Card>
             <CardHeader className="pb-3">
@@ -925,8 +953,8 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
                     className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 bg-white/90 backdrop-blur-sm px-4 py-5 text-center cursor-pointer hover:bg-white hover:border-[#4F46E5] transition-all z-10"
                   >
                     <Upload className="size-6 text-[#4F46E5]" />
-                    <span className="text-sm font-medium">Seleccionar imagenes</span>
-                    <span className="text-xs text-gray-500">Hasta 8 imagenes JPG, PNG o WebP</span>
+                    <span className="text-sm font-medium">Seleccionar imágenes</span>
+                    <span className="text-xs text-gray-500">Hasta 8 imágenes JPG, PNG, WebP o GIF · 10 MB por imagen</span>
                   </Label>
                 )}
               </div>
@@ -1003,6 +1031,6 @@ export function AdminAddPlace({ onCreated, onBack, showPlanType = true }: AdminA
           </Button>
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 }

@@ -108,6 +108,20 @@ La auditoría de privacidad y seguridad del 6 de octubre de 2026 está en [PRIVA
 
 Por ahora varias pantallas usan datos mock y logica demo. La idea es reemplazar eso despues por autenticacion, base de datos y servicios reales.
 
+## Panel de administración
+
+El estado actual, los fallos corregidos y lo pendiente para próximas etapas están en [ESTADO_ADMIN.md](ESTADO_ADMIN.md).
+
+Las vistas de inicio, lugares, estadísticas y gestión comparten el estilo del perfil: tarjetas blancas, bordes suaves y un acento violeta. La navegación de escritorio permanece a la derecha; en móvil se usa una barra inferior. Sus estilos están limitados al panel en `src/app/features/admin/admin.css`.
+
+Gestión organiza las cinco secciones en accesos con colores suaves. Usuarios y delegados se presentan en listados con identidad, perfil/asignaciones, estado y menús de acciones. Las categorías, planes y acciones de lugares usan colores discretos para distinguir su significado.
+
+Las consultas del administrador se conservan en memoria durante cinco minutos. Al volver a una vista se muestran los datos disponibles al instante; cuando vencen, la actualización ocurre en segundo plano y conserva el contenido durante la consulta. Se deduplican las solicitudes simultáneas, los guardados invalidan las cachés relacionadas y cambiar de cuenta o cerrar sesión limpia los datos privados. `tests/admin-cache.test.mjs` cubre vencimiento, reintentos, navegación e invalidación de respuestas pendientes. Estas cachés no almacenan datos privados en `localStorage` ni sustituyen las comprobaciones de permisos del servidor.
+
+Lugares permite buscar por nombre o ubicación, filtrar, consultar la ficha, crear, editar y retirar del catálogo. La eliminación cambia el estado a `inactive` para conservar reservas e historial. Crear y editar requiere Supabase; la vista sin conexión usa ejemplos y no simula guardados exitosos. Los formularios validan campos obligatorios, coordenadas, capacidades e imágenes, y deshabilitan controles mientras guardan.
+
+`tests/place-crud.test.mjs` comprueba los servicios con HTTP simulado, incluidos errores, limpieza de una creación incompleta e invalidación de caché. La edición todavía realiza varias escrituras: si falla un paso posterior, informa que puede haber cambios parciales y exige revisar la ficha. Estas pruebas no sustituyen un recorrido con Auth y Storage reales. Estadísticas y gestión conservan sus integraciones existentes; soporte y reservas de gestión siguen mostrando datos de ejemplo.
+
 ## Identidad visual de Pinwi
 
 El logo original está en `assets/Logo_Pinwi.svg`. `assets/pinwi-mark.svg` y `assets/pinwi-wordmark.svg` conservan sus trazados y ajustan el encuadre para usarlos en tamaños pequeños. Si cambia el original, deben actualizarse ambas variantes. `src/app/components/BrandLogo.tsx` comparte la marca entre las pantallas de acceso, navegación y paneles.

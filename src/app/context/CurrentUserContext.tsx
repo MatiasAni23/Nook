@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
+import { setAdminCacheAccount } from "../services/adminDataCache";
 import {
   type CurrentUserProfile,
   getCurrentUserProfile,
@@ -48,6 +49,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   );
 
   const setCurrentUser = useCallback((user: CurrentUserProfile | null) => {
+    setAdminCacheAccount(user?.id ?? null);
     setCurrentUserState(user);
     writeStoredCurrentUser(user);
   }, []);

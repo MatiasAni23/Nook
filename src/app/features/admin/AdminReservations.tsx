@@ -1,3 +1,5 @@
+import { normalizeAdminSearch } from "./AdminUi";
+import { ManagementSectionHeading, ManagementEmpty } from "./AdminUi";
 import { useState } from "react";
 import { Search, Check, X, Calendar, MapPin, DollarSign } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -9,66 +11,94 @@ import { mockReservations, type Reservation } from "../../data/managementData";
 export function AdminReservations() {
   const [reservations, setReservations] = useState(mockReservations);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<'all' | Reservation['status']>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | Reservation["status"]
+  >("all");
 
-  const filteredReservations = reservations.filter(reservation => {
-    const matchesSearch = reservation.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reservation.placeName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || reservation.status === statusFilter;
+  const filteredReservations = reservations.filter((reservation) => {
+    const matchesSearch =
+      normalizeAdminSearch(reservation.userName).includes(
+        normalizeAdminSearch(searchTerm),
+      ) ||
+      normalizeAdminSearch(reservation.placeName).includes(
+        normalizeAdminSearch(searchTerm),
+      );
+    const matchesStatus =
+      statusFilter === "all" || reservation.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleStatusChange = (reservationId: string, newStatus: Reservation['status']) => {
-    setReservations(reservations.map(r =>
-      r.id === reservationId ? { ...r, status: newStatus } : r
-    ));
+  const handleStatusChange = (
+    reservationId: string,
+    newStatus: Reservation["status"],
+  ) => {
+    setReservations(
+      reservations.map((r) =>
+        r.id === reservationId ? { ...r, status: newStatus } : r,
+      ),
+    );
 
-    if (newStatus === 'confirmed') {
-      alert('Reserva confirmada. Se ha enviado una notificación al usuario.');
-    } else if (newStatus === 'rejected') {
-      alert('Reserva rechazada. Se ha enviado una notificación al usuario.');
+    if (newStatus === "confirmed") {
+      alert(
+        "Demostración: reserva confirmada en esta vista. No se envió ninguna notificación.",
+      );
+    } else if (newStatus === "rejected") {
+      alert(
+        "Demostración: reserva rechazada en esta vista. No se envió ninguna notificación.",
+      );
     }
   };
 
-  const getStatusColor = (status: Reservation['status']) => {
+  const getStatusColor = (status: Reservation["status"]) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
-      case 'confirmed': return 'bg-green-100 text-green-700 border-green-300';
-      case 'rejected': return 'bg-red-100 text-red-700 border-red-300';
-      case 'cancelled': return 'bg-gray-100 text-gray-700 border-gray-300';
+      case "pending":
+        return "bg-amber-50 text-amber-700 border-amber-200";
+      case "confirmed":
+        return "bg-emerald-50 text-emerald-700 border-emerald-200";
+      case "rejected":
+        return "bg-red-50 text-red-700 border-red-200";
+      case "cancelled":
+        return "bg-gray-100 text-gray-700 border-gray-300";
     }
   };
 
-  const getStatusLabel = (status: Reservation['status']) => {
+  const getStatusLabel = (status: Reservation["status"]) => {
     switch (status) {
-      case 'pending': return 'Pendiente';
-      case 'confirmed': return 'Confirmada';
-      case 'rejected': return 'Rechazada';
-      case 'cancelled': return 'Cancelada';
+      case "pending":
+        return "Pendiente";
+      case "confirmed":
+        return "Confirmada";
+      case "rejected":
+        return "Rechazada";
+      case "cancelled":
+        return "Cancelada";
     }
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-CL', {
-      style: 'currency',
-      currency: 'CLP',
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
       minimumFractionDigits: 0,
     }).format(amount);
   };
 
   const formatDateRange = (dates: Date[]) => {
     if (dates.length === 1) {
-      return dates[0].toLocaleDateString('es-CL', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
+      return dates[0].toLocaleDateString("es-CL", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
       });
     }
-    const start = dates[0].toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
-    const end = dates[dates.length - 1].toLocaleDateString('es-CL', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+    const start = dates[0].toLocaleDateString("es-CL", {
+      day: "numeric",
+      month: "short",
+    });
+    const end = dates[dates.length - 1].toLocaleDateString("es-CL", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
     });
     return `${start} - ${end}`;
   };
@@ -76,10 +106,11 @@ export function AdminReservations() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <h3 className="text-lg" style={{ fontWeight: 700 }}>Gestión de Reservas</h3>
-        <p className="text-sm text-gray-600">{filteredReservations.length} reservas</p>
-      </div>
+      <ManagementSectionHeading
+        title="Reservas"
+        count={reservations.length}
+        description="Solicitudes de espacios, fechas y estado de cada reserva."
+      />
 
       {/* Search and Filters */}
       <div className="space-y-3">
@@ -95,34 +126,50 @@ export function AdminReservations() {
 
         <div className="flex gap-2 flex-wrap">
           <Button
-            variant={statusFilter === 'all' ? 'default' : 'outline'}
+            variant={statusFilter === "all" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('all')}
-            className={statusFilter === 'all' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("all")}
+            className={
+              statusFilter === "all"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Todas
           </Button>
           <Button
-            variant={statusFilter === 'pending' ? 'default' : 'outline'}
+            variant={statusFilter === "pending" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('pending')}
-            className={statusFilter === 'pending' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("pending")}
+            className={
+              statusFilter === "pending"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Pendientes
           </Button>
           <Button
-            variant={statusFilter === 'confirmed' ? 'default' : 'outline'}
+            variant={statusFilter === "confirmed" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('confirmed')}
-            className={statusFilter === 'confirmed' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("confirmed")}
+            className={
+              statusFilter === "confirmed"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Confirmadas
           </Button>
           <Button
-            variant={statusFilter === 'rejected' ? 'default' : 'outline'}
+            variant={statusFilter === "rejected" ? "default" : "outline"}
             size="sm"
-            onClick={() => setStatusFilter('rejected')}
-            className={statusFilter === 'rejected' ? 'bg-[#4F46E5]' : ''}
+            onClick={() => setStatusFilter("rejected")}
+            className={
+              statusFilter === "rejected"
+                ? "management-filter-active"
+                : "management-filter-idle"
+            }
           >
             Rechazadas
           </Button>
@@ -130,36 +177,45 @@ export function AdminReservations() {
       </div>
 
       {/* Reservations List */}
-      <div className="space-y-3">
+      {filteredReservations.length === 0 && (
+        <ManagementEmpty
+          title="No encontramos reservas"
+          description="Prueba otro usuario, lugar o estado."
+        />
+      )}
+      <div className="management-record-grid">
         {filteredReservations.map((reservation) => (
-          <Card key={reservation.id}>
+          <Card key={reservation.id} className="management-record">
             <CardContent className="p-4">
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
                       <h4 className="font-semibold">{reservation.placeName}</h4>
                       <Badge className={getStatusColor(reservation.status)}>
                         {getStatusLabel(reservation.status)}
                       </Badge>
                     </div>
                     <div className="space-y-1 text-sm text-gray-600">
-                      <p>👤 {reservation.userName}</p>
+                      <p>Solicitada por {reservation.userName}</p>
                       <p>
                         <Calendar className="size-3 inline mr-1" />
                         {formatDateRange(reservation.dates)}
-                        {reservation.dates.length > 1 && ` (${reservation.dates.length} días)`}
+                        {reservation.dates.length > 1 &&
+                          ` (${reservation.dates.length} días)`}
                       </p>
                       <p>
                         <DollarSign className="size-3 inline mr-1" />
-                        {formatCurrency(reservation.totalAmount)} - {reservation.paymentMethod}
+                        {formatCurrency(reservation.totalAmount)} -{" "}
+                        {reservation.paymentMethod}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Creada: {reservation.createdAt.toLocaleDateString('es-CL', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
+                        Creada:{" "}
+                        {reservation.createdAt.toLocaleDateString("es-CL", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
                         })}
                       </p>
                     </div>
@@ -167,13 +223,15 @@ export function AdminReservations() {
                 </div>
 
                 {/* Actions */}
-                {reservation.status === 'pending' && (
+                {reservation.status === "pending" && (
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(reservation.id, 'confirmed')}
-                      className="text-green-600 border-green-300 hover:bg-green-50"
+                      onClick={() =>
+                        handleStatusChange(reservation.id, "confirmed")
+                      }
+                      className="text-gray-600 border-gray-200 hover:bg-gray-50"
                     >
                       <Check className="size-3 mr-1" />
                       Aprobar
@@ -181,7 +239,9 @@ export function AdminReservations() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleStatusChange(reservation.id, 'rejected')}
+                      onClick={() =>
+                        handleStatusChange(reservation.id, "rejected")
+                      }
                       className="text-red-600 border-red-300 hover:bg-red-50"
                     >
                       <X className="size-3 mr-1" />
@@ -202,8 +262,8 @@ export function AdminReservations() {
             <Calendar className="size-12 text-[#4F46E5] mx-auto mb-3" />
             <h3 className="text-lg font-semibold">Vista de Calendario</h3>
             <p className="text-sm text-gray-600">
-              La vista de calendario se implementará próximamente para visualizar
-              la disponibilidad y reservas de forma más intuitiva.
+              La vista de calendario se implementará próximamente para
+              visualizar la disponibilidad y reservas de forma más intuitiva.
             </p>
           </div>
         </CardContent>

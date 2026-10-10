@@ -1,10 +1,20 @@
-import { demoPlaces } from "../../data/demoPlaces";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Edit, MapPin, Plus, Search, Star, Trash2, Wifi } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
+import { useSearchParams } from "react-router";
+import {
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Badge } from "../../components/ui/badge";
+import { CachedImage } from "../../components/ui/cached-image";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,474 +29,594 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "../../components/ui/dialog";
-import { CachedImage } from "../../components/ui/cached-image";
-import { studyPlaces, workPlaces } from "../../data/mockData";
+import { demoPlaces } from "../../data/demoPlaces";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { deletePlace, getCachedPlaces, listPlaces, type AppPlace } from "../../services/placeService";
+import {
+  deletePlace,
+  getCachedPlaces,
+  getPlacesCacheRemaining,
+  listPlaces,
+  type AppPlace,
+} from "../../services/placeService";
 import { AdminAddPlace } from "./AdminAddPlace";
 import { AdminEditPlace } from "./AdminEditPlace";
+import {
+  AdminEmptyState,
+  AdminPageHeading,
+  placeTypeLabels,
+  planLabels,
+} from "./AdminUi";
+import { useAdminData } from "./useAdminData";
 
-type SuccessDialogKind = "created" | "updated" | "deleted";
-
-const planTypeLabels: Record<AppPlace["planType"], string> = {
-  basic: "Basic",
-  app_billing: "App Billing",
-  basic_premium: "Basic Premium",
-  host_billing: "Host Billing",
+const placesSource = {
+  peek: getCachedPlaces,
+  remaining: getPlacesCacheRemaining,
+  load: listPlaces,
 };
 
+const pageSize = 10;
+const filters = [
+  { value: "all", label: "Todos" },
+  { value: "study", label: "Estudio" },
+  { value: "work", label: "Trabajo" },
+] as const;
+const normalizeSearch = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
 export function AdminManagePlaces() {
-  const [view, setView] = useState<"list" | "add" | "edit">("list");
-  const [editingPlace, setEditingPlace] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState<"all" | "student" | "work">("all");
-  const [dbPlaces, setDbPlaces] = useState<AppPlace[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successDialog, setSuccessDialog] = useState<SuccessDialogKind | null>(null);
+  const [params, setParams] = useSearchParams();
+  const [places, setPlaces] = useState<AppPlace[]>(
+    isSupabaseConfigured ? (getCachedPlaces() ?? []) : demoPlaces,
+  );
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<"all" | "study" | "work">("all");
+  const [page, setPage] = useState(1);
+  const {
+    data: loadedPlaces,
+    isLoading,
+    isRefreshing,
+    error: loadError,
+    refresh,
+  } = useAdminData(placesSource, isSupabaseConfigured);
+  const [actionError, setError] = useState("");
+  const error = actionError || loadError;
+  const [success, setSuccess] = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<AppPlace | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<AppPlace | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const editId = params.get("edit");
+  const editingPlace = places.find((place) => place.id === editId);
+  const adding = params.get("action") === "new";
+  const backToList = () => setParams({}, { replace: true });
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (loadedPlaces) setPlaces(loadedPlaces);
+  }, [loadedPlaces]);
 
-    let isMounted = true;
-    const cachedPlaces = getCachedPlaces();
-    if (cachedPlaces) setDbPlaces(cachedPlaces);
-    setIsLoading(!cachedPlaces);
-    setErrorMessage("");
-
-    listPlaces({ forceRefresh: Boolean(cachedPlaces) })
-      .then((places) => {
-        if (isMounted) setDbPlaces(places);
-      })
-      .catch((error) => {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los lugares.");
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const mockPlaces = demoPlaces;
-  const allPlaces = isSupabaseConfigured ? dbPlaces : mockPlaces;
-
-  const filteredPlaces = allPlaces.filter((place) => {
-    const matchesSearch = place.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "student" && place.category === "study") ||
-      (filter === "work" && place.category === "work");
-    return matchesSearch && matchesFilter;
-  });
-
-  const handleEdit = (place: any) => {
-    setEditingPlace(place);
-    setView("edit");
+  const query = normalizeSearch(search);
+  const filtered = places.filter(
+    (place) =>
+      (filter === "all" || place.category === filter) &&
+      normalizeSearch(
+        [place.name, place.address, place.zone, placeTypeLabels[place.type]]
+          .filter(Boolean)
+          .join(" "),
+      ).includes(query),
+  );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visible = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const editPlace = (place: AppPlace) => {
+    setSelectedPlace(null);
+    setSuccess("");
+    setParams({ edit: place.id });
+  };
+  const createNew = () => {
+    setSuccess("");
+    setParams({ action: "new" });
   };
 
-  const handleDeleteRequest = (place: AppPlace) => {
-    setPlaceToDelete(place);
-  };
-
-  const handleSaveComplete = (updatedPlace?: AppPlace) => {
-    if (updatedPlace) {
-      setDbPlaces((current) =>
-        current.map((place) => place.id === updatedPlace.id ? updatedPlace : place),
-      );
-      setSuccessDialog("updated");
-    }
-    setView("list");
-    setEditingPlace(null);
-  };
-
-  const handlePlaceCreated = (place: AppPlace) => {
-    setDbPlaces((current) => [place, ...current]);
-    setSuccessDialog("created");
-  };
-
-  const goToPlacesList = () => {
-    setSuccessDialog(null);
-    setView("list");
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!placeToDelete) return;
-
-    if (!isSupabaseConfigured) {
-      setErrorMessage("Supabase no esta configurado. No se puede eliminar el lugar.");
-      setPlaceToDelete(null);
-      return;
-    }
-
+  const handleDelete = async () => {
+    if (!placeToDelete || isDeleting) return;
     setIsDeleting(true);
-    setErrorMessage("");
-
+    setError("");
+    setSuccess("");
     try {
       await deletePlace(placeToDelete.id);
-      setDbPlaces((current) => current.filter((place) => place.id !== placeToDelete.id));
+      setPlaces((current) =>
+        current.filter((place) => place.id !== placeToDelete.id),
+      );
+      setSuccess(
+        `“${placeToDelete.name}” se retiró del catálogo. Su historial se conserva.`,
+      );
       setPlaceToDelete(null);
-      setSuccessDialog("deleted");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo eliminar el lugar.");
+    } catch {
+      setError(
+        "No pudimos eliminar el lugar. No se confirmó ningún cambio; vuelve a intentarlo.",
+      );
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const getSuccessCopy = () => {
-    switch (successDialog) {
-      case "created":
-        return {
-          title: "Lugar agregado con exito",
-          description: "El lugar se guardo correctamente y ya esta disponible en la gestion de lugares.",
-          action: "Ir a gestion de lugares",
-        };
-      case "updated":
-        return {
-          title: "Lugar actualizado",
-          description: "Los cambios se guardaron correctamente.",
-          action: "Entendido",
-        };
-      case "deleted":
-        return {
-          title: "Lugar eliminado",
-          description: "El lugar se elimino correctamente de la gestion de lugares.",
-          action: "Entendido",
-        };
-      default:
-        return null;
-    }
-  };
-
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case "library":
-        return "BI";
-      case "cafe":
-        return "CF";
-      case "coworking":
-      case "office":
-      case "meeting_room":
-      case "private_office":
-        return "CO";
-      case "park":
-        return "PA";
-      default:
-        return "LU";
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "library":
-        return "Biblioteca";
-      case "cafe":
-        return "Cafe";
-      case "coworking":
-        return "Cowork";
-      case "office":
-        return "Oficina";
-      case "meeting_room":
-        return "Sala de reunion";
-      case "private_office":
-        return "Oficina privada";
-      case "park":
-        return "Parque";
-      default:
-        return "Lugar";
-    }
-  };
-
-  if (view === "add") {
+  if (adding)
     return (
-      <div className="size-full flex flex-col">
-        <div className="hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setView("list")}
-            className="rounded-xl border-[#E1E5F4] bg-white font-semibold text-slate-700 shadow-sm hover:border-[#4F46E5] hover:bg-[#F8FAFF] hover:text-[#4F46E5]"
-          >
-            ← Volver a listado
-          </Button>
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <AdminAddPlace onCreated={handlePlaceCreated} onBack={() => setView("list")} />
-        </div>
-        <div className="hidden">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setView("list")} 
-            className="bg-white border-2 border-gray-300 hover:bg-gray-100 hover:border-[#4F46E5] text-gray-800 font-semibold shadow-md hover:shadow-lg transition-all"
-          >
-            ← Volver a listado
-          </Button>
-        </div>
-        <Dialog open={successDialog !== null} onOpenChange={(open) => {
-          if (open) {
-            return;
-          }
-          goToPlacesList();
-        }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader className="items-center text-center sm:text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-green-100 text-green-700">
-                <CheckCircle2 className="size-7" />
-              </span>
-              <DialogTitle>{getSuccessCopy()?.title}</DialogTitle>
-              <DialogDescription>
-                {getSuccessCopy()?.description}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="sm:justify-center">
-              <Button onClick={goToPlacesList} className="w-full bg-[#4F46E5] hover:bg-[#4338CA] sm:w-auto">
-                {getSuccessCopy()?.action}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+      <AdminAddPlace
+        onBack={backToList}
+        onCreated={(place) => {
+          setPlaces((current) => [
+            place,
+            ...current.filter((item) => item.id !== place.id),
+          ]);
+          setSuccess(`“${place.name}” se creó correctamente.`);
+          backToList();
+        }}
+      />
     );
-  }
-
-  if (view === "edit" && editingPlace) {
-    return (
-      <div className="size-full flex flex-col">
-        <div className="hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setView("list");
-              setEditingPlace(null);
-            }}
-            className="rounded-xl border-[#E1E5F4] bg-white font-semibold text-slate-700 shadow-sm hover:border-[#4F46E5] hover:bg-[#F8FAFF] hover:text-[#4F46E5]"
-          >
-            ← Volver a listado
-          </Button>
+  if (editId) {
+    if (isLoading)
+      return (
+        <div className="admin-empty" role="status">
+          Cargando la ficha del lugar…
         </div>
-        <div className="flex-1 overflow-hidden">
-          <AdminEditPlace
-            place={editingPlace}
-            onSave={handleSaveComplete}
-            onBack={() => {
-              setView("list");
-              setEditingPlace(null);
-            }}
+      );
+    if (!editingPlace)
+      return (
+        <div className="space-y-4">
+          <AdminPageHeading
+            title="Editar lugar"
+            description="Consulta la ficha antes de guardar cambios."
           />
-        </div>
-        <div className="hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setView("list");
-              setEditingPlace(null);
-            }}
-            className="bg-white border-2 border-gray-300 hover:bg-gray-100 hover:border-[#4F46E5] text-gray-800 font-semibold shadow-md hover:shadow-lg transition-all"
-          >
-            ← Volver a listado
+          <div className="admin-notice" role="alert">
+            {error || "Este lugar ya no está disponible en el catálogo."}
+          </div>
+          <Button variant="outline" onClick={backToList}>
+            Volver a lugares
           </Button>
+          {error && (
+            <Button variant="outline" onClick={() => refresh()}>
+              Reintentar
+            </Button>
+          )}
         </div>
-      </div>
+      );
+    return (
+      <AdminEditPlace
+        key={editingPlace.id}
+        place={editingPlace}
+        onBack={backToList}
+        onSave={(updated) => {
+          if (!updated) return;
+          setPlaces((current) =>
+            current.map((place) => (place.id === updated.id ? updated : place)),
+          );
+          setSuccess(
+            `Los cambios de “${updated.name}” se guardaron correctamente.`,
+          );
+          backToList();
+        }}
+      />
     );
   }
 
   return (
-    <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto p-4 pb-20">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-2xl mb-1" style={{ fontWeight: 700 }}>Gestion de Lugares</h2>
-              <p className="text-gray-600">{filteredPlaces.length} lugares registrados</p>
-            </div>
-            <Button onClick={() => setView("add")} className="bg-[#4F46E5] hover:bg-[#4338CA]">
-              <Plus className="size-4 mr-2" />
-              Nuevo Lugar
-            </Button>
+    <div className="space-y-5">
+      <AdminPageHeading
+        title="Lugares"
+        description="Consulta, crea y edita los espacios de Pinwi."
+        action={
+          <Button onClick={createNew} className="admin-primary">
+            <Plus size={16} /> Nuevo lugar
+          </Button>
+        }
+      />
+      {!isSupabaseConfigured && (
+        <div className="admin-notice">
+          Vista de demostración. Puedes explorar las fichas; guardar y eliminar
+          requiere una conexión a Supabase.
+        </div>
+      )}
+      {success && (
+        <div
+          className="admin-notice is-success flex items-center justify-between gap-3"
+          role="status"
+        >
+          <span>{success}</span>
+          <button
+            type="button"
+            className="admin-icon-button shrink-0"
+            aria-label="Cerrar confirmación"
+            onClick={() => setSuccess("")}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {error && (
+        <div className="admin-notice is-error" role="alert">
+          {error}{" "}
+          <button
+            type="button"
+            className="ml-2 underline"
+            onClick={() => refresh()}
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
+      <section
+        className="admin-panel overflow-hidden"
+        aria-label="Catálogo de lugares"
+      >
+        <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-sm">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
+            <Input
+              aria-label="Buscar lugares por nombre, dirección o zona"
+              placeholder="Buscar por nombre o ubicación…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="h-10 pl-10"
+            />
           </div>
-
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
-                  <Input
-                    placeholder="Buscar lugares..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <div className="flex gap-2 overflow-x-auto">
-                  <Button
-                    variant={filter === "all" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilter("all")}
-                    className={filter === "all" ? "bg-[#4F46E5]" : ""}
-                  >
-                    Todos
-                  </Button>
-                  <Button
-                    variant={filter === "student" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilter("student")}
-                    className={filter === "student" ? "bg-[#4F46E5]" : ""}
-                  >
-                    Estudiantes
-                  </Button>
-                  <Button
-                    variant={filter === "work" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setFilter("work")}
-                    className={filter === "work" ? "bg-[#4F46E5]" : ""}
-                  >
-                    Trabajadores
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {errorMessage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
+          <div className="flex items-center justify-between gap-3">
+            <div
+              className="admin-filter-list"
+              aria-label="Filtrar por categoría"
+            >
+              {filters.map(({ value, label }) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={filter === value}
+                  onClick={() => {
+                    setFilter(value);
+                    setPage(1);
+                  }}
+                >
+                  {label}{" "}
+                  <span className="ml-1 text-[10px] opacity-70">
+                    {
+                      places.filter(
+                        (place) => value === "all" || place.category === value,
+                      ).length
+                    }
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
-
-          {isLoading && (
-            <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
-              Cargando lugares...
-            </div>
-          )}
-
-          <div className="space-y-3">
-            {filteredPlaces.map((place) => (
-              <Card key={place.id}>
-                <CardContent className="p-4">
-                  <div className="flex gap-3">
-                    <div className="size-16 rounded-xl bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden">
-                      {place.images?.[0] ? (
-                        <CachedImage src={place.images[0]} alt={place.name} className="size-full object-cover" />
-                      ) : (
-                        <span className="text-sm font-semibold text-[#4F46E5]">{getPlaceIcon(place.type)}</span>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <h3 className="font-semibold">{place.name}</h3>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Star className="size-3 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-semibold">{place.rating}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 mb-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {getTypeLabel(place.type)}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {place.category === "work" ? "Trabajo" : "Estudio"}
-                        </Badge>
-                        <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-xs text-indigo-700">
-                          {planTypeLabels[place.planType]}
-                        </Badge>
-                        {place.wifi && (
-                          <Badge variant="outline" className="text-xs">
-                            <Wifi className="size-3 mr-1" />
-                            WiFi
-                          </Badge>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-gray-600 mb-2">
-                        <MapPin className="size-3 inline mr-1" />
-                        {place.address || place.hours}
-                      </p>
-
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(place)}
-                          className="text-[#4F46E5] border-[#4F46E5] hover:bg-purple-50"
-                        >
-                          <Edit className="size-3 mr-1" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteRequest(place as AppPlace)}
-                          className="text-red-600 border-red-300 hover:bg-red-50"
-                        >
-                          <Trash2 className="size-3 mr-1" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            <button
+              type="button"
+              className="admin-icon-button"
+              aria-label="Actualizar lugares"
+              disabled={isLoading || isRefreshing || !isSupabaseConfigured}
+              onClick={() => refresh()}
+            >
+              <RefreshCw
+                size={16}
+                className={isRefreshing ? "animate-spin" : ""}
+              />
+            </button>
           </div>
         </div>
-      </div>
-      <AlertDialog open={Boolean(placeToDelete)} onOpenChange={(open) => {
-        if (!open && !isDeleting) setPlaceToDelete(null);
-      }}>
-        <AlertDialogContent>
+        <div className="admin-table-head" aria-hidden="true">
+          <span>Lugar</span>
+          <span>Categoría</span>
+          <span className="admin-place-plan">Plan</span>
+          <span className="text-right">Acciones</span>
+        </div>
+        <div aria-busy={isLoading}>
+          {isLoading ? (
+            <div className="admin-empty" role="status">
+              Cargando lugares…
+            </div>
+          ) : error && !places.length ? (
+            <AdminEmptyState
+              title="El catálogo no está disponible"
+              description="Reintenta la carga para consultar tus lugares."
+            />
+          ) : visible.length ? (
+            visible.map((place) => (
+              <article key={place.id} className="admin-place-row">
+                <div className="admin-place-identity flex min-w-0 items-center gap-3">
+                  <span className="admin-thumbnail">
+                    {place.images[0] ? (
+                      <CachedImage
+                        src={place.images[0]}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <Building2
+                        size={20}
+                        strokeWidth={1.4}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      className="block max-w-full truncate text-left text-sm font-medium hover:text-[#4f46e5]"
+                      onClick={() => setSelectedPlace(place)}
+                    >
+                      {place.name}
+                    </button>
+                    <p className="mt-1 truncate text-xs text-gray-500">
+                      {place.zone || place.address || "Ubicación sin completar"}
+                    </p>
+                  </div>
+                </div>
+                <div className="admin-place-category">
+                  <p className={`admin-pill category-${place.category}`}>
+                    {place.category === "study" ? "Estudio" : "Trabajo"}
+                  </p>
+                  <span
+                    className={`admin-pill admin-place-plan-inline plan-${place.planType}`}
+                  >
+                    {planLabels[place.planType]}
+                  </span>
+                  <p className="mt-1 text-xs text-gray-400">
+                    {placeTypeLabels[place.type]}
+                  </p>
+                </div>
+                <div className="admin-place-plan">
+                  <span className={`admin-pill plan-${place.planType}`}>
+                    {planLabels[place.planType]}
+                  </span>
+                </div>
+                <div className="admin-place-actions">
+                  <button
+                    type="button"
+                    className="admin-icon-button action-view"
+                    onClick={() => setSelectedPlace(place)}
+                    aria-label={`Ver ${place.name}`}
+                    title="Ver ficha"
+                  >
+                    <Eye size={17} strokeWidth={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-icon-button action-edit"
+                    onClick={() => editPlace(place)}
+                    aria-label={`Editar ${place.name}`}
+                    title="Editar"
+                  >
+                    <Pencil size={16} strokeWidth={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    className="admin-icon-button action-delete disabled:opacity-35"
+                    disabled={!isSupabaseConfigured}
+                    onClick={() => {
+                      setError("");
+                      setPlaceToDelete(place);
+                    }}
+                    aria-label={`Eliminar ${place.name}`}
+                    title="Eliminar"
+                  >
+                    <Trash2 size={16} strokeWidth={1.5} />
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <AdminEmptyState
+              title={
+                query || filter !== "all"
+                  ? "No encontramos lugares"
+                  : "Agrega tu primer lugar"
+              }
+              description={
+                query || filter !== "all"
+                  ? "Prueba otra búsqueda o cambia los filtros."
+                  : "Los espacios que crees aparecerán en este catálogo."
+              }
+              action={
+                <Button
+                  variant="outline"
+                  onClick={
+                    query || filter !== "all"
+                      ? () => {
+                          setSearch("");
+                          setFilter("all");
+                          setPage(1);
+                        }
+                      : createNew
+                  }
+                >
+                  {query || filter !== "all"
+                    ? "Limpiar filtros"
+                    : "Nuevo lugar"}
+                </Button>
+              }
+            />
+          )}
+        </div>
+        <div className="admin-pagination">
+          <span>
+            {filtered.length} {filtered.length === 1 ? "lugar" : "lugares"}
+            {filtered.length > pageSize
+              ? ` · Página ${currentPage} de ${pageCount}`
+              : ""}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === 1 || isLoading}
+              onClick={() => setPage(currentPage - 1)}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft size={14} /> Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={currentPage === pageCount || isLoading}
+              onClick={() => setPage(currentPage + 1)}
+              aria-label="Página siguiente"
+            >
+              Siguiente <ChevronRight size={14} />
+            </Button>
+          </div>
+        </div>
+      </section>
+      <AlertDialog
+        open={Boolean(placeToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setPlaceToDelete(null);
+        }}
+      >
+        <AlertDialogContent className="admin-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar lugar</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar este lugar?</AlertDialogTitle>
             <AlertDialogDescription>
-              Estas seguro de eliminar el lugar {placeToDelete ? `"${placeToDelete.name}"` : ""}? Esta accion lo quitara de la gestion de lugares.
+              “{placeToDelete?.name}” dejará de aparecer en el catálogo. Sus
+              reservas e historial se conservarán.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {error && (
+            <p className="text-sm text-red-600" role="alert">
+              {error}
+            </p>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>
+              Cancelar
+            </AlertDialogCancel>
             <AlertDialogAction
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
               onClick={(event) => {
                 event.preventDefault();
-                void handleConfirmDelete();
+                void handleDelete();
               }}
-              disabled={isDeleting}
-              className="bg-red-600 text-white hover:bg-red-700"
             >
-              {isDeleting ? "Eliminando..." : "Eliminar"}
+              {isDeleting ? "Eliminando…" : "Eliminar lugar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <Dialog open={successDialog !== null && view === "list"} onOpenChange={(open) => {
-        if (!open) setSuccessDialog(null);
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader className="items-center text-center sm:text-center">
-            <span className="flex size-12 items-center justify-center rounded-full bg-green-100 text-green-700">
-              <CheckCircle2 className="size-7" />
-            </span>
-            <DialogTitle>{getSuccessCopy()?.title}</DialogTitle>
-            <DialogDescription>{getSuccessCopy()?.description}</DialogDescription>
+      <Dialog
+        open={Boolean(selectedPlace)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPlace(null);
+        }}
+      >
+        <DialogContent className="admin-dialog max-h-[85dvh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{selectedPlace?.name}</DialogTitle>
+            <DialogDescription>
+              {selectedPlace &&
+                `${placeTypeLabels[selectedPlace.type]} · ${selectedPlace.category === "study" ? "Estudio" : "Trabajo"}`}
+            </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-center">
-            <Button onClick={() => setSuccessDialog(null)} className="w-full bg-[#4F46E5] hover:bg-[#4338CA] sm:w-auto">
-              {getSuccessCopy()?.action}
-            </Button>
-          </DialogFooter>
+          {selectedPlace && (
+            <div className="space-y-5">
+              {selectedPlace.images.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto">
+                  {selectedPlace.images.map((url, index) => (
+                    <CachedImage
+                      key={url}
+                      src={url}
+                      alt={`Foto ${index + 1} de ${selectedPlace.name}`}
+                      className="h-40 w-56 shrink-0 rounded-xl object-cover"
+                    />
+                  ))}
+                </div>
+              )}
+              <p className="text-sm leading-7 text-gray-600">
+                {selectedPlace.description || "Sin descripción."}
+              </p>
+              <dl className="grid grid-cols-2 gap-5 text-sm">
+                {[
+                  ["Dirección", selectedPlace.address || "Sin completar"],
+                  ["Zona", selectedPlace.zone || "Sin completar"],
+                  ["Plan", planLabels[selectedPlace.planType]],
+                  [
+                    "Capacidad",
+                    selectedPlace.capacityMax
+                      ? `${selectedPlace.capacityMin ?? 1}–${selectedPlace.capacityMax} personas`
+                      : "Sin informar",
+                  ],
+                  [
+                    "Precio por hora",
+                    selectedPlace.pricePerHour
+                      ? new Intl.NumberFormat("es-CL", {
+                          style: "currency",
+                          currency: "CLP",
+                          maximumFractionDigits: 0,
+                        }).format(selectedPlace.pricePerHour)
+                      : "Gratis",
+                  ],
+                  ["Sitio web", selectedPlace.websiteUrl || "Sin informar"],
+                ].map(([label, value]) => (
+                  <div key={label} className="min-w-0">
+                    <dt className="mb-1 text-xs text-gray-400">{label}</dt>
+                    <dd className="break-words leading-6">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div>
+                <p className="mb-2 text-xs text-gray-400">Horarios</p>
+                <p className="text-sm leading-7 text-gray-600">
+                  {selectedPlace.hours}
+                </p>
+              </div>
+              <div>
+                <p className="mb-2 text-xs text-gray-400">Comodidades</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedPlace.amenities
+                    .filter((a) => a.isAvailable)
+                    .map((a) => (
+                      <span key={a.key} className="admin-pill">
+                        {a.name}
+                      </span>
+                    ))}
+                  {!selectedPlace.amenities.some((a) => a.isAvailable) && (
+                    <span className="text-sm text-gray-500">
+                      Sin comodidades registradas.
+                    </span>
+                  )}
+                </div>
+              </div>
+              {selectedPlace.spaces.length > 0 && (
+                <div>
+                  <p className="mb-2 text-xs text-gray-400">
+                    Espacios disponibles
+                  </p>
+                  {selectedPlace.spaces.map((space) => (
+                    <p key={space.id} className="text-sm leading-7">
+                      {space.name} · {space.capacity} personas
+                    </p>
+                  ))}
+                </div>
+              )}
+              <Button
+                className="admin-primary"
+                onClick={() => editPlace(selectedPlace)}
+              >
+                <Pencil size={15} /> Editar lugar
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
