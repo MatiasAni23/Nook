@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabase";
-import { clearAdminDataCaches } from "./adminDataCache";
+import { clearAdminDataCaches, createAdminDataCache } from "./adminDataCache";
 import { clearPublicMapCache } from "./publicMapService";
 
 export type PlaceCategory = "study" | "work";
@@ -75,6 +75,12 @@ export interface AppPlace {
   isPromoted?: boolean;
 }
 
+export type ManagedPlaceStatus = "active" | "inactive";
+
+export interface ManagedPlace extends AppPlace {
+  status: ManagedPlaceStatus;
+}
+
 export interface CreatePlaceInput {
   name: string;
   type: PlaceType;
@@ -125,6 +131,8 @@ let placesRequest: Promise<AppPlace[]> | null = null;
 let placesCacheGeneration = 0;
 const placeDetailsCache = new Map<string, { timestamp: number; place: AppPlace }>();
 const placeDetailsRequests = new Map<string, Promise<AppPlace | null>>();
+// Separate from the published catalogue: inactive records stay in management.
+const managedPlacesCache = createAdminDataCache<ManagedPlace[]>();
 
 export function clearPlacesCache() {
   clearPublicMapCache();
@@ -348,6 +356,55 @@ export function sortPromotedPlaces(a: AppPlace, b: AppPlace) {
 
 export function getCachedPlaces() {
   return placesCache?.places ?? null;
+}
+
+export const getCachedManagedPlaces = managedPlacesCache.peek;
+export const getManagedPlacesCacheRemaining = managedPlacesCache.remaining;
+
+export function listManagedPlaces(options?: { forceRefresh?: boolean }) {
+  return managedPlacesCache.read(async () => {
+    const { data, error } = await requireSupabase()
+      .from("places")
+      .select(`
+        id, name, status, type, category, plan_type, description, address,
+        latitude, longitude, zone, rating, reviews_count, capacity_min,
+        capacity_max, hours, price_per_hour, website_url, wifi, outlets,
+        parking, quietness_level, lighting_level, images,
+        place_amenities(amenity_key, amenity_name, is_available, additional_info),
+        place_spaces(id, name, capacity, price_per_hour, billing_unit, image_url)
+      `)
+      .in("status", ["active", "inactive"])
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return ((data ?? []) as (PlaceRow & { status: ManagedPlaceStatus })[]).map(
+      (row) => ({ ...toAppPlace(row), status: row.status }),
+    );
+  }, options);
+}
+
+/** RLS checks the account and its scope; only confirmed writes invalidate caches. */
+export async function setManagedPlaceStatus(
+  placeId: string,
+  status: ManagedPlaceStatus,
+): Promise<ManagedPlaceStatus> {
+  if (status !== "active" && status !== "inactive")
+    throw new Error("Estado de lugar no válido.");
+
+  const { data, error } = await requireSupabase()
+    .from("places")
+    .update({ status })
+    .eq("id", placeId)
+    .in("status", ["active", "inactive"])
+    .select("id, status")
+    .single();
+
+  if (error) throw error;
+  // Do not accept zero rows, a different record or a server-rejected state.
+  if (data?.id !== placeId || data.status !== status)
+    throw new Error("No se confirmó el cambio de estado del lugar.");
+  clearPlacesCache();
+  return data.status;
 }
 
 export function getPlacesCacheRemaining() {
@@ -821,4 +878,33 @@ export async function deletePlace(placeId: string): Promise<void> {
 
   if (error) throw error;
   clearPlacesCache();
+}
+
+export async function permanentlyDeletePlace(
+  placeId: string,
+): Promise<{ imageCleanupPending: boolean }> {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("delete_managed_place", {
+    target_place_id: placeId,
+  });
+  if (error) throw error;
+  if (data?.id !== placeId || !Array.isArray(data.image_paths))
+    throw new Error("No se confirmó la eliminación del lugar. Actualiza el listado para comprobarlo.");
+  clearPlacesCache();
+
+  // Never retry a confirmed deletion if a later Storage cleanup fails.
+  const paths: string[] = data.image_paths;
+  if (!paths.every((path) => typeof path === "string" && path.startsWith(`${placeId}/`)))
+    return { imageCleanupPending: true };
+  try {
+    for (let start = 0; start < paths.length; start += 100) {
+      const { error: cleanupError } = await client.storage
+        .from(PLACE_IMAGES_BUCKET)
+        .remove(paths.slice(start, start + 100));
+      if (cleanupError) return { imageCleanupPending: true };
+    }
+    return { imageCleanupPending: false };
+  } catch {
+    return { imageCleanupPending: true };
+  }
 }

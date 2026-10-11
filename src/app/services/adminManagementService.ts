@@ -50,6 +50,7 @@ export interface ManagedDelegate {
 
 export interface DelegateAssignedPlace extends AppPlace {
   reservationsCount: number;
+  status: string;
 }
 
 export interface SaveDelegateInput {
@@ -518,6 +519,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{
       places:place_id(
         id,
         name,
+        status,
         type,
         category,
         plan_type,
@@ -571,6 +573,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{
       return {
         id: String(place.id),
         name: String(place.name ?? ""),
+        status: String(place.status ?? "active"),
         type: (place.type ?? "library") as AppPlace["type"],
         openNow: false,
         category: place.category === "work" ? "work" : "study",

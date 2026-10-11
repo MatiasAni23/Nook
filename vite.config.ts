@@ -33,7 +33,10 @@ export default defineConfig({
       '@': path.resolve(projectDirectory, './src'),
     },
   },
+  // Local reports and browser profiles are not application entry points.
+  optimizeDeps: { entries: ['index.html'] },
   server: {
+    watch: { ignored: ['**/docs-local/**', '**/supabase/schema/**', '**/supabase/migrations/**'] },
     fs: {
       // Retain Vite's defaults and deny local database backups over HTTP.
       deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**',

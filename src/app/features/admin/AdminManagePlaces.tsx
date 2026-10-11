@@ -5,11 +5,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  EyeOff,
   Pencil,
   Plus,
   RefreshCw,
   Search,
-  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -35,11 +35,13 @@ import {
 import { demoPlaces } from "../../data/demoPlaces";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import {
-  deletePlace,
-  getCachedPlaces,
-  getPlacesCacheRemaining,
-  listPlaces,
+  getCachedManagedPlaces,
+  getManagedPlacesCacheRemaining,
+  listManagedPlaces,
+  setManagedPlaceStatus,
   type AppPlace,
+  type ManagedPlace,
+  type ManagedPlaceStatus,
 } from "../../services/placeService";
 import { AdminAddPlace } from "./AdminAddPlace";
 import { AdminEditPlace } from "./AdminEditPlace";
@@ -52,9 +54,9 @@ import {
 import { useAdminData } from "./useAdminData";
 
 const placesSource = {
-  peek: getCachedPlaces,
-  remaining: getPlacesCacheRemaining,
-  load: listPlaces,
+  peek: getCachedManagedPlaces,
+  remaining: getManagedPlacesCacheRemaining,
+  load: listManagedPlaces,
 };
 
 const pageSize = 10;
@@ -72,8 +74,10 @@ const normalizeSearch = (value: string) =>
 
 export function AdminManagePlaces() {
   const [params, setParams] = useSearchParams();
-  const [places, setPlaces] = useState<AppPlace[]>(
-    isSupabaseConfigured ? (getCachedPlaces() ?? []) : demoPlaces,
+  const [places, setPlaces] = useState<ManagedPlace[]>(
+    isSupabaseConfigured
+      ? (getCachedManagedPlaces() ?? [])
+      : demoPlaces.map((place) => ({ ...place, status: "active" })),
   );
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "study" | "work">("all");
@@ -88,20 +92,25 @@ export function AdminManagePlaces() {
   const [actionError, setError] = useState("");
   const error = actionError || loadError;
   const [success, setSuccess] = useState("");
-  const [selectedPlace, setSelectedPlace] = useState<AppPlace | null>(null);
-  const [placeToDelete, setPlaceToDelete] = useState<AppPlace | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<ManagedPlace | null>(null);
+  const [placeToChange, setPlaceToChange] = useState<ManagedPlace | null>(null);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const status: ManagedPlaceStatus =
+    params.get("estado") === "deshabilitados" ? "inactive" : "active";
   const editId = params.get("edit");
   const editingPlace = places.find((place) => place.id === editId);
   const adding = params.get("action") === "new";
-  const backToList = () => setParams({}, { replace: true });
+  const listParams = (): Record<string, string> =>
+    status === "inactive" ? { estado: "deshabilitados" } : {};
+  const backToList = () => setParams(listParams(), { replace: true });
 
   useEffect(() => {
     if (loadedPlaces) setPlaces(loadedPlaces);
   }, [loadedPlaces]);
 
   const query = normalizeSearch(search);
-  const filtered = places.filter(
+  const sectionPlaces = places.filter((place) => place.status === status);
+  const filtered = sectionPlaces.filter(
     (place) =>
       (filter === "all" || place.category === filter) &&
       normalizeSearch(
@@ -119,33 +128,46 @@ export function AdminManagePlaces() {
   const editPlace = (place: AppPlace) => {
     setSelectedPlace(null);
     setSuccess("");
-    setParams({ edit: place.id });
+    setParams({ ...listParams(), edit: place.id });
   };
   const createNew = () => {
     setSuccess("");
-    setParams({ action: "new" });
+    setParams({ ...listParams(), action: "new" });
   };
 
-  const handleDelete = async () => {
-    if (!placeToDelete || isDeleting) return;
-    setIsDeleting(true);
+  const requestStatusChange = (place: ManagedPlace) => {
+    setSelectedPlace(null);
+    setError("");
+    setPlaceToChange(place);
+  };
+
+  const handleStatusChange = async () => {
+    if (!placeToChange || isChangingStatus) return;
+    setIsChangingStatus(true);
     setError("");
     setSuccess("");
     try {
-      await deletePlace(placeToDelete.id);
+      const nextStatus = await setManagedPlaceStatus(
+        placeToChange.id,
+        placeToChange.status === "active" ? "inactive" : "active",
+      );
       setPlaces((current) =>
-        current.filter((place) => place.id !== placeToDelete.id),
+        current.map((place) =>
+          place.id === placeToChange.id ? { ...place, status: nextStatus } : place,
+        ),
       );
       setSuccess(
-        `“${placeToDelete.name}” se retiró del catálogo. Su historial se conserva.`,
+        nextStatus === "active"
+          ? `“${placeToChange.name}” se habilitó y vuelve a aparecer en el mapa.`
+          : `“${placeToChange.name}” se deshabilitó. Su ficha e historial se conservan en Lugares deshabilitados.`,
       );
-      setPlaceToDelete(null);
+      setPlaceToChange(null);
     } catch {
       setError(
-        "No pudimos eliminar el lugar. No se confirmó ningún cambio; vuelve a intentarlo.",
+        "No pudimos cambiar el estado del lugar. Vuelve a intentarlo o actualiza el listado para comprobar su estado.",
       );
     } finally {
-      setIsDeleting(false);
+      setIsChangingStatus(false);
     }
   };
 
@@ -155,7 +177,7 @@ export function AdminManagePlaces() {
         onBack={backToList}
         onCreated={(place) => {
           setPlaces((current) => [
-            place,
+            { ...place, status: "active" },
             ...current.filter((item) => item.id !== place.id),
           ]);
           setSuccess(`“${place.name}” se creó correctamente.`);
@@ -195,10 +217,20 @@ export function AdminManagePlaces() {
         key={editingPlace.id}
         place={editingPlace}
         onBack={backToList}
+        onDeleted={({ imageCleanupPending }) => {
+          setPlaces((current) => current.filter((place) => place.id !== editingPlace.id));
+          setSuccess(
+            `“${editingPlace.name}” se eliminó definitivamente.` +
+            (imageCleanupPending ? " Quedó pendiente limpiar algunas imágenes del almacenamiento." : ""),
+          );
+          backToList();
+        }}
         onSave={(updated) => {
           if (!updated) return;
           setPlaces((current) =>
-            current.map((place) => (place.id === updated.id ? updated : place)),
+            current.map((place) =>
+              place.id === updated.id ? { ...updated, status: place.status } : place,
+            ),
           );
           setSuccess(
             `Los cambios de “${updated.name}” se guardaron correctamente.`,
@@ -213,7 +245,7 @@ export function AdminManagePlaces() {
     <div className="space-y-5">
       <AdminPageHeading
         title="Lugares"
-        description="Consulta, crea y edita los espacios de Pinwi."
+        description="Gestiona las fichas y decide qué espacios aparecen en el mapa."
         action={
           <Button onClick={createNew} className="admin-primary">
             <Plus size={16} /> Nuevo lugar
@@ -222,7 +254,7 @@ export function AdminManagePlaces() {
       />
       {!isSupabaseConfigured && (
         <div className="admin-notice">
-          Vista de demostración. Puedes explorar las fichas; guardar y eliminar
+          Vista de demostración. Puedes explorar las fichas; guardar y cambiar su estado
           requiere una conexión a Supabase.
         </div>
       )}
@@ -258,6 +290,39 @@ export function AdminManagePlaces() {
         className="admin-panel overflow-hidden"
         aria-label="Catálogo de lugares"
       >
+        <div className="admin-place-state-header">
+          <div
+            className="admin-place-state-options"
+            role="group"
+            aria-label="Visibilidad de los lugares"
+          >
+            {([
+              ["active", "Lugares habilitados", Eye],
+              ["inactive", "Lugares deshabilitados", EyeOff],
+            ] as const).map(([value, label, Icon]) => (
+              <button
+                type="button"
+                key={value}
+                aria-pressed={status === value}
+                onClick={() => {
+                  setParams(value === "inactive" ? { estado: "deshabilitados" } : {});
+                  setPage(1);
+                }}
+              >
+                <Icon size={17} aria-hidden="true" />
+                <span>{label}</span>
+                <span className="admin-place-state-count">
+                  {places.filter((place) => place.status === value).length}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p>
+            {status === "active"
+              ? "Visibles en el mapa y en Descubrir. Puedes ocultarlos sin perder su información."
+              : "Ocultos del mapa y de Descubrir. Conservan su ficha e historial; puedes habilitarlos cuando quieras."}
+          </p>
+        </div>
         <div className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative w-full lg:max-w-sm">
             <Search
@@ -291,9 +356,9 @@ export function AdminManagePlaces() {
                   }}
                 >
                   {label}{" "}
-                  <span className="ml-1 text-[10px] opacity-70">
+                  <span className="ml-1 text-xs">
                     {
-                      places.filter(
+                      sectionPlaces.filter(
                         (place) => value === "all" || place.category === value,
                       ).length
                     }
@@ -305,7 +370,7 @@ export function AdminManagePlaces() {
               type="button"
               className="admin-icon-button"
               aria-label="Actualizar lugares"
-              disabled={isLoading || isRefreshing || !isSupabaseConfigured}
+              disabled={isLoading || isRefreshing || isChangingStatus || !isSupabaseConfigured}
               onClick={() => refresh()}
             >
               <RefreshCw
@@ -353,12 +418,12 @@ export function AdminManagePlaces() {
                   <div className="min-w-0">
                     <button
                       type="button"
-                      className="block max-w-full truncate text-left text-sm font-medium hover:text-[#4f46e5]"
+                      className="block max-w-full truncate text-left text-[15px] font-medium hover:text-[#4f46e5]"
                       onClick={() => setSelectedPlace(place)}
                     >
                       {place.name}
                     </button>
-                    <p className="mt-1 truncate text-xs text-gray-500">
+                    <p className="mt-1 truncate text-[13px] text-gray-500">
                       {place.zone || place.address || "Ubicación sin completar"}
                     </p>
                   </div>
@@ -372,7 +437,7 @@ export function AdminManagePlaces() {
                   >
                     {planLabels[place.planType]}
                   </span>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-[13px] text-gray-400">
                     {placeTypeLabels[place.type]}
                   </p>
                 </div>
@@ -402,16 +467,17 @@ export function AdminManagePlaces() {
                   </button>
                   <button
                     type="button"
-                    className="admin-icon-button action-delete disabled:opacity-35"
-                    disabled={!isSupabaseConfigured}
-                    onClick={() => {
-                      setError("");
-                      setPlaceToDelete(place);
-                    }}
-                    aria-label={`Eliminar ${place.name}`}
-                    title="Eliminar"
+                    className={`admin-icon-button ${place.status === "active" ? "action-disable" : "action-enable"} disabled:opacity-35`}
+                    disabled={!isSupabaseConfigured || isChangingStatus}
+                    onClick={() => requestStatusChange(place)}
+                    aria-label={`${place.status === "active" ? "Deshabilitar" : "Habilitar"} ${place.name}`}
+                    title={place.status === "active" ? "Deshabilitar: ocultar del mapa" : "Habilitar: mostrar en el mapa"}
                   >
-                    <Trash2 size={16} strokeWidth={1.5} />
+                    {place.status === "active" ? (
+                      <EyeOff size={17} strokeWidth={1.5} />
+                    ) : (
+                      <Eye size={17} strokeWidth={1.5} />
+                    )}
                   </button>
                 </div>
               </article>
@@ -421,30 +487,36 @@ export function AdminManagePlaces() {
               title={
                 query || filter !== "all"
                   ? "No encontramos lugares"
-                  : "Agrega tu primer lugar"
+                  : status === "inactive"
+                    ? "Sin lugares deshabilitados"
+                    : "Agrega tu primer lugar"
               }
               description={
                 query || filter !== "all"
                   ? "Prueba otra búsqueda o cambia los filtros."
-                  : "Los espacios que crees aparecerán en este catálogo."
+                  : status === "inactive"
+                    ? "Los espacios que ocultes del mapa aparecerán aquí para que puedas volver a habilitarlos."
+                    : "Los espacios que crees aparecerán en este catálogo."
               }
               action={
-                <Button
-                  variant="outline"
-                  onClick={
-                    query || filter !== "all"
-                      ? () => {
-                          setSearch("");
-                          setFilter("all");
-                          setPage(1);
-                        }
-                      : createNew
-                  }
-                >
-                  {query || filter !== "all"
-                    ? "Limpiar filtros"
-                    : "Nuevo lugar"}
-                </Button>
+                (query || filter !== "all" || status === "active") && (
+                  <Button
+                    variant="outline"
+                    onClick={
+                      query || filter !== "all"
+                        ? () => {
+                            setSearch("");
+                            setFilter("all");
+                            setPage(1);
+                          }
+                        : createNew
+                    }
+                  >
+                    {query || filter !== "all"
+                      ? "Limpiar filtros"
+                      : "Nuevo lugar"}
+                  </Button>
+                )
               }
             />
           )}
@@ -479,17 +551,20 @@ export function AdminManagePlaces() {
         </div>
       </section>
       <AlertDialog
-        open={Boolean(placeToDelete)}
+        open={Boolean(placeToChange)}
         onOpenChange={(open) => {
-          if (!open && !isDeleting) setPlaceToDelete(null);
+          if (!open && !isChangingStatus) setPlaceToChange(null);
         }}
       >
         <AlertDialogContent className="admin-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este lugar?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {placeToChange?.status === "active" ? "¿Deshabilitar este lugar?" : "¿Habilitar este lugar?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              “{placeToDelete?.name}” dejará de aparecer en el catálogo. Sus
-              reservas e historial se conservarán.
+              {placeToChange?.status === "active"
+                ? `“${placeToChange.name}” dejará de aparecer en el mapa y en Descubrir. Su ficha, reservas e historial se conservarán en Lugares deshabilitados.`
+                : `“${placeToChange?.name}” volverá a aparecer en el mapa y en Descubrir con su información actual.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error && (
@@ -498,18 +573,20 @@ export function AdminManagePlaces() {
             </p>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
+            <AlertDialogCancel disabled={isChangingStatus}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
+              disabled={isChangingStatus}
+              className="admin-status-confirm"
               onClick={(event) => {
                 event.preventDefault();
-                void handleDelete();
+                void handleStatusChange();
               }}
             >
-              {isDeleting ? "Eliminando…" : "Eliminar lugar"}
+              {isChangingStatus
+                ? "Guardando…"
+                : placeToChange?.status === "active" ? "Deshabilitar lugar" : "Habilitar lugar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -530,6 +607,10 @@ export function AdminManagePlaces() {
           </DialogHeader>
           {selectedPlace && (
             <div className="space-y-5">
+              <p className={`admin-place-visibility is-${selectedPlace.status}`}>
+                {selectedPlace.status === "active" ? <Eye size={16} /> : <EyeOff size={16} />}
+                {selectedPlace.status === "active" ? "Habilitado · Visible en el mapa" : "Deshabilitado · Oculto del mapa"}
+              </p>
               {selectedPlace.images.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto">
                   {selectedPlace.images.map((url, index) => (
@@ -609,12 +690,22 @@ export function AdminManagePlaces() {
                   ))}
                 </div>
               )}
-              <Button
-                className="admin-primary"
-                onClick={() => editPlace(selectedPlace)}
-              >
-                <Pencil size={15} /> Editar lugar
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  className="admin-primary"
+                  onClick={() => editPlace(selectedPlace)}
+                >
+                  <Pencil size={15} /> Editar lugar
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!isSupabaseConfigured || isChangingStatus}
+                  onClick={() => requestStatusChange(selectedPlace)}
+                >
+                  {selectedPlace.status === "active" ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {selectedPlace.status === "active" ? "Deshabilitar" : "Habilitar"}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

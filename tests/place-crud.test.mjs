@@ -46,6 +46,7 @@ const response = (body, status = 200) =>
 
 before(async () => {
   server = await createServer({
+    optimizeDeps: { noDiscovery: true, include: [] },
     server: { middlewareMode: true, hmr: { port: 24683 } },
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("http://127.0.0.1:9"),
@@ -83,7 +84,7 @@ beforeEach(() => {
     const method = options.method || "GET";
     const body =
       typeof options.body === "string" ? JSON.parse(options.body) : null;
-    requests.push({ path: url.pathname, method, body });
+    requests.push({ path: url.pathname, method, body, query: url.searchParams });
     if (failure?.(url, method))
       return response({ message: "Denied by test policy", code: "42501" }, 403);
     if (url.pathname.startsWith("/storage/v1/object/")) {
@@ -93,6 +94,12 @@ beforeEach(() => {
       return response(
         [...database.values()].filter((p) => p.status === "active"),
       );
+    if (url.pathname.endsWith("/rpc/delete_managed_place")) {
+      const id = body.target_place_id;
+      if (!database.has(id)) return response({ message: "place_not_found", code: "P0001" }, 400);
+      database.delete(id);
+      return response({ id, image_paths: [`${id}/cover.webp`] });
+    }
     if (url.pathname.endsWith("/place_spaces")) {
       if (method === "POST")
         return response(
@@ -109,7 +116,8 @@ beforeEach(() => {
       const id = url.searchParams.get("id")?.replace("eq.", "");
       if (method === "PATCH") {
         const row = database.get(id);
-        if (!row)
+        const statusFilter = url.searchParams.get("status");
+        if (!row || (statusFilter === "in.(active,inactive)" && !["active", "inactive"].includes(row.status)))
           return response({ message: "No rows", code: "PGRST116" }, 406);
         database.set(id, { ...row, ...body });
         return response(database.get(id));
@@ -118,7 +126,13 @@ beforeEach(() => {
         database.delete(id);
         return response({ id });
       }
-      return response(database.get(id) ?? null);
+      if (id) return response(database.get(id) ?? null);
+      const statusFilter = url.searchParams.get("status");
+      return response([...database.values()].filter((row) =>
+        statusFilter === "in.(active,inactive)"
+          ? ["active", "inactive"].includes(row.status)
+          : row.status === "active",
+      ));
     }
     throw new Error(`Unexpected request: ${method} ${url.pathname}`);
   };
@@ -327,4 +341,123 @@ test("a pending detail response cannot refill a catalogue invalidated during the
   release();
   assert.equal(await pending, null);
   assert.equal(service.getCachedPlaces(), null);
+});
+
+test("management includes inactive records, preserves nested details and caches separately from publication", async () => {
+  const created = await service.createPlace(input);
+  const inactive = { ...database.get(created.id), id: placeId, status: "inactive",
+    place_amenities: [{ amenity_key: "wifi", amenity_name: "WiFi", is_available: true }],
+    place_spaces: [{ id: "room", name: "Sala conservada", capacity: 4, price_per_hour: 0, billing_unit: "day" }],
+  };
+  database.set(placeId, inactive);
+  database.set("deleted-place", { ...inactive, id: "deleted-place", status: "deleted" });
+  database.set("pending-place", { ...inactive, id: "pending-place", status: "pending" });
+  const [first, simultaneous] = await Promise.all([service.listManagedPlaces(), service.listManagedPlaces()]);
+  assert.equal(first, simultaneous);
+  assert.equal(first.length, 2);
+  const hidden = first.find((place) => place.id === placeId);
+  assert.equal(hidden.status, "inactive");
+  assert.equal(hidden.amenities[0].key, "wifi");
+  assert.equal(hidden.spaces[0].name, "Sala conservada");
+  assert.equal(service.getCachedPlaces(), null);
+  assert.equal(await service.listManagedPlaces(), first);
+  assert.equal(requests.filter((r) => r.method === "GET" && r.path.endsWith("/places")).length, 1);
+  assert.deepEqual((await service.listPlaces()).map((place) => place.id), [created.id]);
+  const originalNow = Date.now;
+  try {
+    Date.now = () => originalNow() + 6 * 60 * 1000;
+    assert.equal(service.getManagedPlacesCacheRemaining(), 0);
+    await service.listManagedPlaces();
+    assert.equal(requests.filter((r) => r.method === "GET" && r.path.endsWith("/places")).length, 2);
+  } finally { Date.now = originalNow; }
+});
+
+test("disable and enable preserve the record and invalidate management, catalogue and public pins", async () => {
+  const created = await service.createPlace(input);
+  const publicMap = await server.ssrLoadModule("/src/app/services/publicMapService.ts");
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (target, options) => {
+    const url = new URL(typeof target === "string" ? target : target.url);
+    if (url.pathname.endsWith("/rpc/get_public_map_pins"))
+      return response([...database.values()].filter((row) => row.status === "active"));
+    return previousFetch(target, options);
+  };
+  await publicMap.listPublicMapPins();
+  await service.listManagedPlaces();
+  await service.listPlaces();
+  assert.equal(await service.setManagedPlaceStatus(created.id, "inactive"), "inactive");
+  assert.equal(service.getCachedManagedPlaces(), null);
+  assert.equal(service.getCachedPlaces(), null);
+  assert.equal(publicMap.getCachedPublicPins(), null);
+  assert.deepEqual(await service.listPlaces(), []);
+  assert.deepEqual(await publicMap.listPublicMapPins(), []);
+  assert.equal((await service.listManagedPlaces())[0].status, "inactive");
+  assert.equal(await service.setManagedPlaceStatus(created.id, "active"), "active");
+  assert.equal((await service.listPlaces())[0].id, created.id);
+  assert.equal((await publicMap.listPublicMapPins())[0].id, created.id);
+  assert.equal(database.get(created.id).description, input.description);
+});
+
+test("denied, missing and deleted places never report a confirmed status change", async () => {
+  const created = await service.createPlace(input);
+  const cached = await service.listManagedPlaces();
+  failure = (url, method) => url.pathname.endsWith("/places") && method === "PATCH";
+  await assert.rejects(service.setManagedPlaceStatus(created.id, "inactive"));
+  assert.equal(database.get(created.id).status, "active");
+  assert.equal(service.getCachedManagedPlaces(), cached);
+  failure = null;
+  await assert.rejects(service.setManagedPlaceStatus(placeId, "active"));
+  database.set(placeId, { ...database.get(created.id), id: placeId, status: "deleted" });
+  await assert.rejects(service.setManagedPlaceStatus(placeId, "active"));
+  assert.equal(database.get(placeId).status, "deleted");
+  await assert.rejects(service.setManagedPlaceStatus(created.id, "pending"), /no válido/);
+});
+
+test("a stale management response cannot restore data after account changes or a confirmed mutation", async () => {
+  let release, started;
+  const received = new Promise((resolve) => { started = resolve; });
+  globalThis.fetch = async () => {
+    started();
+    await new Promise((resolve) => { release = resolve; });
+    return response([{ id: placeId, name: "Respuesta anterior", status: "active", images: [] }]);
+  };
+  const pending = service.listManagedPlaces();
+  // Register a rejection handler before invalidation to avoid an unhandled promise.
+  const rejected = assert.rejects(pending, /sesión o los datos cambiaron/);
+  await received;
+  service.clearPlacesCache();
+  release();
+  await rejected;
+  assert.equal(service.getCachedManagedPlaces(), null);
+});
+
+test("permanent deletion confirms the server result, removes images and clears publication and management caches", async () => {
+  const created = await service.createPlace(input);
+  await service.listManagedPlaces();
+  await service.listPlaces();
+  assert.deepEqual(await service.permanentlyDeletePlace(created.id), { imageCleanupPending: false });
+  assert.equal(database.has(created.id), false);
+  assert.equal(service.getCachedManagedPlaces(), null);
+  assert.equal(service.getCachedPlaces(), null);
+  const cleanup = requests.find((r) => r.method === "DELETE" && r.path.startsWith("/storage/"));
+  assert.deepEqual(cleanup.body.prefixes, [`${created.id}/cover.webp`]);
+  assert.ok(!requests.some((r) => r.method === "DELETE" && r.path.endsWith("/places")), "Use the administrator-only RPC for irreversible deletion");
+});
+
+test("a denied permanent deletion keeps data, caches and images intact", async () => {
+  const created = await service.createPlace(input);
+  const cached = await service.listManagedPlaces();
+  failure = (url) => url.pathname.endsWith("/rpc/delete_managed_place");
+  await assert.rejects(service.permanentlyDeletePlace(created.id));
+  assert.equal(database.has(created.id), true);
+  assert.equal(service.getCachedManagedPlaces(), cached);
+  assert.ok(!requests.some((r) => r.path.startsWith("/storage/") && r.method === "DELETE"));
+});
+
+test("image cleanup failure reports the already-confirmed deletion without attempting it twice", async () => {
+  const created = await service.createPlace(input);
+  failure = (url) => url.pathname.startsWith("/storage/");
+  assert.deepEqual(await service.permanentlyDeletePlace(created.id), { imageCleanupPending: true });
+  assert.equal(database.has(created.id), false);
+  assert.equal(requests.filter((r) => r.path.endsWith("/rpc/delete_managed_place")).length, 1);
 });

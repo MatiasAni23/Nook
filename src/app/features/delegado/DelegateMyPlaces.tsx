@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { Calendar, Clock, Edit, MapPin, Plus, Star, Wifi } from "lucide-react";
+import { Calendar, Clock, Edit, EyeOff, MapPin, Plus, Star, Wifi } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { listCurrentDelegatePlaces, type DelegateAssignedPlace } from "../../services/adminManagementService";
-import type { AppPlace } from "../../services/placeService";
+import { setManagedPlaceStatus, type AppPlace } from "../../services/placeService";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
 import { AdminAddPlace } from "../admin/AdminAddPlace";
 import { AdminEditPlace } from "../admin/AdminEditPlace";
 
@@ -15,6 +19,29 @@ export function DelegateMyPlaces() {
   const [myPlaces, setMyPlaces] = useState<DelegateAssignedPlace[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [placeToDisable, setPlaceToDisable] = useState<DelegateAssignedPlace | null>(null);
+  const [isDisabling, setIsDisabling] = useState(false);
+  const [statusError, setStatusError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const handleDisable = async () => {
+    if (!placeToDisable || isDisabling) return;
+    setIsDisabling(true);
+    setStatusError("");
+    setSuccessMessage("");
+    try {
+      const status = await setManagedPlaceStatus(placeToDisable.id, "inactive");
+      setMyPlaces((current) => current.map((place) =>
+        place.id === placeToDisable.id ? { ...place, status } : place,
+      ));
+      setSuccessMessage(`“${placeToDisable.name}” se deshabilitó. Su información e historial se conservan.`);
+      setPlaceToDisable(null);
+    } catch {
+      setStatusError("No pudimos deshabilitar el lugar. Vuelve a intentarlo.");
+    } finally {
+      setIsDisabling(false);
+    }
+  };
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -103,7 +130,7 @@ export function DelegateMyPlaces() {
       <div className="size-full flex flex-col">
         <div className="flex-1 overflow-hidden">
           <AdminAddPlace showPlanType={false} onCreated={(place) => {
-            setMyPlaces((current) => [{ ...place, reservationsCount: 0 }, ...current]);
+            setMyPlaces((current) => [{ ...place, reservationsCount: 0, status: "active" }, ...current]);
             setView("list");
           }} />
         </div>
@@ -161,6 +188,7 @@ export function DelegateMyPlaces() {
               {errorMessage}
             </div>
           )}
+          {successMessage && <p className="rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-sm text-green-900" role="status">{successMessage}</p>}
 
           {isLoading && (
             <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">Cargando lugares...</div>
@@ -199,6 +227,11 @@ export function DelegateMyPlaces() {
                           <Badge variant="outline" className="text-xs">
                             {place.category === "work" ? "Trabajo" : "Estudio"}
                           </Badge>
+                          {place.status === "inactive" && (
+                            <Badge variant="outline" className="border-[#c894a4] bg-[#fff7f9] text-xs text-[#8e3449]">
+                              <EyeOff className="size-3 mr-1" /> Oculto del mapa
+                            </Badge>
+                          )}
                           {place.wifi && (
                             <Badge variant="outline" className="text-xs">
                               <Wifi className="size-3 mr-1" />
@@ -230,9 +263,15 @@ export function DelegateMyPlaces() {
                         <Edit className="size-3 mr-1" />
                         Editar Lugar
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1 text-gray-700 hover:bg-gray-50">
-                        <MapPin className="size-3 mr-1" />
-                        Ver Detalles
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={place.status !== "active" || isDisabling || !isSupabaseConfigured}
+                        onClick={() => { setStatusError(""); setPlaceToDisable(place); }}
+                        className="flex-1 border-[#c894a4] bg-[#fff7f9] text-[#8e3449] hover:bg-[#f8e7ec]"
+                      >
+                        <EyeOff className="size-3 mr-1" />
+                        {place.status === "inactive" ? "Deshabilitado" : "Deshabilitar"}
                       </Button>
                     </div>
                   </div>
@@ -259,6 +298,24 @@ export function DelegateMyPlaces() {
           </Card>
         </div>
       </div>
+      <AlertDialog open={Boolean(placeToDisable)} onOpenChange={(open) => { if (!open && !isDisabling) setPlaceToDisable(null); }}>
+        <AlertDialogContent className="admin-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Deshabilitar este lugar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{placeToDisable?.name}” se ocultará del mapa y de Descubrir. Su información,
+              reservas e historial se conservarán. Un administrador podrá volver a habilitarlo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {statusError && <p className="text-sm text-red-700" role="alert">{statusError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDisabling}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction disabled={isDisabling} className="admin-status-confirm" onClick={(event) => { event.preventDefault(); void handleDisable(); }}>
+              {isDisabling ? "Guardando…" : "Deshabilitar lugar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

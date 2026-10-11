@@ -19,6 +19,7 @@ import {
   Presentation,
   Save,
   Star,
+  Trash2,
   Upload,
   Users,
   Volume2,
@@ -34,11 +35,17 @@ import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Slider } from "../../components/ui/slider";
 import { Switch } from "../../components/ui/switch";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
+import { useCurrentUser } from "../../context/CurrentUserContext";
 import { PlaceSpacesEditor, arePlaceSpacesValid, placeSpacesToDrafts, validPlaceSpaces, type PlaceSpaceDraft } from "../shared/PlaceSpacesEditor";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import { validatePlaceCapacity, validatePlaceImages } from "./placeFormValidation";
 import {
   updatePlace,
+  permanentlyDeletePlace,
   type AppPlace,
   type PlaceImageInput,
   type PlaceAmenity,
@@ -51,6 +58,7 @@ interface AdminEditPlaceProps {
   place: Partial<AppPlace> & { id: string };
   onSave: (place?: AppPlace) => void;
   onBack?: () => void;
+  onDeleted?: (result: { imageCleanupPending: boolean }) => void;
   showPlanType?: boolean;
 }
 
@@ -216,7 +224,8 @@ function parseHours(hours?: string): DaySchedule[] {
   return parsedDays;
 }
 
-export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: AdminEditPlaceProps) {
+export function AdminEditPlace({ place, onSave, onBack, onDeleted, showPlanType = true }: AdminEditPlaceProps) {
+  const { currentUser } = useCurrentUser();
   const errorRef = useRef<HTMLDivElement>(null);
   const objectUrlsRef = useRef<string[]>([]);
   const initialCategory = getInitialCategory(place);
@@ -257,6 +266,24 @@ export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: A
   const [spaces, setSpaces] = useState<PlaceSpaceDraft[]>(() => placeSpacesToDrafts(place.spaces ?? []));
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const canDelete = currentUser?.role === "admin" && Boolean(onDeleted);
+
+  const handlePermanentDelete = async () => {
+    if (!canDelete || !onDeleted || isDeleting || isSaving) return;
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      const result = await permanentlyDeletePlace(place.id);
+      onDeleted(result);
+    } catch {
+      setDeleteError("No pudimos eliminar el lugar. Actualiza el listado para comprobar su estado antes de volver a intentarlo.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!errorMessage) return;
@@ -514,7 +541,7 @@ export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: A
   const fallbackOffsetX = (pinPosition.lng - defaultPosition.lng) * 3000;
   const fallbackOffsetY = (defaultPosition.lat - pinPosition.lat) * 3000;
   return (
-    <fieldset disabled={isSaving} className="admin-form size-full min-w-0 flex flex-col border-0">
+    <fieldset disabled={isSaving || isDeleting} className="admin-form size-full min-w-0 flex flex-col border-0">
       <div className="flex-1 overflow-auto p-4 pb-32">
         <div className="space-y-4">
           <div>
@@ -991,16 +1018,54 @@ export function AdminEditPlace({ place, onSave, onBack, showPlanType = true }: A
             </CardContent>
           </Card>
 
-          <Button
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className="mb-6 h-12 w-full bg-[#4F46E5] hover:bg-[#4338CA]"
-          >
-            <Save className="size-5 mr-2" />
-            {isSaving ? "Guardando..." : "Guardar cambios"}
-          </Button>
+          <div className="admin-form-actions">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSaving || isDeleting}
+              className="admin-form-save h-12"
+            >
+              <Save className="size-5" />
+              {isSaving ? "Guardando…" : "Guardar cambios"}
+            </Button>
+            {canDelete && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!isSupabaseConfigured || isSaving || isDeleting}
+                className="admin-form-delete h-12"
+                onClick={() => { setDeleteError(""); setDeleteOpen(true); }}
+              >
+                <Trash2 className="size-4" /> Eliminar lugar
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+      {canDelete && (
+        <AlertDialog open={deleteOpen} onOpenChange={(open) => { if (!isDeleting) setDeleteOpen(open); }}>
+          <AlertDialogContent className="admin-dialog">
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar este lugar definitivamente?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se eliminará “{place.name}” junto con sus datos vinculados, incluidas reservas,
+                reseñas y favoritos. Esta acción no se puede deshacer. Para ocultarlo del mapa
+                conservando su información, usa Deshabilitar en el listado.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {deleteError && <p className="text-sm text-red-700" role="alert">{deleteError}</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={isDeleting}
+                className="admin-delete-confirm"
+                onClick={(event) => { event.preventDefault(); void handlePermanentDelete(); }}
+              >
+                {isDeleting ? "Eliminando…" : "Eliminar definitivamente"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </fieldset>
   );
 }
