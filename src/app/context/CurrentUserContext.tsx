@@ -5,10 +5,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import { setAdminCacheAccount } from "../services/adminDataCache";
+import { clearAppCaches } from "../services/appCacheService";
 import {
   type CurrentUserProfile,
   getCurrentUserProfile,
@@ -40,6 +42,8 @@ export function clearStoredCurrentUser() {
 }
 
 export function CurrentUserProvider({ children }: { children: ReactNode }) {
+  const refreshGeneration = useRef(0);
+  const activeAccountId = useRef(currentUserMemoryCache?.id ?? null);
   const [currentUser, setCurrentUserState] = useState<CurrentUserProfile | null>(() =>
     readStoredCurrentUser(),
   );
@@ -55,6 +59,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearCurrentUser = useCallback(() => {
+    refreshGeneration.current += 1;
     setCurrentUser(null);
   }, [setCurrentUser]);
 
@@ -64,14 +69,16 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
+    const generation = ++refreshGeneration.current;
     setIsLoadingCurrentUser(true);
 
     try {
       const freshUser = await getCurrentUserProfile({ forceRefresh: true });
+      if (generation !== refreshGeneration.current) return null;
       setCurrentUser(freshUser);
       return freshUser;
     } finally {
-      setIsLoadingCurrentUser(false);
+      if (generation === refreshGeneration.current) setIsLoadingCurrentUser(false);
     }
   }, [setCurrentUser]);
 
@@ -85,18 +92,32 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
     if (!supabase) return;
 
-    const { data } = supabase.auth.onAuthStateChange((event) => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
+        activeAccountId.current = null;
+        clearTimeout(refreshTimer);
         clearCurrentUser();
+        setIsLoadingCurrentUser(false);
+        void clearAppCaches();
         return;
       }
 
-      if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        void refreshCurrentUser().catch(() => clearCurrentUser());
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "USER_UPDATED") {
+        const accountId = session?.user.id ?? null;
+        if (event !== "USER_UPDATED" && activeAccountId.current === accountId) return;
+        if (activeAccountId.current !== accountId) void clearAppCaches();
+        activeAccountId.current = accountId;
+        // Defer calls to Auth until its synchronous event callback releases its lock.
+        clearCurrentUser();
+        clearTimeout(refreshTimer);
+        refreshTimer = setTimeout(() => { void refreshCurrentUser().catch(() => clearCurrentUser()); }, 0);
       }
     });
 
     return () => {
+      clearTimeout(refreshTimer);
+      refreshGeneration.current += 1;
       data.subscription.unsubscribe();
     };
   }, [clearCurrentUser, refreshCurrentUser]);
@@ -110,6 +131,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     const client = supabase;
     const channel = client.channel("online-users", {
       config: {
+        private: true,
         presence: {
           key: currentUser.id,
         },
@@ -125,7 +147,6 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
       await channel.track({
         user_id: currentUser.id,
-        online_at: new Date().toISOString(),
       });
     });
 

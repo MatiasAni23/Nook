@@ -1,3 +1,4 @@
+import { getSafeWebsiteUrl } from "../../lib/externalUrl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import {
@@ -488,7 +489,7 @@ export function PlaceDetails() {
     : "Sin información";
   const hasValidPrice = Number.isFinite(place.pricePerHour) && place.pricePerHour > 0;
   const priceText = hasValidPrice ? formatPrice(place.pricePerHour) : "Gratis";
-  const websiteUrl = typeof place.websiteUrl === "string" ? place.websiteUrl.trim() : "";
+  const websiteUrl = getSafeWebsiteUrl(place.websiteUrl);
   const locationText = place.zone || place.address || "Ver ubicación";
   const hasSchedule = Boolean(String(place.hours ?? "").trim());
 

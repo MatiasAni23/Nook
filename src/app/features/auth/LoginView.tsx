@@ -1,3 +1,5 @@
+import { getPasswordValidationMessage, getPasswordStrength } from "../../lib/passwordPolicy";
+import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
 import { useId, useMemo, useState, type ComponentProps, type ReactNode } from "react";
@@ -15,12 +17,13 @@ import { verificationLink } from "./authNavigation";
 interface LoginViewProps {
   initialTab?: "login" | "register";
   returnTo?: string;
-  onLogin: (email: string, password: string) => Promise<void> | void;
+  onLogin: (email: string, password: string, captchaToken?: string) => Promise<void> | void;
   onRegister?: (
     name: string,
     email: string,
     phone: string,
     password: string,
+    captchaToken?: string,
   ) => Promise<RegisterResult> | RegisterResult;
 }
 
@@ -55,26 +58,6 @@ function normalizeChilePhone(digits: string) {
   return `+569${digits}`;
 }
 
-function getPasswordScore(password: string) {
-  let score = 0;
-
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-
-  return score;
-}
-
-function getPasswordStrength(score: number) {
-  if (score <= 1) return { label: "Muy debil", color: "bg-red-500", width: "20%" };
-  if (score === 2) return { label: "Debil", color: "bg-orange-500", width: "40%" };
-  if (score === 3) return { label: "Aceptable", color: "bg-yellow-500", width: "60%" };
-  if (score === 4) return { label: "Buena", color: "bg-blue-500", width: "80%" };
-  return { label: "Fuerte", color: "bg-green-500", width: "100%" };
-}
-
 function getAuthErrorMessage(error: unknown) {
   if (!(error instanceof Error)) {
     return "No se pudo completar la accion.";
@@ -83,7 +66,7 @@ function getAuthErrorMessage(error: unknown) {
   const message = error.message.toLowerCase();
 
   if (message.includes("invalid login credentials")) {
-    return "Correo o contraseña incorrectos. Verifica que el usuario exista en Supabase Auth.";
+    return "Correo o contraseña incorrectos.";
   }
 
   if (message.includes("email not confirmed")) {
@@ -91,7 +74,7 @@ function getAuthErrorMessage(error: unknown) {
   }
 
   if (message.includes("user already registered") || message.includes("already registered")) {
-    return "Este correo ya esta registrado. Intenta iniciar sesion.";
+    return "Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.";
   }
 
   return error.message;
@@ -214,12 +197,13 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showRegisterPasswordConfirm, setShowRegisterPasswordConfirm] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
 
-  const passwordScore = useMemo(() => getPasswordScore(registerPassword), [registerPassword]);
-  const passwordStrength = getPasswordStrength(passwordScore);
+  const passwordStrength = useMemo(() => getPasswordStrength(registerPassword), [registerPassword]);
   const passwordsMatch =
     registerPasswordConfirm.length > 0 && registerPassword === registerPasswordConfirm;
   const passwordsMismatch =
@@ -242,6 +226,7 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
   };
 
   const handleTabChange = (value: string) => {
+    if (isSubmitting) return;
     setActiveTab(value === "register" ? "register" : "login");
     setErrorMessage("");
     setIsSubmitting(false);
@@ -255,6 +240,7 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
   };
 
   const handleLogin = async () => {
+    if (isSubmitting) return;
     if (!loginEmail || !loginPassword) {
       setErrorMessage("Ingresa tu correo y contraseña.");
       return;
@@ -270,15 +256,17 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
     setErrorMessage("");
 
     try {
-      await onLogin(loginEmail.trim(), loginPassword);
+      await onLogin(loginEmail.trim(), loginPassword, captchaToken);
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
 
   const handleRegister = async () => {
+    if (isSubmitting) return;
     if (!registerName.trim()) {
       setErrorMessage("Ingresa tu nombre completo.");
       return;
@@ -295,8 +283,9 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
       return;
     }
 
-    if (passwordScore < 3) {
-      setErrorMessage("La contraseña debe tener al menos 8 caracteres y combinar letras con numeros.");
+    const passwordError = getPasswordValidationMessage(registerPassword);
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return;
     }
 
@@ -315,6 +304,7 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
           registerEmail.trim(),
           normalizeChilePhone(registerPhone),
           registerPassword,
+          captchaToken,
         );
 
         if (result.needsEmailVerification) {
@@ -331,6 +321,7 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
     } catch (error) {
       setErrorMessage(getAuthErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
@@ -472,9 +463,10 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
                           />
                         </div>
                       </AuthField>
+                      <AuthCaptcha onToken={setCaptchaToken} resetKey={captchaAttempt} />
                       <PrimaryAuthButton
                         onClick={handleLogin}
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || (isAuthCaptchaEnabled && !captchaToken)}
                         className="mt-3"
                       >
                         <LogIn className="size-4" />
@@ -609,7 +601,8 @@ export function LoginView({ onLogin, onRegister, initialTab = "login", returnTo 
                           Las contraseñas no coinciden.
                         </p>
                       )}
-                      <PrimaryAuthButton onClick={handleRegister} disabled={isSubmitting}>
+                      <AuthCaptcha onToken={setCaptchaToken} resetKey={captchaAttempt} />
+                      <PrimaryAuthButton onClick={handleRegister} disabled={isSubmitting || (isAuthCaptchaEnabled && !captchaToken)}>
                         <UserPlus className="size-4" />
                         {isSubmitting ? "Creando..." : "Crear cuenta"}
                       </PrimaryAuthButton>

@@ -197,7 +197,8 @@ test("new images upload after parent creation and are cleaned before rolling bac
   await assert.rejects(
     service.createPlace({
       ...input,
-      imageFiles: [new File(["image"], "cover.webp", { type: "image/webp" })],
+      // Minimal WebP signature; HTTP is mocked, but upload validation is real.
+      imageFiles: [new File([new Uint8Array([82,73,70,70,0,0,0,0,87,69,66,80])], "cover.webp", { type: "image/webp" })],
     }),
   );
   const insert = requests.findIndex(

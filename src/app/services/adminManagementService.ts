@@ -325,6 +325,9 @@ async function getFunctionErrorMessage(error: unknown) {
       const message =
         typeof payload.message === "string" ? payload.message : null;
       const code = typeof payload.error === "string" ? payload.error : null;
+      if (code === "rate_limit_exceeded") return `Alcanzaste el límite de envíos. Intenta nuevamente en ${Math.max(1, Math.ceil(Number(payload.retry_after) || 60))} segundos.`;
+      if (code === "brevo_email_failed") return "El proveedor no pudo enviar la invitación. Revisa los registros de correo antes de reintentar.";
+      if (code === "security_service_unavailable") return "El servicio de envío no está disponible temporalmente. Intenta más tarde.";
       if (message && code) return `${code}: ${message}`;
       if (message) return message;
       if (code) return code;

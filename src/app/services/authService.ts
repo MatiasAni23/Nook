@@ -1,5 +1,8 @@
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { getPasswordValidationMessage } from "../lib/passwordPolicy";
+import { normalizeAuthCode, normalizeAuthEmail, requireCaptcha } from "../lib/authSecurity";
+import { withEmailCooldown } from "./authAttemptService";
 
 export type UserRole = "student" | "worker" | "admin" | "delegate";
 
@@ -10,6 +13,7 @@ export interface RegisterInput {
   password: string;
   role?: "student" | "worker";
   emailRedirectTo?: string;
+  captchaToken?: string;
 }
 
 export interface ProfileSetupInput {
@@ -28,7 +32,10 @@ export interface RegisterResult {
   needsEmailVerification: boolean;
 }
 
-const ACCOUNT_EXISTS_MESSAGE = "Este correo ya esta registrado. Intenta iniciar sesion.";
+function validateNewPassword(password: string) {
+  const message = getPasswordValidationMessage(password);
+  if (message) throw new Error(message);
+}
 
 function requireSupabase() {
   if (!supabase) {
@@ -43,9 +50,10 @@ export async function ensureAppUserRecord(user: User) {
   if (!(await getAppUserRecord(user.id))) throw new Error("No se encontro el perfil de la cuenta. Contacta al administrador.");
 }
 
-export async function signInWithEmail(email: string, password: string) {
+export async function signInWithEmail(email: string, password: string, captchaToken?: string) {
   const client = requireSupabase();
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  requireCaptcha(captchaToken);
+  const { data, error } = await client.auth.signInWithPassword({ email: normalizeAuthEmail(email), password, options: { captchaToken } });
 
   if (error) {
     throw error;
@@ -54,40 +62,25 @@ export async function signInWithEmail(email: string, password: string) {
   return data;
 }
 
-export async function emailAccountExists(email: string) {
+export async function signUpWithEmail({ name, email, phone, password, role = "student", emailRedirectTo, captchaToken }: RegisterInput) {
   const client = requireSupabase();
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await client.rpc("email_account_exists", {
-    lookup_email: normalizedEmail,
-  });
+  const normalizedEmail = normalizeAuthEmail(email);
+  validateNewPassword(password);
+  requireCaptcha(captchaToken);
 
-  if (error) {
-    throw error;
-  }
-
-  return Boolean(data);
-}
-
-export async function signUpWithEmail({ name, email, phone, password, role = "student", emailRedirectTo }: RegisterInput) {
-  const client = requireSupabase();
-  const normalizedEmail = email.trim().toLowerCase();
-
-  if (await emailAccountExists(normalizedEmail)) {
-    throw new Error(ACCOUNT_EXISTS_MESSAGE);
-  }
-
-  const { data, error } = await client.auth.signUp({
+  const { data, error } = await withEmailCooldown(normalizedEmail, () => client.auth.signUp({
     email: normalizedEmail,
     password,
     options: {
       emailRedirectTo,
+      captchaToken,
       data: {
         full_name: name,
         phone,
         role,
       },
     },
-  });
+  }));
 
   if (error) {
     throw error;
@@ -96,26 +89,32 @@ export async function signUpWithEmail({ name, email, phone, password, role = "st
   return data;
 }
 
-export async function sendPasswordRecoveryCode(email: string) {
+export async function sendPasswordRecoveryCode(email: string, captchaToken?: string) {
   const client = requireSupabase();
-  const { error } = await client.auth.resetPasswordForEmail(email, {
+  const normalizedEmail = normalizeAuthEmail(email);
+  requireCaptcha(captchaToken);
+  const { error } = await withEmailCooldown(normalizedEmail, () => client.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: `${window.location.origin}/recover-password`,
-  });
+    captchaToken,
+  }));
 
   if (error) {
     throw error;
   }
 }
 
-export async function resendSignupVerificationCode(email: string, emailRedirectTo?: string) {
+export async function resendSignupVerificationCode(email: string, emailRedirectTo?: string, captchaToken?: string) {
   const client = requireSupabase();
-  const { error } = await client.auth.resend({
+  const normalizedEmail = normalizeAuthEmail(email);
+  requireCaptcha(captchaToken);
+  const { error } = await withEmailCooldown(normalizedEmail, () => client.auth.resend({
     type: "signup",
-    email,
+    email: normalizedEmail,
     options: {
       emailRedirectTo: emailRedirectTo ?? `${window.location.origin}/verify-account`,
+      captchaToken,
     },
-  });
+  }));
 
   if (error) {
     throw error;
@@ -125,8 +124,8 @@ export async function resendSignupVerificationCode(email: string, emailRedirectT
 export async function verifySignupCode(email: string, code: string) {
   const client = requireSupabase();
   const { data, error } = await client.auth.verifyOtp({
-    email,
-    token: code,
+    email: normalizeAuthEmail(email),
+    token: normalizeAuthCode(code),
     type: "signup",
   });
 
@@ -137,28 +136,16 @@ export async function verifySignupCode(email: string, code: string) {
   return data;
 }
 
-export async function verifyPasswordRecoveryCode(email: string, code: string) {
+export async function completePasswordRecovery(email: string, code: string, password: string, captchaToken?: string) {
   const client = requireSupabase();
-  const { data, error } = await client.auth.verifyOtp({
-    email,
-    token: code,
-    type: "recovery",
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
-export async function completePasswordRecovery(email: string, code: string, password: string) {
-  const client = requireSupabase();
+  validateNewPassword(password);
+  requireCaptcha(captchaToken);
   const { data, error } = await client.functions.invoke("complete-password-recovery", {
     body: {
-      email: email.trim().toLowerCase(),
-      code: code.replace(/\s/g, ""),
+      email: normalizeAuthEmail(email),
+      code: normalizeAuthCode(code),
       password,
+      captchaToken,
     },
   });
 
@@ -166,7 +153,7 @@ export async function completePasswordRecovery(email: string, code: string, pass
     const context = (error as { context?: unknown }).context;
 
     if (context instanceof Response) {
-      let payload: { error?: string } | null = null;
+      let payload: { error?: string; retry_after?: number } | null = null;
 
       try {
         payload = await context.clone().json();
@@ -179,6 +166,15 @@ export async function completePasswordRecovery(email: string, code: string, pass
       }
       if (payload?.error === "weak_password") {
         throw new Error("La contraseña no cumple los requisitos de seguridad.");
+      }
+      if (payload?.error === "rate_limit_exceeded") {
+        throw new Error(`Demasiados intentos. Espera ${Math.max(1, Math.ceil(Number(payload.retry_after) || 60))} segundos antes de volver a intentar.`);
+      }
+      if (payload?.error === "captcha_required" || payload?.error === "captcha_invalid") {
+        throw new Error("Completa nuevamente la verificación de seguridad.");
+      }
+      if (payload?.error === "security_service_unavailable") {
+        throw new Error("La recuperación no está disponible temporalmente. Intenta más tarde.");
       }
     }
 
@@ -194,6 +190,7 @@ export async function completePasswordRecovery(email: string, code: string, pass
 
 export async function updateRecoveredPassword(password: string) {
   const client = requireSupabase();
+  validateNewPassword(password);
   const { data, error } = await client.auth.updateUser({ password });
 
   if (error) {

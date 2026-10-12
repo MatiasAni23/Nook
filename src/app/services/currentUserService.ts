@@ -1,5 +1,6 @@
 import { supabase } from "../lib/supabase";
 import { getSharedProfiles } from "./sharedProfileService";
+import { validateImageUpload } from "../lib/imageUploadSecurity";
 
 const PROFILE_IMAGES_BUCKET = "profile-images";
 const UUID_PATTERN =
@@ -319,21 +320,21 @@ export async function updateStudyProfileVisibility(visible: boolean) {
 
 export async function uploadCurrentUserProfileImage(file: File) {
   if (!supabase) throw new Error("Supabase no esta configurado.");
+  const extension = await validateImageUpload(file, 5 * 1024 * 1024);
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError) throw authError;
   if (!authData.user) throw new Error("No hay un usuario autenticado.");
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-  const safeName = `${Date.now()}.${extension}`;
+  const safeName = `${crypto.randomUUID()}.${extension}`;
   const path = `${authData.user.id}/${safeName}`;
   const { error: uploadError } = await supabase.storage
     .from(PROFILE_IMAGES_BUCKET)
     .upload(path, file, {
       cacheControl: "3600",
       contentType: file.type,
-      upsert: true,
+      upsert: false,
     });
 
   if (uploadError) throw uploadError;

@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { assertPublicEnvironment } from './src/app/lib/publicConfigSecurity'
 import { fileURLToPath } from 'node:url'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
@@ -19,7 +20,9 @@ function figmaAssetResolver(): Plugin {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  assertPublicEnvironment(loadEnv(mode, projectDirectory, 'VITE_'))
+  return {
   plugins: [
     figmaAssetResolver(),
     // The React and Tailwind plugins are both required for Make, even if
@@ -40,10 +43,12 @@ export default defineConfig({
     fs: {
       // Retain Vite's defaults and deny local database backups over HTTP.
       deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**',
-        '**/supabase/schema/private/**', '**/supabase/.temp/**'],
+        '**/docs-local/**', '**/supabase/schema/**', '**/supabase/migrations/**', '**/*.sql',
+        '**/supabase/.temp/**', '**/.agents/**', '**/.codex/**', '**/.aws/**'],
     },
   },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   assetsInclude: ['**/*.svg', '**/*.csv'],
+  }
 })

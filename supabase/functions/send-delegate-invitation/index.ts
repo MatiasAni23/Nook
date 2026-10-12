@@ -1,18 +1,5 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-interface RequestBody {
-  invitationId: string;
-  email: string;
-  name: string;
-  phone?: string | null;
-  inviteUrl: string;
-}
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
+import { allowedOrigins, consumeRateLimit, errorResponse, readJsonBody, securityHeaders, SecurityError } from "../_shared/security.ts";
 
 interface BrevoPayload {
   sender?: {
@@ -27,13 +14,6 @@ interface BrevoPayload {
   subject?: string;
   htmlContent?: string;
   params: Record<string, unknown>;
-}
-
-function jsonResponse(body: Record<string, unknown>, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
 }
 
 function escapeHtml(value: string) {
@@ -64,162 +44,68 @@ function getDefaultHtmlContent(name: string, inviteUrl: string) {
   `;
 }
 
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return jsonResponse({ error: "method_not_allowed" }, 405);
-  }
-
+  let headers: HeadersInit = {};
   try {
+    headers = securityHeaders(req);
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
+    if (req.method !== "POST") throw new SecurityError("method_not_allowed", 405);
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const brevoApiKey = Deno.env.get("BREVO_API_KEY");
-    const brevoTemplateId = Deno.env.get("BREVO_DELEGATE_TEMPLATE_ID");
-    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
-    const senderName = Deno.env.get("BREVO_SENDER_NAME") ?? "Pinwi";
-
-    if (!supabaseUrl || !anonKey || !serviceRoleKey) {
-      console.error("Missing Edge Function env vars", {
-        hasSupabaseUrl: Boolean(supabaseUrl),
-        hasAnonKey: Boolean(anonKey),
-        hasServiceRoleKey: Boolean(serviceRoleKey),
-      });
-      return jsonResponse({ error: "missing_supabase_environment" }, 500);
-    }
-
-    if (!brevoApiKey) {
-      console.error("Missing Brevo API key");
-      return jsonResponse({ error: "missing_brevo_api_key" }, 500);
-    }
-
+    if (!supabaseUrl || !anonKey || !serviceRoleKey || !brevoApiKey) throw new SecurityError("security_service_unavailable", 503);
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.error("Missing Authorization header");
-      return jsonResponse({ error: "missing_authorization" }, 401);
-    }
-
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
+    if (!authHeader?.startsWith("Bearer ")) throw new SecurityError("missing_authorization", 401);
+    const callerClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false, autoRefreshToken: false } });
     const { data: callerData, error: callerError } = await callerClient.auth.getUser();
-    if (callerError || !callerData.user) {
-      console.error("Invalid caller authorization", callerError);
-      return jsonResponse({ error: "invalid_authorization", message: callerError?.message }, 401);
-    }
-
-    const { data: callerProfile, error: callerProfileError } = await adminClient
-      .from("users")
-      .select("role, status")
-      .eq("id", callerData.user.id)
-      .maybeSingle();
-
-    if (callerProfileError) {
-      console.error("Could not load caller profile", callerProfileError);
-      return jsonResponse({ error: "caller_profile_failed", message: callerProfileError.message }, 500);
-    }
-    if (callerProfile?.role !== "admin" || !["active", "verified"].includes(callerProfile.status)) {
-      console.error("Caller is not admin", { userId: callerData.user.id, role: callerProfile?.role ?? null });
-      return jsonResponse({ error: "forbidden" }, 403);
-    }
-
-    const body = (await req.json()) as RequestBody;
-    if (!body.invitationId || !body.email || !body.name || !body.inviteUrl) {
-      console.error("Invalid payload", body);
-      return jsonResponse({ error: "invalid_payload" }, 400);
-    }
-
-    const { data: invitation, error: invitationError } = await adminClient
-      .from("delegate_invitations")
-      .select("id, email, status, expires_at")
-      .eq("id", body.invitationId)
-      .maybeSingle();
-
-    if (invitationError) {
-      console.error("Could not load delegate invitation", invitationError);
-      return jsonResponse({ error: "invitation_lookup_failed", message: invitationError.message }, 500);
-    }
-    if (!invitation || invitation.status !== "pending" || new Date(invitation.expires_at).getTime() < Date.now()) {
-      console.error("Invalid delegate invitation", {
-        invitationId: body.invitationId,
-        found: Boolean(invitation),
-        status: invitation?.status ?? null,
-        expiresAt: invitation?.expires_at ?? null,
-      });
-      return jsonResponse({ error: "invalid_delegate_invitation" }, 400);
-    }
-
-    if (String(invitation.email).toLowerCase() !== body.email.trim().toLowerCase()) {
-      console.error("Invitation email mismatch", { invitationEmail: invitation.email, requestEmail: body.email });
-      return jsonResponse({ error: "email_mismatch" }, 400);
-    }
-
-    const normalizedEmail = body.email.trim().toLowerCase();
-    const templateId = brevoTemplateId ? Number(brevoTemplateId) : null;
-    const brevoPayload: BrevoPayload = {
-      to: [{ email: normalizedEmail, name: body.name }],
-      params: {
-        name: body.name,
-        email: normalizedEmail,
-        invite_url: body.inviteUrl,
-        invitation_id: body.invitationId,
-        expires_at: invitation.expires_at,
-      },
+    if (callerError || !callerData.user) throw new SecurityError("invalid_authorization", 401);
+    if (!callerData.user.email_confirmed_at) throw new SecurityError("forbidden", 403);
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data: callerProfile, error: callerProfileError } = await adminClient.from("users").select("role, status").eq("id", callerData.user.id).maybeSingle();
+    if (callerProfileError) throw new SecurityError("security_service_unavailable", 503);
+    if (callerProfile?.role !== "admin" || !["active", "verified"].includes(callerProfile.status)) throw new SecurityError("forbidden", 403);
+    const body = await readJsonBody(req);
+    if (typeof body.invitationId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.invitationId)
+      || typeof body.email !== "string" || body.email.length > 254 || typeof body.inviteUrl !== "string" || body.inviteUrl.length > 2048) throw new SecurityError("invalid_payload");
+    const secret = Deno.env.get("AUTH_RATE_LIMIT_SECRET") ?? serviceRoleKey;
+    await consumeRateLimit(adminClient, "invite_admin", callerData.user.id, secret);
+    const { data: invitation, error: invitationError } = await adminClient.from("delegate_invitations")
+      .select("id, email, name, token, status, expires_at").eq("id", body.invitationId).maybeSingle();
+    if (invitationError) throw new SecurityError("security_service_unavailable", 503);
+    const expiry = invitation ? new Date(invitation.expires_at).getTime() : NaN;
+    if (!invitation || invitation.status !== "pending" || !Number.isFinite(expiry) || expiry <= Date.now()) throw new SecurityError("invalid_delegate_invitation");
+    const email = String(invitation.email).trim().toLowerCase();
+    if (email !== body.email.trim().toLowerCase()) throw new SecurityError("email_mismatch");
+    let inviteUrl: URL;
+    try { inviteUrl = new URL(body.inviteUrl); } catch { throw new SecurityError("invalid_invitation_url"); }
+    if (!allowedOrigins().has(inviteUrl.origin) || inviteUrl.username || inviteUrl.password || inviteUrl.pathname !== "/delegate-invite"
+      || inviteUrl.hash || inviteUrl.searchParams.get("token") !== String(invitation.token)
+      || Array.from(inviteUrl.searchParams).length !== 1) throw new SecurityError("invalid_invitation_url");
+    await consumeRateLimit(adminClient, "invite_recipient", email, secret);
+    const name = String(invitation.name);
+    const templateId = Number(Deno.env.get("BREVO_DELEGATE_TEMPLATE_ID"));
+    const payload: BrevoPayload = {
+      to: [{ email, name }],
+      params: { name, email, invite_url: inviteUrl.href, invitation_id: invitation.id, expires_at: invitation.expires_at },
     };
-
-    if (senderEmail) {
-      brevoPayload.sender = { name: senderName, email: senderEmail };
-    }
-
-    if (templateId && Number.isFinite(templateId)) {
-      brevoPayload.templateId = templateId;
-    } else {
-      brevoPayload.subject = "Tu invitacion para ser delegado en Pinwi";
-      brevoPayload.htmlContent = getDefaultHtmlContent(body.name, body.inviteUrl);
-    }
-
-    const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": brevoApiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(brevoPayload),
+    const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
+    if (senderEmail) payload.sender = { name: Deno.env.get("BREVO_SENDER_NAME") ?? "Pinwi", email: senderEmail };
+    if (Number.isSafeInteger(templateId) && templateId > 0) payload.templateId = templateId;
+    else { payload.subject = "Tu invitación para ser delegado en Pinwi"; payload.htmlContent = getDefaultHtmlContent(name, inviteUrl.href); }
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST", headers: { "api-key": brevoApiKey, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(10000),
     });
-
-    if (!brevoResponse.ok) {
-      const responseText = await brevoResponse.text();
-      console.error("Brevo invite email failed", {
-        status: brevoResponse.status,
-        responseText,
-      });
-
-      return jsonResponse(
-        {
-          error: "brevo_email_failed",
-          message: responseText,
-          status: brevoResponse.status,
-        },
-        brevoResponse.status >= 400 && brevoResponse.status < 500 ? brevoResponse.status : 500,
-      );
+    if (!response.ok) {
+      // Provider payloads can contain recipient identities or links; never return/log them.
+      console.error("Invitation provider rejected request", { status: response.status });
+      throw new SecurityError("brevo_email_failed", 502);
     }
-
-    return jsonResponse({ ok: true });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown_error";
-    console.error("Unhandled send-delegate-invitation error", error);
-
-    return jsonResponse({ error: "unhandled_error", message }, 500);
+    if (!(error instanceof SecurityError)) console.error("Invitation internal failure");
+    return errorResponse(error, headers);
   }
 });

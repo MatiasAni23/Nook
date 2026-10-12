@@ -42,6 +42,8 @@ export function placeMatchesTab(place: SearchablePlace, activeTab: string) {
     case "reuniones":
     case "salas":
       return ["meeting_room", "private_office", "office"].includes(place.type);
+    case "cafeterias":
+      return place.type === "cafe";
     case "parques":
       return place.type === "park";
     case "oficinas":

@@ -6,6 +6,7 @@ import { clearCurrentUserServiceCaches } from "./currentUserService";
 import { clearDelegateServiceCache } from "./delegateService";
 import { clearPlacesCache } from "./placeService";
 import { clearDemoSession } from "./demoSessionService";
+import { clearAuthAttemptState } from "./authAttemptService";
 
 function clearPinwiSessionStorage() {
   if (typeof window === "undefined") return;
@@ -16,6 +17,7 @@ function clearPinwiSessionStorage() {
 }
 
 export async function clearAppCaches() {
+  clearAuthAttemptState();
   clearDemoSession();
   clearStoredCurrentUser();
   clearAdminManagementCache();

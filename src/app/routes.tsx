@@ -229,13 +229,13 @@ function AuthWrapper() {
     }
   };
 
-  const handleLogin = async (email: string, password: string) => {
+  const handleLogin = async (email: string, password: string, captchaToken?: string) => {
     if (!isSupabaseConfigured) {
       handleDemoLogin(email, password);
       return;
     }
 
-    const { user } = await signInWithEmail(email, password);
+    const { user } = await signInWithEmail(email, password, captchaToken);
 
     if (!user) {
       throw new Error("No se pudo iniciar sesion.");
@@ -255,6 +255,7 @@ function AuthWrapper() {
     email: string,
     phone: string,
     password: string,
+    captchaToken?: string,
   ): Promise<RegisterResult> => {
     if (!isSupabaseConfigured) {
       setIsAuthenticated(true);
@@ -263,7 +264,7 @@ function AuthWrapper() {
       return { email, needsEmailVerification: false };
     }
 
-    const { user, session } = await signUpWithEmail({ name, email, phone, password, emailRedirectTo: window.location.origin + verificationLink(params.get("continuar")) });
+    const { user, session } = await signUpWithEmail({ name, email, phone, password, captchaToken, emailRedirectTo: window.location.origin + verificationLink(params.get("continuar")) });
 
     if (!user) {
       throw new Error("No se pudo crear la cuenta.");

@@ -146,6 +146,7 @@ export async function sendChatMessage(input: {
     .select("id, sender_id, receiver_id, message, created_at, read, read_at")
     .single();
 
+  if (error?.message.includes("rate_limit_exceeded")) throw new Error("Has enviado muchos mensajes seguidos. Espera un minuto antes de continuar.");
   if (error || !data) throw error ?? new Error("No se pudo enviar el mensaje.");
 
   const message = mapChatMessage(data as ChatMessageRow);
@@ -249,13 +250,18 @@ export function createTypingChannel(
   const client = supabase;
   const channel = client.channel(`typing-${conversationId}`, {
     config: {
+      private: true,
       broadcast: { self: false },
     },
   });
 
   channel.on("broadcast", { event: "typing" }, (payload) => {
-    if (!payload?.payload) return;
-    onTyping(payload.payload as TypingEvent);
+    const event: unknown = payload?.payload;
+    if (!event || typeof event !== "object") return;
+    const candidate = event as Record<string, unknown>;
+    const participants = [conversationId.slice(0, 36), conversationId.slice(37)];
+    if (typeof candidate.from !== "string" || typeof candidate.isTyping !== "boolean" || !participants.includes(candidate.from)) return;
+    onTyping({ from: candidate.from, isTyping: candidate.isTyping });
   });
 
   channel.subscribe();

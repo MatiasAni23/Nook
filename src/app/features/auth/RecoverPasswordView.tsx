@@ -1,3 +1,6 @@
+import { useEmailCooldown } from "./useEmailCooldown";
+import { getPasswordValidationMessage, getPasswordStrength } from "../../lib/passwordPolicy";
+import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
 import { useMemo, useState, type ComponentProps, type ReactNode } from "react";
@@ -35,26 +38,6 @@ function getEmailValidationMessage(email: string) {
   if (!emailPattern.test(trimmedEmail)) return "Ingresa un correo valido.";
 
   return "";
-}
-
-function getPasswordScore(password: string) {
-  let score = 0;
-
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-
-  return score;
-}
-
-function getPasswordStrength(score: number) {
-  if (score <= 1) return { label: "Muy débil", color: "bg-red-500", width: "20%" };
-  if (score === 2) return { label: "Debil", color: "bg-orange-500", width: "40%" };
-  if (score === 3) return { label: "Aceptable", color: "bg-yellow-500", width: "60%" };
-  if (score === 4) return { label: "Buena", color: "bg-blue-500", width: "80%" };
-  return { label: "Fuerte", color: "bg-green-500", width: "100%" };
 }
 
 function getRecoveryErrorMessage(error: unknown) {
@@ -158,15 +141,18 @@ export function RecoverPasswordView() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+  const emailCooldown = useEmailCooldown(email);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const passwordScore = useMemo(() => getPasswordScore(password), [password]);
-  const passwordStrength = getPasswordStrength(passwordScore);
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
   const passwordsMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
   const currentStep = step === "email" ? 0 : step === "code" ? 1 : 2;
 
   const requestCode = async () => {
+    if (isSubmitting) return;
     const emailError = getEmailValidationMessage(email);
 
     if (emailError) {
@@ -178,11 +164,12 @@ export function RecoverPasswordView() {
     setErrorMessage("");
 
     try {
-      await sendPasswordRecoveryCode(email.trim());
+      await sendPasswordRecoveryCode(email.trim(), captchaToken);
       setStep("code");
     } catch (error) {
       setErrorMessage(getRecoveryErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
@@ -190,7 +177,7 @@ export function RecoverPasswordView() {
   const verifyCode = async () => {
     const cleanCode = code.replace(/\s/g, "");
 
-    if (cleanCode.length < 6) {
+    if (!/^\d{6,10}$/.test(cleanCode)) {
       setErrorMessage("Ingresa el código completo.");
       return;
     }
@@ -201,8 +188,10 @@ export function RecoverPasswordView() {
   };
 
   const updatePassword = async () => {
-    if (passwordScore < 3) {
-      setErrorMessage("La contraseña debe tener al menos 8 caracteres y combinar letras con números.");
+    if (isSubmitting) return;
+    const passwordError = getPasswordValidationMessage(password);
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return;
     }
 
@@ -215,11 +204,15 @@ export function RecoverPasswordView() {
     setErrorMessage("");
 
     try {
-      await completePasswordRecovery(email, code, password);
+      await completePasswordRecovery(email, code, password, captchaToken);
+      setPassword("");
+      setPasswordConfirm("");
+      setCode("");
       setStep("done");
     } catch (error) {
       setErrorMessage(getRecoveryErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
@@ -235,6 +228,7 @@ export function RecoverPasswordView() {
     } catch (error) {
       setErrorMessage(getRecoveryErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
@@ -312,6 +306,7 @@ export function RecoverPasswordView() {
               <p className="mt-4 max-w-sm text-sm font-medium leading-6 text-slate-500">{description}</p>
             </div>
 
+            {step !== "done" && <AuthCaptcha onToken={setCaptchaToken} resetKey={step + captchaAttempt} />}
             <AnimatePresence mode="wait">
               {errorMessage && (
                 <motion.div
@@ -338,9 +333,9 @@ export function RecoverPasswordView() {
                       onKeyDown={(event) => event.key === "Enter" && requestCode()}
                     />
                   </RecoveryField>
-                  <PrimaryRecoveryButton onClick={requestCode} disabled={isSubmitting}>
+                  <PrimaryRecoveryButton onClick={requestCode} disabled={isSubmitting || emailCooldown > 0 || (isAuthCaptchaEnabled && !captchaToken)}>
                     <Mail className="mr-2 size-4" />
-                    {isSubmitting ? "Enviando..." : "Enviar código"}
+                    {isSubmitting ? "Enviando..." : emailCooldown > 0 ? `Espera ${emailCooldown} s` : "Enviar código"}
                   </PrimaryRecoveryButton>
                 </motion.div>
               )}
@@ -353,19 +348,20 @@ export function RecoverPasswordView() {
                       inputMode="numeric"
                       placeholder="123456"
                       value={code}
-                      maxLength={12}
-                      onChange={(event) => setCode(event.target.value.replace(/[^\dA-Za-z]/g, ""))}
+                      maxLength={10}
+                      onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
                       onKeyDown={(event) => event.key === "Enter" && verifyCode()}
                     />
                   </RecoveryField>
                   <p className="-mt-2 text-xs font-medium text-slate-400">Enviado a {email.trim()}.</p>
+                  <p className="text-xs text-slate-600">El código es de un solo uso. Completa la recuperación dentro de los diez minutos desde su envío.</p>
                   <PrimaryRecoveryButton onClick={verifyCode} disabled={isSubmitting}>
                     <KeyRound className="mr-2 size-4" />
-                    {isSubmitting ? "Verificando..." : "Verificar código"}
+                    Continuar
                   </PrimaryRecoveryButton>
-                  <button type="button" onClick={requestCode} disabled={isSubmitting} className="w-full rounded-xl px-3 py-2 text-sm font-black text-[#4F46E5] transition hover:bg-[#EEF2FF] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60">
+                  <button type="button" onClick={requestCode} disabled={isSubmitting || emailCooldown > 0 || (isAuthCaptchaEnabled && !captchaToken)} className="w-full rounded-xl px-3 py-2 text-sm font-black text-[#4F46E5] transition hover:bg-[#EEF2FF] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60">
                     <Mail className="mr-2 inline size-4" />
-                    Reenviar código
+                    {emailCooldown > 0 ? `Reenviar en ${emailCooldown} s` : "Reenviar código"}
                   </button>
                 </motion.div>
               )}
@@ -374,7 +370,7 @@ export function RecoverPasswordView() {
                 <motion.div key="password" className="space-y-5" initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -14 }} transition={{ duration: 0.2 }}>
                   <RecoveryField id="new-password" label="Nueva contraseña" icon={LockKeyhole}>
                     <div className="relative w-full">
-                      <RecoveryInput id="new-password" type={showPassword ? "text" : "password"} placeholder="********" value={password} className="pr-10" onChange={(event) => setPassword(event.target.value)} />
+                      <RecoveryInput id="new-password" autoComplete="new-password" type={showPassword ? "text" : "password"} placeholder="********" value={password} className="pr-10" onChange={(event) => setPassword(event.target.value)} />
                       <PasswordVisibilityButton isVisible={showPassword} onClick={() => setShowPassword((value) => !value)} label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} />
                     </div>
                   </RecoveryField>
@@ -391,10 +387,11 @@ export function RecoverPasswordView() {
                     </div>
                   </RecoveryField>
                   {passwordsMismatch && <p className="-mt-3 text-xs font-medium text-red-600">Las contraseñas no coinciden.</p>}
-                  <PrimaryRecoveryButton onClick={updatePassword} disabled={isSubmitting}>
+                  <PrimaryRecoveryButton onClick={updatePassword} disabled={isSubmitting || (isAuthCaptchaEnabled && !captchaToken)}>
                     <LockKeyhole className="mr-2 size-4" />
                     {isSubmitting ? "Guardando..." : "Guardar nueva contraseña"}
                   </PrimaryRecoveryButton>
+                  <button type="button" disabled={isSubmitting} className="w-full rounded-xl px-3 py-2 text-sm font-bold text-[#4F46E5] hover:bg-[#EEF2FF] focus-visible:outline-2" onClick={() => { setPassword(""); setPasswordConfirm(""); setErrorMessage(""); setStep("code"); }}>Cambiar o reenviar el código</button>
                 </motion.div>
               )}
 

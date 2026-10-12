@@ -1,3 +1,21 @@
+[auth]
+minimum_password_length = 8
+password_requirements = ""
+enable_anonymous_sign_ins = false
+
+[auth.rate_limit]
+email_sent = 30
+sign_in_sign_ups = 30
+token_verifications = 30
+token_refresh = 150
+
+[auth.email]
+enable_confirmations = true
+double_confirm_changes = true
+max_frequency = "1m"
+otp_length = 6
+otp_expiry = 600
+
 [functions.send-delegate-invitation]
 verify_jwt = false
 

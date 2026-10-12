@@ -312,7 +312,7 @@ export function MapView() {
     { id: 'cowork', label: 'Cowork', icon: BriefcaseBusiness },
     { id: 'estudios', label: 'Estudio', icon: BookOpen },
     { id: 'reuniones', label: 'Reuniones', icon: Users },
-    { id: 'parques', label: 'Parques', icon: Trees },
+    { id: 'cafeterias', label: 'Cafeterías', icon: Coffee },
   ];
 
   // Helpers visuales compartidos por mapa, fallback y tarjetas.

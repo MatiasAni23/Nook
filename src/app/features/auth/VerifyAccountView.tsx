@@ -1,3 +1,5 @@
+import { useEmailCooldown } from "./useEmailCooldown";
+import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
 import { useState } from "react";
@@ -51,6 +53,9 @@ export function VerifyAccountView() {
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [code, setCode] = useState("");
+  const emailCooldown = useEmailCooldown(email);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
@@ -58,6 +63,7 @@ export function VerifyAccountView() {
   const [isVerified, setIsVerified] = useState(false);
 
   const resendCode = async () => {
+    if (isResending || isVerifying) return;
     const emailError = getEmailValidationMessage(email);
 
     if (emailError) {
@@ -70,16 +76,18 @@ export function VerifyAccountView() {
     setSuccessMessage("");
 
     try {
-      await resendSignupVerificationCode(email.trim(), window.location.origin + verificationLink(searchParams.get("continuar")));
+      await resendSignupVerificationCode(email.trim(), window.location.origin + verificationLink(searchParams.get("continuar")), captchaToken);
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");
     } catch (error) {
       setErrorMessage(getVerificationErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsResending(false);
     }
   };
 
   const verifyCode = async () => {
+    if (isResending || isVerifying) return;
     const emailError = getEmailValidationMessage(email);
     const cleanCode = code.replace(/\s/g, "");
 
@@ -88,7 +96,7 @@ export function VerifyAccountView() {
       return;
     }
 
-    if (cleanCode.length < 6) {
+    if (!/^\d{6,10}$/.test(cleanCode)) {
       setErrorMessage("Ingresa el codigo completo.");
       return;
     }
@@ -196,8 +204,8 @@ export function VerifyAccountView() {
                       inputMode="numeric"
                       placeholder="123456"
                       value={code}
-                      maxLength={12}
-                      onChange={(event) => setCode(event.target.value.replace(/[^\dA-Za-z]/g, ""))}
+                      maxLength={10}
+                      onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
                       onKeyDown={(event) => event.key === "Enter" && verifyCode()}
                       className="h-11 border-0 bg-transparent px-0 text-sm shadow-none outline-none placeholder:text-[#BFC4F8] focus-visible:border-0 focus-visible:ring-0"
                     />
@@ -213,14 +221,15 @@ export function VerifyAccountView() {
                     {isVerifying ? "Verificando..." : "Verificar cuenta"}
                   </Button>
 
+                  <AuthCaptcha onToken={setCaptchaToken} resetKey={captchaAttempt} />
                   <button
                     type="button"
                     onClick={resendCode}
-                    disabled={isResending}
+                    disabled={isResending || isVerifying || emailCooldown > 0 || (isAuthCaptchaEnabled && !captchaToken)}
                   className="w-full rounded-xl px-3 py-2 text-sm font-black text-[#4F46E5] transition hover:bg-[#EEF2FF] hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Mail className="mr-2 inline size-4" />
-                    {isResending ? "Reenviando..." : "Reenviar codigo"}
+                    {isResending ? "Reenviando..." : emailCooldown > 0 ? "Reenviar en " + emailCooldown + " s" : "Reenviar código"}
                   </button>
                 </>
               ) : (

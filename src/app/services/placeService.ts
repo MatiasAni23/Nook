@@ -1,3 +1,5 @@
+import { validateImageUpload } from "../lib/imageUploadSecurity";
+import { validateWebsiteUrl } from "../lib/externalUrl";
 import { supabase } from "../lib/supabase";
 import { clearAdminDataCaches, createAdminDataCache } from "./adminDataCache";
 import { clearPublicMapCache } from "./publicMapService";
@@ -203,9 +205,7 @@ function toNumber(value: string | number | null | undefined, fallback = 0) {
 }
 
 function normalizeWebsiteUrl(value: string | null | undefined) {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return validateWebsiteUrl(value);
 }
 
 function toAppPlace(row: PlaceRow): AppPlace {
@@ -535,7 +535,7 @@ async function uploadPlaceImages(
   const imageUrls: string[] = [];
 
   for (const file of imageFiles) {
-    const extension = file.name.split(".").pop() ?? "jpg";
+    const extension = await validateImageUpload(file);
     const path = `${placeId}/${crypto.randomUUID()}.${extension}`;
     const { error } = await client.storage
       .from(PLACE_IMAGES_BUCKET)
@@ -604,6 +604,8 @@ async function savePlaceSpaces(
 
 export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
   const client = requireSupabase();
+  await Promise.all(input.imageFiles.map((file) => validateImageUpload(file)));
+  validateWebsiteUrl(input.websiteUrl);
   const { data: userData, error: userError } = await client.auth.getUser();
 
   if (userError) throw userError;
@@ -740,6 +742,7 @@ export async function createPlace(input: CreatePlaceInput): Promise<AppPlace> {
 }
 
 export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
+  validateWebsiteUrl(input.websiteUrl);
   const client = requireSupabase();
   // Secondary writes may fail after the main row has been saved.
   clearPlacesCache();

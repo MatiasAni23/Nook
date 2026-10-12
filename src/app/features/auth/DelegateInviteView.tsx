@@ -1,3 +1,6 @@
+import { useEmailCooldown } from "./useEmailCooldown";
+import { getPasswordValidationMessage, getPasswordStrength } from "../../lib/passwordPolicy";
+import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
 import { useEffect, useMemo, useState } from "react";
@@ -20,24 +23,6 @@ import {
   updateRecoveredPassword,
   verifySignupCode,
 } from "../../services/authService";
-
-function getPasswordScore(password: string) {
-  let score = 0;
-  if (password.length >= 8) score += 1;
-  if (/[A-Z]/.test(password)) score += 1;
-  if (/[a-z]/.test(password)) score += 1;
-  if (/\d/.test(password)) score += 1;
-  if (/[^A-Za-z0-9]/.test(password)) score += 1;
-  return score;
-}
-
-function getPasswordStrength(score: number) {
-  if (score <= 1) return { label: "Muy debil", color: "bg-red-500", width: "20%" };
-  if (score === 2) return { label: "Debil", color: "bg-orange-500", width: "40%" };
-  if (score === 3) return { label: "Aceptable", color: "bg-yellow-500", width: "60%" };
-  if (score === 4) return { label: "Buena", color: "bg-blue-500", width: "80%" };
-  return { label: "Fuerte", color: "bg-green-500", width: "100%" };
-}
 
 function getInviteErrorMessage(error: unknown) {
   if (!(error instanceof Error)) return "No se pudo completar la accion.";
@@ -95,11 +80,13 @@ export function DelegateInviteView() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const emailCooldown = useEmailCooldown(invitation?.email ?? "");
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const passwordScore = useMemo(() => getPasswordScore(password), [password]);
-  const passwordStrength = getPasswordStrength(passwordScore);
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
   const isExpired = invitation ? invitation.expiresAt.getTime() < Date.now() : false;
 
   useEffect(() => {
@@ -134,13 +121,15 @@ export function DelegateInviteView() {
   }, [token]);
 
   const handleRegister = async () => {
+    if (isSubmitting) return;
     if (!invitation) return;
     if (invitation.status !== "pending" || isExpired) {
       setErrorMessage("Esta invitacion ya no esta disponible.");
       return;
     }
-    if (passwordScore < 3) {
-      setErrorMessage("La contrasena debe tener al menos 8 caracteres y combinar letras con numeros.");
+    const passwordError = getPasswordValidationMessage(password);
+    if (passwordError) {
+      setErrorMessage(passwordError);
       return;
     }
     if (password !== passwordConfirm) {
@@ -171,6 +160,7 @@ export function DelegateInviteView() {
         phone: invitation.phone ?? "",
         password,
         role: "student",
+        captchaToken,
         emailRedirectTo: `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
       });
 
@@ -186,15 +176,17 @@ export function DelegateInviteView() {
     } catch (error) {
       setErrorMessage(getInviteErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
 
   const handleVerify = async () => {
+    if (isSubmitting || isResending) return;
     if (!invitation) return;
     const cleanCode = code.replace(/\s/g, "");
 
-    if (cleanCode.length < 6) {
+    if (!/^\d{6,10}$/.test(cleanCode)) {
       setErrorMessage("Ingresa el codigo completo.");
       return;
     }
@@ -213,11 +205,13 @@ export function DelegateInviteView() {
     } catch (error) {
       setErrorMessage(getInviteErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsSubmitting(false);
     }
   };
 
   const resendCode = async () => {
+    if (isSubmitting || isResending) return;
     if (!invitation) return;
     setIsResending(true);
     setErrorMessage("");
@@ -227,11 +221,13 @@ export function DelegateInviteView() {
       await resendSignupVerificationCode(
         invitation.email,
         `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
+        captchaToken,
       );
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");
     } catch (error) {
       setErrorMessage(getInviteErrorMessage(error));
     } finally {
+      setCaptchaAttempt((value) => value + 1);
       setIsResending(false);
     }
   };
@@ -324,9 +320,10 @@ export function DelegateInviteView() {
                   />
                 </div>
               </div>
+              <AuthCaptcha onToken={setCaptchaToken} resetKey={step + captchaAttempt} />
               <Button
                 onClick={handleRegister}
-                disabled={isSubmitting || invitation.status !== "pending" || isExpired}
+                disabled={isSubmitting || (isAuthCaptchaEnabled && !captchaToken) || invitation.status !== "pending" || isExpired}
                 className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"
               >
                 <UserPlus className="size-4 mr-2" />
@@ -348,8 +345,8 @@ export function DelegateInviteView() {
                   inputMode="numeric"
                   placeholder="123456"
                   value={code}
-                  maxLength={12}
-                  onChange={(event) => setCode(event.target.value.replace(/[^\dA-Za-z]/g, ""))}
+                  maxLength={10}
+                  onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))}
                   onKeyDown={(event) => event.key === "Enter" && handleVerify()}
                 />
               </div>
@@ -361,14 +358,15 @@ export function DelegateInviteView() {
                 <ShieldCheck className="size-4 mr-2" />
                 {isSubmitting ? "Verificando..." : "Verificar y activar"}
               </Button>
+              <AuthCaptcha onToken={setCaptchaToken} resetKey={step + captchaAttempt} />
               <button
                 type="button"
                 onClick={resendCode}
-                disabled={isResending}
+                disabled={isResending || isSubmitting || emailCooldown > 0 || (isAuthCaptchaEnabled && !captchaToken)}
                 className="w-full rounded-lg px-3 py-2 text-sm font-medium text-[#4F46E5] transition-colors hover:bg-purple-50 hover:text-[#4338CA] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Mail className="mr-2 inline size-4" />
-                {isResending ? "Reenviando..." : "Reenviar codigo"}
+                {isResending ? "Reenviando..." : emailCooldown > 0 ? "Reenviar en " + emailCooldown + " s" : "Reenviar código"}
               </button>
             </>
           )}

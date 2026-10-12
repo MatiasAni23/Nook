@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 
 type PlaceReportRow = {
   id: string;
-  user_id: string;
+  user_id?: string;
   place_id: string;
   type: IssueType;
   description: string | null;
@@ -44,39 +44,16 @@ function toIssue(row: PlaceReportRow, confirmedReportIds: Set<string>): Issue {
 
 export async function listPlaceReports(placeId: string): Promise<Issue[]> {
   const client = requireSupabase();
-  const { data: authData } = await client.auth.getUser();
-
-  const { data, error } = await client
-    .from("place_reports")
-    .select("id, user_id, place_id, type, description, upvotes_count, created_at")
-    .eq("place_id", placeId)
-    .in("status", ["pending", "reviewing"])
-    .order("created_at", { ascending: false });
-
+  const { data, error } = await client.rpc("get_place_report_summaries", { target_place_id: placeId });
   if (error) throw error;
-
-  const reports = (data ?? []) as PlaceReportRow[];
-  const reportIds = reports.map((report) => report.id);
-  const confirmedReportIds = new Set<string>();
-
-  if (authData.user && reportIds.length > 0) {
-    const { data: confirmations, error: confirmationsError } = await client
-      .from("place_report_confirmations")
-      .select("report_id")
-      .eq("user_id", authData.user.id)
-      .in("report_id", reportIds);
-
-    if (confirmationsError) throw confirmationsError;
-    confirmations?.forEach((confirmation) => {
-      if (confirmation.report_id) confirmedReportIds.add(String(confirmation.report_id));
-    });
-  }
-
-  return reports.map((report) => toIssue(report, confirmedReportIds));
+  const reports = (data ?? []) as (PlaceReportRow & { has_confirmed: boolean })[];
+  const confirmed = new Set(reports.filter((report) => report.has_confirmed).map((report) => report.id));
+  return reports.map((report) => toIssue(report, confirmed));
 }
 
 export async function createPlaceReport(placeId: string, type: IssueType, description: string): Promise<Issue> {
   const client = requireSupabase();
+  if (description.length > 2000) throw new Error("La descripción no puede superar los 2000 caracteres.");
   const userId = await getCurrentUserId();
 
   const { data, error } = await client
@@ -90,6 +67,7 @@ export async function createPlaceReport(placeId: string, type: IssueType, descri
     .select("id, user_id, place_id, type, description, upvotes_count, created_at")
     .single();
 
+  if (error?.message.includes("rate_limit_exceeded")) throw new Error("Alcanzaste el límite de cinco reportes por hora. Intenta más tarde.");
   if (error) throw error;
 
   return toIssue(data as PlaceReportRow, new Set());
@@ -103,6 +81,7 @@ export async function confirmPlaceReport(reportId: string): Promise<number> {
     target_report_id: reportId,
   });
 
+  if (error?.message.includes("rate_limit_exceeded")) throw new Error("Has realizado muchas confirmaciones seguidas. Espera un minuto.");
   if (error) throw error;
 
   return Number(data ?? 0);
