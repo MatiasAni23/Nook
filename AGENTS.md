@@ -26,6 +26,7 @@ Este archivo orienta a los asistentes de programación que trabajan en este repo
 | `src/main.tsx` | Entrada de React e importación de estilos. |
 | `src/app/App.tsx` | Montaje del proveedor de usuario y del router. |
 | `src/app/routes.tsx` | Rutas, acceso por rol y flujo de autenticación/demo. |
+| `src/app/seo/` | Registro de páginas públicas, metadatos por ruta y entrada de prerender para la compilación. |
 | `src/app/features/` | Pantallas por dominio: `landing`, `auth`, `admin`, `delegado`, `descubrir`, `mapa`, `perfil`, `encontrar-estudiantes` y `chat`. |
 | `src/app/features/shared/` | Layouts, modales y piezas compartidas entre pantallas. |
 | `src/app/components/ui/` | Componentes visuales reutilizables; `utils.ts` exporta `cn` para combinar clases. |
@@ -52,6 +53,7 @@ Usar npm y conservar `package-lock.json`. Existe configuración de pnpm, pero el
 | `npm run typecheck` | Comprobar tipos con `tsc --noEmit`. |
 | `npm test` | Ejecutar la suite con el runner de Node. |
 | `npm run build` | Compilar la aplicación web en `dist/`. |
+| `npm run seo:check` | Verificar HTML, canonicals, robots, sitemap y recursos públicos después de compilar. |
 | `git diff --check` | Revisar errores de espacios en los cambios. |
 
 - No hay un script de lint configurado. No afirmar que se ejecutó uno ni instalar herramientas sólo para simular esa comprobación.
@@ -73,6 +75,7 @@ Usar npm y conservar `package-lock.json`. Existe configuración de pnpm, pero el
 - El alias `@/` apunta a `src/`; también existen imports relativos. Mantener coherencia con el módulo que se modifica.
 - La navegación web usa React Router y se define en `routes.tsx`. Conservar los flujos de estudiante/trabajador, administrador y delegado, y el acceso público a `/terminos` y `/privacidad`.
 - `/` muestra la landing; `/iniciar-sesion` conserva login/registro y un destino interno validado en `authNavigation.ts`. El mapa público usa `publicMapService` y la RPC `get_public_map_pins`, que expone sólo los campos de los pines. No reutilizar el catálogo completo, las fichas, las métricas identificables ni la geolocalización automática en la landing. Las rutas privadas también exigen entrar al flujo demo cuando Supabase está desactivado; `demoSessionService` nunca acredita una sesión de producción.
+- SEO: el dominio canónico es `https://www.pinwi.cl`. `siteSeo.ts` centraliza páginas públicas, títulos, robots y datos estructurados. `seoPlugin` genera la landing y los documentos legales con sus mismos componentes React durante `npm run build`; los efectos no se ejecutan, no consulta Auth, pines ni cuentas y no incluye el renderer de servidor en el cliente. El mapa se activa normalmente en el navegador. Sólo la landing es indexable actualmente; los documentos legales siguen como borradores con `noindex, follow`. Sitemap y robots se generan en `dist/` y se sirven también en desarrollo, sin fechas ficticias. `vercel.json` conserva las cabeceras de seguridad, sirve HTML público con `cleanUrls` y limita los rewrites al shell privado con `noindex`; no recuperar el rewrite global que convertía sitemap, robots y errores en la landing. La navegación SPA actualiza el head y retira canonical/JSON-LD de rutas privadas. Al agregar una página pública, revisar registro, renderer, indexabilidad y sitemap; no introducir fichas autenticadas ni tokens en metadatos. Iconos y logo públicos reutilizan el arte de Pinwi. Orden de validación y pasos de Search Console: `docs-local/seo/IMPLEMENTACION.md`.
 - Redes y WhatsApp del footer se consultan con `siteSettingsService` y se editan en Administración → Gestión → Sitio público. La tabla `site_settings` tiene lectura pública y escritura sólo para administradores activos mediante RLS. Campos vacíos no generan enlaces. Su migración incremental local debe aplicarse antes del frontend; consultar `docs-local/supabase/PUBLIC_LANDING.md` para el orden de activación.
 - El mapa de la landing inicia Google Maps y la consulta de pines al acercarse a la sección, mediante `IntersectionObserver`; conservar la alternativa para navegadores sin esa API. Reutilizar su instancia con opciones estables al volver a la landing. La caché de pines reduce consultas de Supabase; no evita por sí sola las cargas facturables de Google Maps.
 - Gestionar carga, error, vacío y éxito en operaciones asíncronas. Mostrar éxito sólo después de la confirmación del servidor; limpiar suscripciones Realtime, observadores de ubicación y efectos al desmontar.

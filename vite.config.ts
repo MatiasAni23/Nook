@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { seoPlugin } from './scripts/seoPlugin'
 
 const projectDirectory = fileURLToPath(new URL('.', import.meta.url))
 
@@ -29,6 +30,7 @@ export default defineConfig(({ mode }) => {
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
+    seoPlugin(),
   ],
   resolve: {
     alias: {

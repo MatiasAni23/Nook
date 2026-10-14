@@ -1,4 +1,11 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/index", "destination": "/", "permanent": true }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -9,12 +16,27 @@
         { "key": "Content-Security-Policy", "value": "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(self)" }
       ]
-    }
+    },
+    { "source": "/app/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/admin/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/delegate/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/iniciar-sesion", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/recover-password", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/verify-account", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/delegate-invite", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/app-shell", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/terminos", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/privacidad", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/sitemap.xml", "headers": [{ "key": "Content-Type", "value": "application/xml; charset=utf-8" }] },
+    { "source": "/robots.txt", "headers": [{ "key": "Content-Type", "value": "text/plain; charset=utf-8" }] }
   ],
   "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/app/:path*", "destination": "/app-shell" },
+    { "source": "/admin/:path*", "destination": "/app-shell" },
+    { "source": "/delegate/:path*", "destination": "/app-shell" },
+    { "source": "/iniciar-sesion", "destination": "/app-shell" },
+    { "source": "/recover-password", "destination": "/app-shell" },
+    { "source": "/verify-account", "destination": "/app-shell" },
+    { "source": "/delegate-invite", "destination": "/app-shell" }
   ]
 }
