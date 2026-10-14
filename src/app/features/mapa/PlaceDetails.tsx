@@ -47,6 +47,8 @@ import {
 import type { DetailNavigationState } from "./navigationState";
 import { PlaceGallery } from "./PlaceGallery";
 import { getPlaceTypeLabel } from "./placeFilters";
+import { ReservationModal } from "./ReservationModal";
+import { getPlaceReservationsEnabled } from "../../services/reservationService";
 import "./place-details.css";
 
 function getAmenityLabel(key?: string, name?: string) {
@@ -124,6 +126,8 @@ export function PlaceDetails() {
   const [readyImageUrls, setReadyImageUrls] = useState<Set<string>>(new Set());
   const [displayedImage, setDisplayedImage] = useState<string | undefined>();
   const [showContactDialog, setShowContactDialog] = useState(false);
+  const [reservationsEnabled, setReservationsEnabled] = useState(false);
+  const [reservationSpace, setReservationSpace] = useState<string | null>(null);
   const [contactMessage, setContactMessage] = useState("");
   const [isSendingContact, setIsSendingContact] = useState(false);
   const [contactMessageStatus, setContactMessageStatus] = useState("");
@@ -133,6 +137,16 @@ export function PlaceDetails() {
     [place?.images],
   );
   const selectedImage = currentPlaceImages[activeImageIndex];
+
+  useEffect(() => {
+    let active = true;
+    setReservationsEnabled(false); setReservationSpace(null);
+    if (isSupabaseConfigured && placeId && currentUser?.id) {
+      void getPlaceReservationsEnabled(placeId).then((enabled) => { if (active) setReservationsEnabled(enabled); })
+        .catch(() => { /* Keep the pilot hidden until its server configuration is available. */ });
+    }
+    return () => { active = false; };
+  }, [placeId, currentUser?.id]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 899px)");
@@ -541,6 +555,7 @@ export function PlaceDetails() {
         <div><h2>Ubicación</h2><p>{place.address || place.zone || "Dirección no informada"}</p>{place.address && place.zone && <span>{place.zone}</span>}</div>
       </div>
       <button type="button" className="place-primary-action" onClick={handleOpenDirections}><ExternalLink size={16} aria-hidden="true" />Cómo llegar</button>
+      {reservationsEnabled && <button type="button" className="place-secondary-action" onClick={() => setReservationSpace("")}><Calendar size={16} aria-hidden="true" />Reservar · Prueba sin pago</button>}
       {currentUser?.role === "worker" && (
         <button type="button" className="place-secondary-action" onClick={() => { setContactMessageStatus(""); setShowContactDialog(true); }}><MessageCircle size={16} aria-hidden="true" />Contactar al lugar</button>
       )}
@@ -606,6 +621,7 @@ export function PlaceDetails() {
                   <h3>{space.name}</h3>
                   <p><Users size={14} aria-hidden="true" />{space.capacity} personas</p>
                   <span>{space.pricePerHour > 0 ? formatPrice(space.pricePerHour) + " / " + (space.billingUnit === "day" ? "día" : space.billingUnit === "week" ? "semana" : space.billingUnit === "month" ? "mes" : "hora") : "Gratis"}</span>
+                  {reservationsEnabled && <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setReservationSpace(space.id)}>Reservar este espacio</Button>}
                 </div>
               </article>
             ))}
@@ -702,6 +718,7 @@ export function PlaceDetails() {
           onReport={handleReport}
         />
       )}
+      {reservationSpace !== null && placeId && <ReservationModal key={placeId + reservationSpace} placeId={placeId} placeName={String(place.name)} spaces={place.spaces ?? []} initialSpaceId={reservationSpace || undefined} onClose={() => setReservationSpace(null)} />}
       <Dialog open={showContactDialog} onOpenChange={setShowContactDialog}>
         <DialogContent>
           <DialogHeader>

@@ -33,7 +33,7 @@ function edgeHarness(entry = 'complete-password-recovery', config = {}) {
     Date: class extends Date { static now() { return now; } },
     Deno: { env: { get: (name) => env[name] }, serve: (fn) => { handler = fn; } },
     console: { error: (...args) => logs.push(args) },
-    fetch: async (...args) => { calls.push(['fetch', args[0]]); return config.fetchResult ?? new Response('{}'); },
+    fetch: async (...args) => { calls.push(['fetch', args[0], args[1]?.body]); return config.fetchResult ?? new Response('{}'); },
   });
   function load(file) {
     if (cache.has(file)) return cache.get(file).exports;
@@ -139,6 +139,44 @@ test('delegate emails require an active admin, a live invitation and its exact t
     assert.equal(response.status, status);
     if (status !== 200) assert.equal(h.calls.some(([type]) => type === 'fetch'), false);
   }
+});
+
+test('delegate email keeps its numeric template ID and adds authoritative Chilean expiry for Brevo', async () => {
+  const token = '90000000-0000-4000-8000-000000000002';
+  const invitation = { id, email, name: 'Invitado del servidor', token, status: 'pending', expires_at: '2026-10-20T21:00:00Z' };
+  const h = edgeHarness('send-delegate-invitation', { invitation, env: { BREVO_DELEGATE_TEMPLATE_ID: '27' } });
+  assert.equal((await h.invoke({ invitationId: id, email, name: 'Nombre del cliente', inviteUrl: 'https://www.pinwi.cl/delegate-invite?token=' + token })).status, 200);
+  const payload = JSON.parse(h.calls.find(([type]) => type === 'fetch')[2]);
+  assert.equal(payload.templateId, 27);
+  assert.equal(payload.params.name, invitation.name);
+  assert.equal(payload.params.expires_at, invitation.expires_at);
+  assert.match(payload.params.expires_at_label, /20 de octubre de 2026.*18:00/);
+  assert.equal(payload.htmlContent, undefined);
+  assert.deepEqual(h.logs, []);
+});
+
+test('invitation HTML escapes dynamic names and URLs and rejects executable link schemes', () => {
+  const { renderDelegateInvitation, formatInvitationExpiry } = edgeHarness().load(resolve('supabase/functions/_shared/emailTemplates.ts'));
+  const html = renderDelegateInvitation('<img src=x onerror="alert(1)">', 'https://www.pinwi.cl/delegate-invite?token=sample&more="value"', '2026-10-20T21:00:00Z');
+  assert.ok(html.includes('&lt;img'));
+  assert.ok(!html.includes('<img src=x'));
+  assert.ok(!html.includes('onerror="alert(1)"'));
+  assert.ok(html.includes('token=sample&amp;more='));
+  assert.match(html, /20 de octubre de 2026.*18:00/);
+  assert.throws(() => renderDelegateInvitation('Invitado', 'javascript:alert(1)', '2026-10-20T21:00:00Z'), /invalid_invitation_url/);
+  assert.throws(() => formatInvitationExpiry('invalid'), /invalid_invitation_expiry/);
+});
+
+test('invitation fallback uses the branded template and server expiration without a Brevo template ID', async () => {
+  const token = '90000000-0000-4000-8000-000000000002';
+  const invitation = { id, email, name: '<script>untrusted</script>', token, status: 'pending', expires_at: '2026-10-20T21:00:00Z' };
+  const h = edgeHarness('send-delegate-invitation', { invitation });
+  assert.equal((await h.invoke({ invitationId: id, email, inviteUrl: 'https://www.pinwi.cl/delegate-invite?token=' + token })).status, 200);
+  const payload = JSON.parse(h.calls.find(([type]) => type === 'fetch')[2]);
+  assert.equal(payload.subject, 'Te invitaron a gestionar espacios en Pinwi');
+  assert.match(payload.htmlContent, /Aceptar mi invitación/);
+  assert.ok(!payload.htmlContent.includes('<script>'));
+  assert.match(payload.htmlContent, /20 de octubre de 2026.*18:00/);
 });
 
 test('rate-limit RPC is server-only, atomic across queued calls, isolated by account and resets after expiry', async () => {

@@ -28,6 +28,7 @@ export function placeSpacesToDrafts(spaces: PlaceSpace[]): PlaceSpaceDraft[] {
 
 export function validPlaceSpaces(drafts: PlaceSpaceDraft[]): PlaceSpaceInput[] {
   return drafts.map((space) => ({
+    id: space.id,
     name: space.name.trim(),
     capacity: Number(space.capacity),
     pricePerHour: Number(space.pricePerHour),
@@ -59,7 +60,7 @@ export function PlaceSpacesEditor({ spaces, onChange }: PlaceSpacesEditorProps) 
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-gray-900">Espacios dentro del lugar</p>
-          <p className="text-xs text-gray-500">Opcional. Ej.: oficinas, salas o piezas de estudio. No habilita reservas.</p>
+          <p className="text-xs text-gray-500">Opcional. Ej.: oficinas, salas o piezas de estudio. Los horarios reservables se configuran por separado en Reservas y horarios.</p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={addSpace} className="shrink-0 border-[#4F46E5] text-[#4F46E5]">
           <Plus className="mr-1 size-4" /> Agregar espacio

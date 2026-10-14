@@ -5,6 +5,7 @@ import {
   BookOpen,
   BriefcaseBusiness,
   Building2,
+  Calendar,
   ChevronRight,
   Compass,
   GraduationCap,
@@ -303,6 +304,7 @@ export function ProfilePage({ mode }: { mode: "student" | "worker" }) {
                 />
               </Link>
             )}
+            {isSupabaseConfigured && <Link to="/app/reservations" className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-indigo-200 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-50"><Calendar className="size-4" aria-hidden="true" />Mis reservas</Link>}
             <dl
               className={`mt-6 grid gap-4 border-t border-[#F0F0F5] pt-5 ${isStudent ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
             >

@@ -94,6 +94,9 @@ const ADMIN_CACHE_TTL_MS = 5 * 60 * 1000;
 const managedUsersCache = createAdminDataCache<ManagedUser[]>();
 const managedDelegatesCache = createAdminDataCache<ManagedDelegate[]>();
 const managedPlaceOptionsCache = createAdminDataCache<ManagedPlaceOption[]>();
+const delegatePlacesCache = createAdminDataCache<DelegateAssignedPlace[]>();
+export const getCachedCurrentDelegatePlaces = delegatePlacesCache.peek;
+export const getDelegatePlacesCacheRemaining = delegatePlacesCache.remaining;
 let delegateInvitationCache = new Map<
   string,
   { timestamp: number; invitation: DelegateInvitation }
@@ -544,7 +547,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{
         lighting_level,
         address,
         images,
-        reservations(id),
+        reservations(count),
         place_amenities(
           amenity_key,
           amenity_name,
@@ -626,9 +629,7 @@ async function fetchCurrentDelegatePlaces(): Promise<{
             "hour") as AppPlace["spaces"][number]["billingUnit"],
           imageUrl: String(space.image_url ?? ""),
         })),
-        reservationsCount: Array.isArray(place.reservations)
-          ? place.reservations.length
-          : 0,
+        reservationsCount: Number(place.reservations?.[0]?.count ?? 0),
       };
     })
     .filter((place): place is DelegateAssignedPlace => Boolean(place));
@@ -636,9 +637,8 @@ async function fetchCurrentDelegatePlaces(): Promise<{
   return { userId, places };
 }
 
-export async function listCurrentDelegatePlaces(_options?: {
+export async function listCurrentDelegatePlaces(options?: {
   forceRefresh?: boolean;
 }): Promise<DelegateAssignedPlace[]> {
-  // Assignments may change in another session; always consult current permissions.
-  return (await fetchCurrentDelegatePlaces()).places;
+  return delegatePlacesCache.read(async () => (await fetchCurrentDelegatePlaces()).places, options);
 }

@@ -122,6 +122,8 @@ const REPORT_TICKET_SELECT = `
 `;
 
 const adminReportCache = createAdminDataCache<ReportTicket[]>();
+const delegateReportCache = createAdminDataCache<ReportTicket[]>();
+export const getCachedDelegateReportTickets = delegateReportCache.peek;
 export const getCachedAdminReportTickets = adminReportCache.peek;
 export const getAdminReportsCacheRemaining = adminReportCache.remaining;
 
@@ -141,7 +143,7 @@ export function listAdminReportTickets(options?: { forceRefresh?: boolean }) {
   return adminReportCache.read(fetchAdminReportTickets, options);
 }
 
-export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
+async function fetchDelegateReportTickets(): Promise<ReportTicket[]> {
   const client = requireSupabase();
   const { data: userData, error: userError } = await client.auth.getUser();
 
@@ -152,6 +154,7 @@ export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
     .from("delegates")
     .select("id")
     .eq("user_id", userData.user.id)
+    .eq("status", "active")
     .maybeSingle();
 
   if (delegateError) throw delegateError;
@@ -171,7 +174,7 @@ export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
 
   const { data, error } = await client
     .from("place_reports")
-    .select(REPORT_TICKET_SELECT)
+    .select("id, place_id, type, description, status, upvotes_count, created_at, updated_at, places:place_id(name, address)")
     .in("place_id", placeIds)
     .in("status", ACTIVE_TICKET_STATUSES)
     .order("created_at", { ascending: false });
@@ -179,6 +182,10 @@ export async function listDelegateReportTickets(): Promise<ReportTicket[]> {
   if (error) throw error;
 
   return (data ?? []).map(normalizeReport);
+}
+
+export function listDelegateReportTickets(options?: { forceRefresh?: boolean }) {
+  return delegateReportCache.read(fetchDelegateReportTickets, options);
 }
 
 export async function updateReportTicketStatus(

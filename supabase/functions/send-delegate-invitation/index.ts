@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.106.2";
 import { allowedOrigins, consumeRateLimit, errorResponse, readJsonBody, securityHeaders, SecurityError } from "../_shared/security.ts";
+import { formatInvitationExpiry, renderDelegateInvitation } from "../_shared/emailTemplates.ts";
 
 interface BrevoPayload {
   sender?: {
@@ -15,35 +16,6 @@ interface BrevoPayload {
   htmlContent?: string;
   params: Record<string, unknown>;
 }
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function getDefaultHtmlContent(name: string, inviteUrl: string) {
-  const safeName = escapeHtml(name);
-  const safeUrl = escapeHtml(inviteUrl);
-
-  return `
-    <h2>Tu invitacion para ser delegado en Pinwi</h2>
-    <p>Hola ${safeName},</p>
-    <p>Te invitamos a administrar lugares en Pinwi. Para aceptar la invitacion, abre el siguiente enlace y configura tu contrasena.</p>
-    <p>
-      <a href="${safeUrl}" style="display:inline-block;padding:12px 18px;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">
-        Aceptar invitacion
-      </a>
-    </p>
-    <p>Si el boton no funciona, copia y pega este enlace en tu navegador:</p>
-    <p><a href="${safeUrl}">${safeUrl}</a></p>
-    <p>Si no esperabas esta invitacion, puedes ignorar este correo.</p>
-  `;
-}
-
 
 Deno.serve(async (req) => {
   let headers: HeadersInit = {};
@@ -88,12 +60,12 @@ Deno.serve(async (req) => {
     const templateId = Number(Deno.env.get("BREVO_DELEGATE_TEMPLATE_ID"));
     const payload: BrevoPayload = {
       to: [{ email, name }],
-      params: { name, email, invite_url: inviteUrl.href, invitation_id: invitation.id, expires_at: invitation.expires_at },
+      params: { name, email, invite_url: inviteUrl.href, invitation_id: invitation.id, expires_at: invitation.expires_at, expires_at_label: formatInvitationExpiry(invitation.expires_at) },
     };
     const senderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
     if (senderEmail) payload.sender = { name: Deno.env.get("BREVO_SENDER_NAME") ?? "Pinwi", email: senderEmail };
     if (Number.isSafeInteger(templateId) && templateId > 0) payload.templateId = templateId;
-    else { payload.subject = "Tu invitación para ser delegado en Pinwi"; payload.htmlContent = getDefaultHtmlContent(name, inviteUrl.href); }
+    else { payload.subject = "Te invitaron a gestionar espacios en Pinwi"; payload.htmlContent = renderDelegateInvitation(name, inviteUrl.href, invitation.expires_at); }
     const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST", headers: { "api-key": brevoApiKey, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify(payload), signal: AbortSignal.timeout(10000),

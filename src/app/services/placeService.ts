@@ -39,6 +39,7 @@ export interface PlaceSpace {
 }
 
 export type PlaceSpaceInput = {
+  id?: string;
   name: string;
   capacity: number;
   pricePerHour: number;
@@ -577,6 +578,7 @@ async function savePlaceSpaces(
       imageUrl = uploadedUrl;
     }
     rows.push({
+      id: space.id ?? crypto.randomUUID(),
       place_id: placeId,
       name: space.name.trim(),
       capacity: space.capacity,
@@ -586,13 +588,10 @@ async function savePlaceSpaces(
     });
   }
 
-  if (rows.length === 0) return [];
   const { data, error } = await client
-    .from("place_spaces")
-    .insert(rows)
-    .select("id, name, capacity, price_per_hour, billing_unit, image_url");
+    .rpc("replace_place_spaces", { target_place_id: placeId, spaces_json: rows });
   if (error) throw error;
-  return (data ?? []).map((space) => ({
+  return (data ?? []).map((space: NonNullable<PlaceRow["place_spaces"]>[number]) => ({
     id: String(space.id),
     name: space.name,
     capacity: space.capacity,
@@ -846,11 +845,6 @@ export async function updatePlace(input: UpdatePlaceInput): Promise<AppPlace> {
       if (amenitiesError) throw amenitiesError;
     }
 
-    const { error: deleteSpacesError } = await client
-      .from("place_spaces")
-      .delete()
-      .eq("place_id", input.id);
-    if (deleteSpacesError) throw deleteSpacesError;
     const spaces = await savePlaceSpaces(input.id, input.spaces);
 
     const updatedPlace = {

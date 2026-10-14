@@ -100,6 +100,9 @@ beforeEach(() => {
       database.delete(id);
       return response({ id, image_paths: [`${id}/cover.webp`] });
     }
+    if (url.pathname.endsWith("/rpc/replace_place_spaces")) {
+      return response(body.spaces_json.map((s) => ({ ...s })));
+    }
     if (url.pathname.endsWith("/place_spaces")) {
       if (method === "POST")
         return response(
@@ -160,12 +163,15 @@ test("CRUD creates a complete place, reads the full catalogue, edits it and remo
   assert.equal((await service.getPlaceById(created.id)).name, input.name);
   const updated = await service.updatePlace({
     ...input,
+    spaces: input.spaces.map((space, index) => ({ ...space, id: created.spaces[index].id })),
     id: created.id,
     name: "Biblioteca editada",
     images: [{ type: "existing", url: "https://example.test/cover.webp" }],
   });
   assert.equal(updated.name, "Biblioteca editada");
   assert.equal(updated.spaces[0].billingUnit, "day");
+  assert.equal(updated.spaces[0].id, created.spaces[0].id, "Editing preserves the space used by reservation schedules");
+  assert.ok(!requests.some((request) => request.path.endsWith("/place_spaces") && request.method === "DELETE"));
   assert.equal(updated.images[0], "https://example.test/cover.webp");
   assert.equal(database.get(created.id).website_url, "https://ejemplo.cl");
   await service.deletePlace(created.id);

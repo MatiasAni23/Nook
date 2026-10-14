@@ -26,6 +26,7 @@ import { MapView } from "./features/mapa/MapView";
 import { PlaceDetails } from "./features/mapa/PlaceDetails";
 import { EditProfileView } from "./features/perfil/EditProfileView";
 import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
+import { MyReservations } from "./features/reservas/MyReservations";
 import { Layout } from "./features/shared/Layout";
 import { LandingPage } from "./features/landing/LandingPage";
 import { authLink, destinationAfterLogin, safeAppDestination, verificationLink } from "./features/auth/authNavigation";
@@ -374,6 +375,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: MapView },
       { path: "profile", Component: ProfileWrapper },
+      { path: "reservations", Component: MyReservations },
       { path: "profile/edit", Component: EditProfileView },
       { path: "students", Component: StudentsView },
       { path: "discover", Component: DiscoverWrapper },

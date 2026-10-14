@@ -1,0 +1,114 @@
+[
+  {
+    "key": "confirmation",
+    "label": "Confirmar registro",
+    "subject": "Confirma tu correo en Pinwi",
+    "preheader": "Ya casi estás dentro de Pinwi.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "recovery",
+    "label": "Recuperar contraseña",
+    "subject": "Tu código para recuperar tu cuenta de Pinwi",
+    "preheader": "Recupera el acceso a tu cuenta.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "magic_link",
+    "label": "Enlace de acceso",
+    "subject": "Tu enlace de acceso a Pinwi",
+    "preheader": "Continúa de forma segura.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "invite",
+    "label": "Invitación de Supabase Auth",
+    "subject": "Te invitaron a unirte a Pinwi",
+    "preheader": "Tu invitación a Pinwi está lista.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "email_change",
+    "label": "Confirmar cambio de correo",
+    "subject": "Confirma el cambio de correo en Pinwi",
+    "preheader": "Verifica tu nuevo correo.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "reauthentication",
+    "label": "Verificar identidad",
+    "subject": "Verifica tu identidad en Pinwi",
+    "preheader": "Confirma que eres tú.",
+    "provider": "Supabase Auth",
+    "notification": false
+  },
+  {
+    "key": "password_changed_notification",
+    "label": "Contraseña modificada",
+    "subject": "Tu contraseña de Pinwi fue modificada",
+    "preheader": "Hay un cambio en tu cuenta.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "email_changed_notification",
+    "label": "Correo modificado",
+    "subject": "El correo de tu cuenta de Pinwi cambió",
+    "preheader": "Revisa el cambio de correo.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "phone_changed_notification",
+    "label": "Teléfono modificado",
+    "subject": "El teléfono de tu cuenta de Pinwi cambió",
+    "preheader": "Revisa el cambio de teléfono.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "identity_linked_notification",
+    "label": "Método de acceso vinculado",
+    "subject": "Se vinculó un método de acceso a Pinwi",
+    "preheader": "Hay un nuevo método de acceso.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "identity_unlinked_notification",
+    "label": "Método de acceso eliminado",
+    "subject": "Se desvinculó un método de acceso de Pinwi",
+    "preheader": "Revisa tus métodos de acceso.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "mfa_factor_enrolled_notification",
+    "label": "Verificación adicional agregada",
+    "subject": "Se agregó una verificación a tu cuenta de Pinwi",
+    "preheader": "Revisa la seguridad de tu cuenta.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "mfa_factor_unenrolled_notification",
+    "label": "Verificación adicional eliminada",
+    "subject": "Se eliminó una verificación de tu cuenta de Pinwi",
+    "preheader": "Revisa la seguridad de tu cuenta.",
+    "provider": "Supabase Auth",
+    "notification": true
+  },
+  {
+    "key": "delegates_invitation",
+    "label": "Invitación de delegado · Brevo",
+    "subject": "Te invitaron a gestionar espacios en Pinwi",
+    "preheader": "Activa tu acceso de delegado.",
+    "provider": "Brevo",
+    "notification": false
+  }
+]

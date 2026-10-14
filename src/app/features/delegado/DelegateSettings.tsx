@@ -1,313 +1,60 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { Bell, Clock, Mail, MapPin, Phone, Save, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
+import { Bell, CalendarDays, Mail, MapPin, Phone, Save, ShieldCheck, UserRound } from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Switch } from "../../components/ui/switch";
-import { isSupabaseConfigured } from "../../lib/supabase";
-import { listCurrentDelegatePlaces, type DelegateAssignedPlace } from "../../services/adminManagementService";
-import { getCurrentUserProfile, type CurrentUserProfile } from "../../services/currentUserService";
-import { updateCurrentDelegateProfile } from "../../services/delegateService";
+import { getCachedDelegateSettings, getCurrentDelegateSettings, updateCurrentDelegateProfile } from "../../services/delegateService";
 import { useCurrentUser } from "../../context/CurrentUserContext";
+import { useDelegateData } from "./useDelegateData";
+import { DelegatePage, DelegateRefresh, DelegateNotice, DelegateSkeleton } from "./DelegatePage";
 
 export function DelegateSettings() {
   const { refreshCurrentUser } = useCurrentUser();
-  const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
-  const [places, setPlaces] = useState<DelegateAssignedPlace[]>([]);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    notifications: {
-      newReservations: true,
-      reservationConfirmed: true,
-      placeReports: true,
-      weeklyReport: false,
-    },
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setErrorMessage("Supabase no esta configurado.");
-      return;
-    }
-
-    let isMounted = true;
-    setIsLoading(true);
-    setErrorMessage("");
-
-    Promise.all([getCurrentUserProfile(), listCurrentDelegatePlaces()])
-      .then(([profile, assignedPlaces]) => {
-        if (!isMounted) return;
-        setCurrentUser(profile);
-        setPlaces(assignedPlaces);
-        setFormData((current) => ({
-          ...current,
-          name: profile?.name ?? "",
-          email: profile?.email ?? "",
-          phone: profile?.phone ?? "",
-        }));
-      })
-      .catch((error) => {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar tu configuracion.");
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    setErrorMessage("");
-    setSuccessMessage("");
-
+  const read = useDelegateData(getCurrentDelegateSettings, getCachedDelegateSettings);
+  const [form, setForm] = useState({ name: "", phone: "" });
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  useEffect(() => { if (read.data && !dirty) setForm({ name: read.data.profile.name, phone: read.data.profile.phone ?? "" }); }, [read.data, dirty]);
+  async function save() {
+    if (busy.current || !read.data) return;
+    const values = { ...form };
+    busy.current = true; setSaving(true); setError(""); setSuccess("");
     try {
-      await updateCurrentDelegateProfile({
-        name: formData.name,
-        phone: formData.phone,
-      });
-      await refreshCurrentUser();
-      setCurrentUser((current) =>
-        current
-          ? {
-              ...current,
-              name: formData.name.trim(),
-              phone: formData.phone.trim() || null,
-            }
-          : current,
-      );
-      setSuccessMessage("Configuracion guardada correctamente.");
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar la configuracion.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto p-4 pb-20">
-        <div className="space-y-4">
-          <div>
-            <h2 className="mb-1 text-2xl" style={{ fontWeight: 700 }}>
-              Configuracion
-            </h2>
-            <p className="text-gray-600">Administra tu perfil y preferencias</p>
-          </div>
-
-          {errorMessage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {successMessage}
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
-              Cargando configuracion...
-            </div>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informacion Personal</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="delegate-name">
-                  <User className="mr-2 inline size-4" />
-                  Nombre completo
-                </Label>
-                <Input
-                  id="delegate-name"
-                  value={formData.name}
-                  onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="delegate-email">
-                  <Mail className="mr-2 inline size-4" />
-                  Email
-                </Label>
-                <Input id="delegate-email" type="email" value={formData.email} disabled className="bg-gray-100" />
-                <p className="text-xs text-gray-500">
-                  El correo viene de tu cuenta de acceso y no se cambia desde este formulario.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="delegate-phone">
-                  <Phone className="mr-2 inline size-4" />
-                  Telefono
-                </Label>
-                <Input
-                  id="delegate-phone"
-                  value={formData.phone}
-                  onChange={(event) => setFormData({ ...formData, phone: event.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                <Bell className="mr-2 inline size-5" />
-                Notificaciones
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Label htmlFor="notif-new">Nuevas reservas</Label>
-                  <p className="text-sm text-gray-600">Recibe notificaciones cuando lleguen nuevas solicitudes</p>
-                </div>
-                <Switch
-                  id="notif-new"
-                  checked={formData.notifications.newReservations}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, newReservations: checked },
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Label htmlFor="notif-confirmed">Reservas confirmadas</Label>
-                  <p className="text-sm text-gray-600">Notificacion cuando confirmes una reserva</p>
-                </div>
-                <Switch
-                  id="notif-confirmed"
-                  checked={formData.notifications.reservationConfirmed}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, reservationConfirmed: checked },
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Label htmlFor="notif-reports">Reportes de lugares</Label>
-                  <p className="text-sm text-gray-600">Alertas cuando se reporten problemas en tus lugares</p>
-                </div>
-                <Switch
-                  id="notif-reports"
-                  checked={formData.notifications.placeReports}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, placeReports: checked },
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <Label htmlFor="notif-weekly">Reporte semanal</Label>
-                  <p className="text-sm text-gray-600">Resumen de actividad cada semana</p>
-                </div>
-                <Switch
-                  id="notif-weekly"
-                  checked={formData.notifications.weeklyReport}
-                  onCheckedChange={(checked) =>
-                    setFormData({
-                      ...formData,
-                      notifications: { ...formData.notifications, weeklyReport: checked },
-                    })
-                  }
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                <MapPin className="mr-2 inline size-5" />
-                Lugares Administrados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {places.map((place) => (
-                  <div key={place.id} className="flex items-center justify-between border-b py-2 last:border-b-0">
-                    <span className="text-sm">{place.name}</span>
-                    <span className="text-xs text-gray-600">{place.reservationsCount} reservas</span>
-                  </div>
-                ))}
-
-                {!isLoading && places.length === 0 && (
-                  <p className="text-sm text-gray-600">Aun no tienes lugares asignados.</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">
-                <Clock className="mr-2 inline size-5" />
-                Horarios de Atencion
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-sm text-gray-600">
-                Los horarios se configuran individualmente para cada lugar desde la seccion "Mis Lugares".
-              </p>
-              <Button variant="outline" size="sm" onClick={() => navigate("/delegate/places")} className="w-full">
-                Ir a Mis Lugares
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Button
-            onClick={handleSave}
-            disabled={isSaving || !currentUser}
-            className="h-12 w-full bg-[#4F46E5] hover:bg-[#4338CA]"
-          >
-            <Save className="mr-2 size-5" />
-            {isSaving ? "Guardando..." : "Guardar Cambios"}
-          </Button>
-
-          <Card className="border-purple-200 bg-purple-50">
-            <CardContent className="pb-4 pt-4">
-              <div className="space-y-2 text-center">
-                <p className="text-sm font-semibold">Cuenta de Delegado</p>
-                <p className="text-xs text-gray-700">
-                  Como delegado, puedes administrar tus lugares, gestionar reservas y configurar horarios de forma
-                  independiente.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+      await updateCurrentDelegateProfile(values);
+      if (mounted.current) {
+        read.setData((current) => current ? { ...current, profile: { ...current.profile, name: values.name.trim(), phone: values.phone.trim() || null } } : current);
+        setDirty(false); setSuccess("Tu perfil se guardó correctamente.");
+      }
+      await refreshCurrentUser().catch(() => undefined);
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof Error ? cause.message : "No pudimos guardar tu perfil.");
+    } finally { busy.current = false; if (mounted.current) setSaving(false); }
+  }
+  return <DelegatePage eyebrow="Tu cuenta en Pinwi" title="Perfil del delegado" description="Actualiza tus datos de contacto y revisa los lugares que gestionas." actions={<DelegateRefresh updating={read.updating || saving || dirty} onClick={() => void read.refresh()} />}>
+    {(read.error || error) && <DelegateNotice>{error || read.error}</DelegateNotice>}
+    {success && <DelegateNotice success>{success}</DelegateNotice>}
+    {read.loading ? <DelegateSkeleton cards={2} /> : read.data && <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="overflow-hidden rounded-2xl border border-[#E6E8F2] bg-white">
+        <div className="flex items-center gap-3 border-b border-[#EFEDF6] p-5"><div className="grid size-11 place-items-center rounded-xl bg-indigo-50 text-indigo-500"><UserRound className="size-5" aria-hidden="true" /></div><div><h2 className="font-semibold text-[#302A47]">Información personal</h2><p className="mt-1 text-xs text-[#938BA3]">Estos datos identifican tu cuenta.</p></div></div>
+        <div className="space-y-5 p-5">
+          <div className="space-y-2"><Label htmlFor="delegate-name">Nombre completo</Label><Input id="delegate-name" autoComplete="name" required maxLength={120} disabled={saving} value={form.name} onChange={(e) => { setForm((v) => ({ ...v, name: e.target.value })); setDirty(true); }} /></div>
+          <div className="space-y-2"><Label htmlFor="delegate-email">Correo de acceso</Label><div className="relative"><Mail className="absolute left-3 top-2.5 size-4 text-[#A499B6]" aria-hidden="true" /><Input id="delegate-email" type="email" value={read.data.profile.email} readOnly className="bg-[#F7F6FB] pl-9 text-[#8B829D]" /></div><p className="text-xs leading-relaxed text-[#938BA3]">El correo de acceso se mantiene asociado a tu cuenta y no se modifica desde aquí.</p></div>
+          <div className="space-y-2"><Label htmlFor="delegate-phone">Teléfono de contacto</Label><div className="relative"><Phone className="absolute left-3 top-2.5 size-4 text-[#A499B6]" aria-hidden="true" /><Input id="delegate-phone" type="tel" autoComplete="tel" maxLength={30} disabled={saving} value={form.phone} className="pl-9" placeholder="+56 9…" onChange={(e) => { setForm((v) => ({ ...v, phone: e.target.value })); setDirty(true); }} /></div></div>
         </div>
-      </div>
-    </div>
-  );
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#EFEDF6] bg-[#FAFAFD] p-5"><span className="text-xs text-[#938BA3]">{dirty ? "Tienes cambios sin guardar" : "Tus datos están al día"}</span><Button type="submit" disabled={saving || !dirty || !form.name.trim()} className="bg-[#4F46E5] hover:bg-[#4338CA]"><Save className="mr-2 size-4" aria-hidden="true" />{saving ? "Guardando…" : "Guardar cambios"}</Button></div>
+      </form>
+      <aside className="space-y-4">
+        <div className="rounded-2xl border border-[#E6E8F2] bg-white p-5"><div className="mb-3 flex items-center gap-2"><ShieldCheck className="size-5 text-indigo-400" aria-hidden="true" /><h2 className="font-semibold text-[#302A47]">Cuenta de delegado</h2></div><p className="text-xs leading-relaxed text-[#8B829D]">Puedes gestionar las fichas, horarios y reservas de tus lugares asignados.</p></div>
+        <section className="rounded-2xl border border-[#E6E8F2] bg-white p-5"><h2 className="mb-3 flex items-center gap-2 font-semibold text-[#302A47]"><MapPin className="size-4 text-indigo-400" aria-hidden="true" />Lugares asignados</h2><div className="divide-y divide-[#EFEDF6]">{read.data.places.map((place) => <Link key={place.id} to="/delegate/places" className="block py-3 text-sm text-[#746685] hover:text-indigo-600">{place.name}</Link>)}{!read.data.places.length && <p className="text-xs text-[#938BA3]">Aún no tienes lugares asignados.</p>}</div></section>
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5"><h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#6257BD]"><CalendarDays className="size-4" aria-hidden="true" />Organiza la disponibilidad</h2><p className="text-xs leading-relaxed text-[#8B829D]">Publica los horarios de cada espacio desde Mis lugares.</p><Button asChild variant="outline" className="mt-4 w-full border-indigo-200 bg-white text-indigo-600"><Link to="/delegate/places">Configurar horarios</Link></Button></div>
+        <div className="rounded-2xl border border-[#E6E8F2] bg-white p-5"><h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-[#6257BD]"><Bell className="size-4" aria-hidden="true" />Avisos de reservas</h2><p className="text-xs leading-relaxed text-[#8B829D]">Las nuevas solicitudes y sus cambios de estado se reflejan en el apartado de Reservas.</p></div>
+      </aside>
+    </div>}
+  </DelegatePage>;
 }

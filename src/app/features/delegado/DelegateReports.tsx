@@ -1,52 +1,27 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, Check, MapPin, ThumbsUp } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
-import { getIssueIcon, getIssueLabel } from "../../data/mockData";
-import { isSupabaseConfigured } from "../../lib/supabase";
+import { getIssueLabel } from "../../data/mockData";
 import {
   listDelegateReportTickets,
+  getCachedDelegateReportTickets,
   updateReportTicketStatus,
   type ReportTicket,
 } from "../../services/reportTicketService";
+import { useDelegateData } from "./useDelegateData";
+import { DelegatePage, DelegateRefresh, DelegateNotice, DelegateSkeleton } from "./DelegatePage";
 
 export function DelegateReports() {
-  const [reports, setReports] = useState<ReportTicket[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const read = useDelegateData(listDelegateReportTickets, getCachedDelegateReportTickets);
+  const reports = read.data ?? [];
+  const setReports = (update: (current: ReportTicket[]) => ReportTicket[]) => read.setData((current) => update(current ?? []));
   const [savingReportId, setSavingReportId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setErrorMessage("Supabase no esta configurado.");
-      return;
-    }
-
-    let isMounted = true;
-    setIsLoading(true);
-    setErrorMessage("");
-
-    listDelegateReportTickets()
-      .then((nextReports) => {
-        if (isMounted) setReports(nextReports);
-      })
-      .catch((error) => {
-        if (isMounted) {
-          setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar los tickets.");
-        }
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
   const handleResolve = async (reportId: string) => {
+    if (savingReportId) return;
     setSavingReportId(reportId);
     setErrorMessage("");
     setSuccessMessage("");
@@ -76,87 +51,19 @@ export function DelegateReports() {
   };
 
   return (
-    <div className="size-full flex flex-col bg-gray-50">
-      <div className="flex-1 overflow-auto p-4 pb-28">
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-2xl mb-1" style={{ fontWeight: 700 }}>Tickets de reportes</h2>
-            <p className="text-gray-600">{reports.length} problemas activos en tus lugares</p>
-          </div>
-
-          {errorMessage && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {errorMessage}
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {successMessage}
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="rounded-lg border bg-white px-3 py-3 text-sm text-gray-600">
-              Cargando tickets...
-            </div>
-          )}
-
-          {!isLoading && reports.length === 0 && (
-            <Card className="border-green-200 bg-green-50">
-              <CardContent className="p-4 text-center">
-                <AlertTriangle className="mx-auto mb-2 size-6 text-green-700" />
-                <p className="text-sm font-medium text-green-700">No hay problemas activos por resolver.</p>
-              </CardContent>
-            </Card>
-          )}
-
-          <div className="space-y-3">
-            {reports.map((report) => (
-              <Card key={report.id} className="border-orange-200 bg-orange-50">
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <span className="text-3xl">{getIssueIcon(report.type)}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold">{getIssueLabel(report.type)}</h3>
-                          <Badge className="border-blue-300 bg-blue-100 text-blue-700">
-                            Ticket activo
-                          </Badge>
-                        </div>
-                        <p className="mb-2 text-sm text-gray-700">
-                          <MapPin className="size-3 inline mr-1" />
-                          {report.placeName}
-                        </p>
-                        {report.description && (
-                          <p className="mb-2 text-sm text-gray-700">"{report.description}"</p>
-                        )}
-                        <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600">
-                          <span>{getTimeAgo(report.createdAt)}</span>
-                          <span>
-                            <ThumbsUp className="size-3 inline mr-1" />
-                            {report.upvotes} confirmaciones
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      onClick={() => handleResolve(report.id)}
-                      disabled={savingReportId === report.id}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="size-4 mr-2" />
-                      {savingReportId === report.id ? "Marcando..." : "Marcar como resuelto"}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <DelegatePage eyebrow="Cuida la experiencia" title="Reportes de tus lugares" description="Revisa los problemas que detectó la comunidad y mantén tus espacios en buenas condiciones." actions={<DelegateRefresh updating={read.updating || Boolean(savingReportId)} onClick={() => void read.refresh()} />}>
+      {(read.error || errorMessage) && <DelegateNotice>{errorMessage || read.error}</DelegateNotice>}
+      {successMessage && <DelegateNotice success>{successMessage}</DelegateNotice>}
+      {read.loading ? <DelegateSkeleton cards={2} /> : <>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">{[
+          ["Activos", reports.length], ["En revisión", reports.filter((r) => r.status === "reviewing").length], ["Lugares", new Set(reports.map((r) => r.placeId)).size],
+        ].map(([label, value]) => <div key={label} className="rounded-2xl border border-[#E6E8F2] bg-white p-3 sm:p-5"><p className="text-xs font-medium text-[#78728D] sm:text-sm">{label}</p><p className="mt-2 text-2xl font-bold text-[#302A47]">{read.error && !read.data ? "—" : value}</p></div>)}</div>
+        <div className="grid gap-4 lg:grid-cols-2">{reports.map((report) => <article key={report.id} className="overflow-hidden rounded-2xl border border-[#E6E8F2] bg-white">
+          <div className="flex items-start gap-3 border-b border-[#EFEDF6] p-4 sm:p-5"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600"><AlertTriangle className="size-5" aria-hidden="true" /></div><div className="min-w-0 flex-1"><h2 className="font-semibold text-[#302A47]">{getIssueLabel(report.type)}</h2><p className="mt-1 flex items-start gap-1 text-xs text-[#8A839B]"><MapPin className="mt-0.5 size-3 shrink-0" aria-hidden="true" />{report.placeName}</p></div><Badge variant="outline" className="shrink-0 border-amber-200 bg-amber-50 text-xs text-amber-700">{report.status === "reviewing" ? "En revisión" : "Por resolver"}</Badge></div>
+          <div className="space-y-4 p-4 sm:p-5">{report.description && <p className="whitespace-pre-line break-words text-sm leading-relaxed text-[#6E657E]">{report.description}</p>}<div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#91889E]"><span>{getTimeAgo(report.createdAt)}</span><span className="flex items-center gap-1.5 rounded-full bg-[#F6F5FB] px-2 py-1"><ThumbsUp className="size-3" aria-hidden="true" />{report.upvotes} confirmaciones</span></div><Button onClick={() => void handleResolve(report.id)} disabled={Boolean(savingReportId)} className="w-full bg-[#4F46E5] hover:bg-[#4338CA]"><Check className="mr-2 size-4" aria-hidden="true" />{savingReportId === report.id ? "Guardando…" : "Marcar como resuelto"}</Button></div>
+        </article>)}</div>
+        {!reports.length && (!read.error || read.data) && <div className="rounded-2xl border border-dashed border-emerald-200 bg-white p-10 text-center"><div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-emerald-50 text-emerald-600"><Check className="size-7" aria-hidden="true" /></div><h2 className="font-semibold text-[#4B425F]">Todo al día</h2><p className="mt-2 text-sm text-[#8B829D]">Tus lugares no tienen reportes activos por resolver.</p></div>}
+      </>}
+    </DelegatePage>
   );
 }
