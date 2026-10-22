@@ -17,6 +17,6 @@ export async function loadPublicPlaceCatalog(environment: Record<string, string>
       return response.json() as Promise<unknown>;
     });
   } catch {
-    throw new Error("No se pudo prerenderizar el catálogo público. Comprueba la conexión y aplica 202610210001_public_place_cards.sql antes de compilar. No se generará una landing con lugares incompletos.");
+    throw new Error("No se pudo prerenderizar el catálogo público. Comprueba la conexión y aplica 202610210003_public_place_card_addresses.sql antes de compilar. No se generará una landing con lugares incompletos.");
   }
 }

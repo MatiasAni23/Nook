@@ -10,7 +10,7 @@ export function LandingGuide() {
         <div className="landing-guide-bubble">
           <svg className="landing-guide-tail" viewBox="0 0 80 32" aria-hidden="true"><path d="M0 1 Q32 11 78 1 Q42 30 0 31" /></svg>
           <p className="landing-guide-greeting">¡Hola! ¿Buscamos tu próximo lugar?</p>
-          <p>Mira las fotos. Entra a tu cuenta para conocer cada espacio.</p>
+          <p>Mira las fotos y abre un lugar para ver su dirección. Con tu cuenta, descubre mucho más.</p>
           <a className="landing-inline-link" href="#como-funciona">Te cuento cómo<ArrowRight size={15} aria-hidden="true" /></a>
         </div>
         <div className="landing-guide-character" aria-hidden="true">

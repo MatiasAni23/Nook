@@ -3,7 +3,7 @@ import { ArrowUpRight, BookOpen, Heart, MousePointer2 } from "lucide-react";
 const readingMascot = new URL("../../../../assets/pinwi-reading-v1.png", import.meta.url).href;
 const steps = [
   { title: "Ese lugar que te llama", text: "Recorre las fotos y descubre un espacio donde te imagines estudiando o trabajando.", Icon: MousePointer2 },
-  { title: "De la foto a los detalles", text: "Entra a tu cuenta para consultar su dirección, horarios y servicios.", Icon: BookOpen },
+  { title: "De la foto a los detalles", text: "Abre el lugar para ver su dirección. Entra a tu cuenta para conocer horarios y servicios.", Icon: BookOpen },
   { title: "Guárdalo para tu próximo plan", text: "Agrega tus favoritos y vuelve a ellos cuando necesites un cambio de aire.", Icon: Heart },
 ];
 

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, ImageOff, LockKeyhole, Pause, Play, RefreshCw } from "lucide-react";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
+import { ArrowRight, LockKeyhole, Pause, Play, RefreshCw } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "../../components/ui/carousel";
 import { useCurrentUser } from "../../context/CurrentUserContext";
 import { isSupabaseConfigured } from "../../lib/supabase";
@@ -10,19 +9,18 @@ import { getCachedPublicPlaces, listPublicPlaces, type PublicPlaceCard } from ".
 import { readPublicPlaceSnapshot } from "../../services/publicPlaceCatalog";
 import { authLink } from "../auth/authNavigation";
 import { LandingGuide } from "./LandingGuide";
+import { PlacePhoto } from "./PlacePhoto";
 
 const carouselOptions = { align: "start" as const, loop: true, breakpoints: { "(prefers-reduced-motion: reduce)": { duration: 0 } } };
 const AUTOPLAY_DELAY_MS = 6000;
 
-function PlacePhoto({ place, eager = false }: { place: PublicPlaceCard; eager?: boolean }) {
-  const [failedSource, setFailedSource] = useState<string | null>(null);
-  return place.imageUrl && failedSource !== place.imageUrl ? (
-    <img src={place.imageUrl} alt={"Foto principal de " + place.name} width={640} height={440}
-      loading={eager ? "eager" : "lazy"} decoding="async" onError={() => setFailedSource(place.imageUrl)} />
-  ) : <span className="landing-photo-placeholder"><ImageOff size={28} strokeWidth={1.3} aria-hidden="true" /><span>Imagen no disponible</span></span>;
+interface Props {
+  initialPlaces?: PublicPlaceCard[];
+  accessOpen: boolean;
+  onPreview: (place: PublicPlaceCard, opener: HTMLAnchorElement) => void;
 }
 
-export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCard[] }) {
+export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
   const { currentUser } = useCurrentUser();
   const hasAccount = Boolean(currentUser) || (!isSupabaseConfigured && Boolean(getDemoSession()));
   const [places, setPlaces] = useState<PublicPlaceCard[] | null>(() => initialPlaces ?? getCachedPublicPlaces() ?? readPublicPlaceSnapshot());
@@ -39,8 +37,6 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
   const [dragging, setDragging] = useState(false);
   const [inView, setInView] = useState(false);
   const [tabVisible, setTabVisible] = useState(true);
-  const [selected, setSelected] = useState<PublicPlaceCard | null>(null);
-  const opener = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 639px)");
@@ -103,12 +99,10 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
   }, [carousel, places, pageSize]);
 
   useEffect(() => {
-    if (!carousel || pages.length < 2 || paused || reducedMotion || hovered || focused || dragging || !inView || !tabVisible || selected) return;
+    if (!carousel || pages.length < 2 || paused || reducedMotion || hovered || focused || dragging || !inView || !tabVisible || accessOpen) return;
     const timer = window.setTimeout(() => carousel.scrollNext(), AUTOPLAY_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [carousel, pages.length, activePage, paused, reducedMotion, hovered, focused, dragging, inView, tabVisible, selected]);
-
-  const destination = selected ? "/app/place/" + selected.id : "/app/discover";
+  }, [carousel, pages.length, activePage, paused, reducedMotion, hovered, focused, dragging, inView, tabVisible, accessOpen]);
 
   return (
     <section id="espacios" className="landing-catalog landing-container" aria-labelledby="landing-places-heading">
@@ -133,10 +127,10 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
                   <Link to={hasAccount ? "/app/place/" + place.id : authLink("/app/place/" + place.id)} aria-label={"Conocer " + place.name} tabIndex={carousel && pageIndex !== activePage ? -1 : undefined}
                     onClick={event => {
                       if (hasAccount || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
-                      event.preventDefault(); opener.current = event.currentTarget; setSelected(place);
+                      event.preventDefault(); onPreview(place, event.currentTarget);
                     }}>
                     <div className="landing-card-photo"><PlacePhoto place={place} /><span className="landing-card-arrow" aria-hidden="true"><ArrowRight size={20} /></span></div>
-                    <h3>{place.name}</h3>
+                    <h3 title={place.name}>{place.name}</h3>
                   </Link>
                 </article>
               ))}</div>
@@ -146,21 +140,7 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
         </Carousel>
       )}
       {!loading && !error && !places?.length && <div className="landing-catalog-status"><p>Pronto encontrarás nuevos espacios aquí.</p></div>}
-      <p className="landing-catalog-note"><LockKeyhole size={15} aria-hidden="true" />Inicia sesión para ver direcciones, horarios y todos los detalles.</p>
-
-      <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open) setSelected(null); }}>
-        <DialogContent className="landing-access-dialog" onCloseAutoFocus={event => {
-          if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus(); }
-        }}>
-          {selected && <div className="landing-access-photo"><PlacePhoto place={selected} eager /><p>{selected.name}</p></div>}
-          <div className="landing-access-body"><span className="landing-access-icon"><LockKeyhole size={21} aria-hidden="true" /></span>
-            <DialogTitle>Conoce tu próximo espacio.</DialogTitle>
-            <DialogDescription>Inicia sesión o crea tu cuenta para ver la dirección, los horarios y los detalles de este lugar. Te llevaremos directamente a su ficha.</DialogDescription>
-            <div className="landing-access-actions"><Link className="landing-button is-primary" to={authLink(destination)}>Iniciar sesión<ArrowRight size={17} aria-hidden="true" /></Link><Link className="landing-button is-secondary" to={authLink(destination, true)}>Crear una cuenta</Link></div>
-            <DialogClose className="landing-access-explore">Seguir descubriendo lugares</DialogClose>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <p className="landing-catalog-note"><LockKeyhole size={15} aria-hidden="true" />Abre un lugar para ver su dirección. Entra a tu cuenta para conocer más.</p>
     </section>
   );
 }

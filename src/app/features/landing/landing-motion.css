@@ -3,24 +3,29 @@
   transition: opacity .65s ease, translate .65s cubic-bezier(.2, .7, .2, 1);
   transition-delay: var(--landing-reveal-delay, 0ms);
 }
-.landing-page [data-landing-from="left"] { --landing-enter-x: -42px; --landing-enter-y: 0; }
-.landing-page [data-landing-from="right"] { --landing-enter-x: 42px; --landing-enter-y: 0; }
-.landing-page [data-landing-from="bottom"] { --landing-enter-x: 0; --landing-enter-y: 32px; }
-.landing-page[data-landing-motion="enabled"] [data-landing-reveal="waiting"] { opacity: 0; translate: var(--landing-enter-x, 0) var(--landing-enter-y, 24px); will-change: opacity, translate; }
+.landing-page [data-landing-from="left"] { --landing-enter-x: -42px; --landing-enter-y: 0px; }
+.landing-page [data-landing-from="right"] { --landing-enter-x: 42px; --landing-enter-y: 0px; }
+.landing-page [data-landing-from="bottom"] { --landing-enter-x: 0px; --landing-enter-y: 32px; }
+.landing-page [data-landing-return="true"] { --landing-enter-direction: -1; }
+.landing-page[data-landing-motion="enabled"] [data-landing-reveal="waiting"] { opacity: 0; translate: calc(var(--landing-enter-x, 0px) * var(--landing-enter-direction, 1)) calc(var(--landing-enter-y, 24px) * var(--landing-enter-direction, 1)); transition: none; will-change: opacity, translate; }
 .landing-page[data-landing-motion="enabled"] [data-landing-reveal="visible"] { opacity: 1; translate: none; }
 .landing-page[data-landing-motion="enabled"] [data-landing-reveal]:focus-within { opacity: 1; translate: none; transition: none; }
 
-.landing-page[data-landing-motion="enabled"] .landing-hero-copy > * { animation: landing-arrive .8s cubic-bezier(.2, .7, .2, 1) both; }
+.landing-page[data-landing-motion="enabled"] .landing-hero-copy > :not([data-landing-reveal="waiting"]) { animation: landing-arrive .8s cubic-bezier(.2, .7, .2, 1) both; }
 .landing-page[data-landing-motion="enabled"] .landing-hero-copy > :nth-child(2) { animation-delay: .08s; }
 .landing-page[data-landing-motion="enabled"] .landing-hero-copy > :nth-child(3) { animation-delay: .16s; }
 .landing-page[data-landing-motion="enabled"] .landing-hero-copy > :nth-child(4) { animation-delay: .24s; }
 .landing-page[data-landing-motion="enabled"] .landing-hero-copy > :nth-child(5) { animation-delay: .32s; }
-.landing-page[data-landing-motion="enabled"] .landing-hero-visual { animation: landing-art-arrive 1s cubic-bezier(.2, .7, .2, 1) .12s both; }
+.landing-page[data-landing-motion="enabled"] .landing-hero-visual:not([data-landing-reveal="waiting"]) { animation: landing-art-arrive 1s cubic-bezier(.2, .7, .2, 1) .12s both; }
 
 .landing-page[data-landing-motion="enabled"] .landing-guide-float { animation: landing-mascot-float 5s ease-in-out infinite; animation-play-state: paused; }
 .landing-page[data-landing-motion="enabled"] .landing-guide-halo { animation: landing-mascot-halo 5s ease-in-out infinite; animation-play-state: paused; }
+.landing-page[data-landing-motion="enabled"] .landing-guide-float::before,
+.landing-page[data-landing-motion="enabled"] .landing-guide-float::after { animation: landing-ground-shadow 5s ease-in-out infinite; animation-play-state: paused; }
 .landing-page[data-landing-motion="enabled"] .landing-guide-float[data-ambient-active="true"],
-.landing-page[data-landing-motion="enabled"] .landing-guide-float[data-ambient-active="true"] .landing-guide-halo { animation-play-state: running; }
+.landing-page[data-landing-motion="enabled"] .landing-guide-float[data-ambient-active="true"] .landing-guide-halo,
+.landing-page[data-landing-motion="enabled"] .landing-guide-float[data-ambient-active="true"]::before,
+.landing-page[data-landing-motion="enabled"] .landing-guide-float[data-ambient-active="true"]::after { animation-play-state: running; }
 .landing-page[data-landing-motion="enabled"] .landing-mascot-scene img { animation: landing-mascot-float 7s ease-in-out infinite; animation-play-state: paused; }
 .landing-page[data-landing-motion="enabled"] .landing-mascot-scene[data-ambient-active="true"] img { animation-play-state: running; }
 
@@ -57,11 +62,11 @@
 .landing-carousel-arrow:hover:not(:disabled) { box-shadow: 0 5px 20px #6543a52b; }
 
 @keyframes landing-arrive {
-  from { opacity: .65; translate: 0 -24px; }
+  from { opacity: .65; translate: 0 calc(-24px * var(--landing-enter-direction, 1)); }
   to { opacity: 1; translate: none; }
 }
 @keyframes landing-art-arrive {
-  from { opacity: .65; translate: 0 -32px; }
+  from { opacity: .65; translate: 0 calc(-32px * var(--landing-enter-direction, 1)); }
   to { opacity: 1; translate: none; }
 }
 @keyframes landing-card-arrive {
@@ -75,6 +80,10 @@
 @keyframes landing-mascot-halo {
   0%, 100% { opacity: .7; transform: scale(.96); }
   50% { opacity: 1; transform: scale(1.06); }
+}
+@keyframes landing-ground-shadow {
+  0%, 100% { opacity: .9; transform: translateY(0) scale(1); }
+  50% { opacity: .65; transform: translateY(8px) scale(.88); }
 }
 @media (prefers-reduced-motion: reduce) {
   .landing-page *, .landing-access-dialog * { animation: none !important; transition: none !important; }

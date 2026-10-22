@@ -2,6 +2,7 @@
 export interface PublicPlaceCard {
   id: string;
   name: string;
+  address: string | null;
   imageUrl: string | null;
 }
 
@@ -12,8 +13,8 @@ export function parsePublicPlaceCards(value: unknown): PublicPlaceCard[] {
   if (!Array.isArray(value)) throw new Error("La respuesta de los lugares no es válida.");
   return value.map((row: unknown) => {
     if (!row || typeof row !== "object") throw new Error("La respuesta de los lugares no es válida.");
-    const { id, name, image_url, imageUrl } = row as Record<string, unknown>;
-    if (typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id) || typeof name !== "string" || !name.trim()) {
+    const { id, name, address, image_url, imageUrl } = row as Record<string, unknown>;
+    if (typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id) || typeof name !== "string" || !name.trim() || (address != null && typeof address !== "string")) {
       throw new Error("La respuesta de los lugares no es válida.");
     }
     const image = image_url ?? imageUrl;
@@ -24,7 +25,7 @@ export function parsePublicPlaceCards(value: unknown): PublicPlaceCard[] {
         if (url.protocol === "https:" && !url.username && !url.password) safeImage = url.href;
       } catch { /* Missing or unsafe images use the neutral placeholder. */ }
     }
-    return { id, name: name.trim(), imageUrl: safeImage };
+    return { id, name: name.trim(), address: typeof address === "string" ? address.trim() || null : null, imageUrl: safeImage };
   });
 }
 

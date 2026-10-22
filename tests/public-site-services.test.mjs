@@ -19,7 +19,7 @@ after(async () => {globalThis.fetch=originalFetch;await server?.close();});
 beforeEach(() => {
   database=row();requests=[];denyWrite=false;failRead=false;
   settings.clearSiteSettingsCache();places.clearPublicPlaceCache();
-  publicRows = [{id:'public-card',name:'Espacio',image_url:'https://example.test/main.jpg',description:'Unexpected private field',address:'Private address',latitude:-33.45}];
+  publicRows = [{id:'public-card',name:'Espacio',image_url:'https://example.test/main.jpg',description:'Unexpected private field',address:'Public address',latitude:-33.45}];
   globalThis.fetch = async (target,options={}) => {
     const url=new URL(typeof target==='string' || target instanceof URL ? target : target.url);
     assert.equal(url.origin,'http://127.0.0.1:9','No live backend request is allowed');
@@ -37,17 +37,18 @@ beforeEach(() => {
     return response(database);
   };
 });
-test('public cards request only the limited RPC, project name and main photo, and reuse their cache',async()=>{
+test('public cards request only the limited RPC, project name, address and main photo, and reuse their cache',async()=>{
   const [left,right]=await Promise.all([places.listPublicPlaces(),places.listPublicPlaces()]);
   assert.deepEqual(left,right);
-  assert.deepEqual(Object.keys(left[0]).sort(),['id','imageUrl','name']);
+  assert.deepEqual(Object.keys(left[0]).sort(),['address','id','imageUrl','name']);
+  assert.equal(left[0].address,'Public address');
   await places.listPublicPlaces();
   assert.equal(requests.length,1);
   assert.equal(requests[0].path,'/rest/v1/rpc/get_public_place_cards');
 });
 
 test('public catalogue and SEO loader include all pages without private fields or Auth calls',async()=>{
-  publicRows=Array.from({length:205},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:`Lugar ${index}`,image_url:null,address:'private'}));
+  publicRows=Array.from({length:205},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:`Lugar ${index}`,image_url:null,address:'Public address',description:'private'}));
   const result=await places.listPublicPlaces();
   assert.equal(result.length,205);assert.equal(requests.length,3);
   assert.equal(JSON.parse(requests[1].body).after_id,'place-0099');
@@ -60,18 +61,20 @@ test('public catalogue and SEO loader include all pages without private fields o
 test('public catalogue rejects backend failures and invalid rows without manufacturing a demo result',async()=>{
   failRead=true;
   await assert.rejects(places.listPublicPlaces());assert.equal(places.getCachedPublicPlaces(),null);
-  await assert.rejects(buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch),/202610210001/);
+  await assert.rejects(buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch),/202610210003/);
   failRead=false;publicRows=[{id:'bad/id',name:'Invalid',image_url:null}];
   await assert.rejects(places.listPublicPlaces(),/no es válida/);
   assert.equal(places.getCachedPublicPlaces(),null);
 });
 
 test('public snapshot escapes script injection, drops extra fields and rejects unsafe photo URLs',()=>{
-  const rows=catalog.parsePublicPlaceCards([{id:'place',name:'</script><script>alert(1)</script>',image_url:'javascript:alert(1)',address:'hidden'}]);
-  assert.equal(rows[0].imageUrl,null);
+  const rows=catalog.parsePublicPlaceCards([{id:'place',name:'</script><script>alert(1)</script>',image_url:'javascript:alert(1)',address:'Calle </script> 123',description:'hidden'}]);
+  assert.equal(rows[0].imageUrl,null);assert.equal(rows[0].address,'Calle </script> 123');
   const serialized=catalog.serializePublicPlaceCards(rows);
   assert.ok(!serialized.includes('</script>') && !serialized.includes('hidden'));
   assert.deepEqual(JSON.parse(serialized),rows);
+  assert.equal(catalog.parsePublicPlaceCards([{id:'legacy',name:'Legacy snapshot'}])[0].address,null);
+  assert.throws(()=>catalog.parsePublicPlaceCards([{id:'invalid',name:'Invalid address',address:123}]),/no es v\u00e1lida/);
 });
 
 test('public catalogue fails on repeated cursors instead of looping or truncating the listing',async()=>{

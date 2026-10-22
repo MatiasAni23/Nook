@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from "react";
 
 const revealSelector = [
+  ".landing-hero-copy > *", ".landing-hero-visual",
   ".landing-place-types > *", ".landing-catalog-heading > *", ".landing-how-heading",
   ".landing-steps li", ".landing-purpose > *", ".landing-faq > *",
   ".landing-final > *", ".landing-footer-top > *",
@@ -16,6 +17,7 @@ export function useLandingMotion(reference: RefObject<HTMLDivElement>) {
     const ambientTargets = Array.from(root.querySelectorAll<HTMLElement>(".landing-guide-float, .landing-mascot-scene"));
     const ambientVisibility = new Map<HTMLElement, boolean>();
     let revealObserver: IntersectionObserver | null = null;
+    let resetObserver: IntersectionObserver | null = null;
     let ambientObserver: IntersectionObserver | null = null;
 
     const updateAmbient = () => ambientVisibility.forEach((visible, element) => {
@@ -23,10 +25,15 @@ export function useLandingMotion(reference: RefObject<HTMLDivElement>) {
     });
     const reset = () => {
       revealObserver?.disconnect();
+      resetObserver?.disconnect();
       ambientObserver?.disconnect();
       ambientVisibility.clear();
       delete root.dataset.landingMotion;
-      targets.forEach(element => { delete element.dataset.landingReveal; element.style.removeProperty("--landing-reveal-delay"); });
+      targets.forEach(element => {
+        delete element.dataset.landingReveal;
+        delete element.dataset.landingReturn;
+        element.style.removeProperty("--landing-reveal-delay");
+      });
       ambientTargets.forEach(element => { delete element.dataset.ambientActive; });
     };
     const configure = () => {
@@ -39,19 +46,31 @@ export function useLandingMotion(reference: RefObject<HTMLDivElement>) {
         entries.forEach(entry => {
           if (!entry.isIntersecting) return;
           (entry.target as HTMLElement).dataset.landingReveal = "visible";
-          revealObserver?.unobserve(entry.target);
         });
-      }, { root, threshold: 0.12, rootMargin: "0px 0px -24px 0px" });
+      }, { root, threshold: 0, rootMargin: "-16px 0px -16px 0px" });
+
+      // Reset only after leaving an expanded viewport. The separate boundary keeps
+      // an entrance's own translation from repeatedly hiding/showing the element.
+      resetObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) return;
+          const element = entry.target as HTMLElement;
+          const above = entry.boundingClientRect.bottom <= root.getBoundingClientRect().top;
+          element.dataset.landingReturn = String(above);
+          element.dataset.landingReveal = "waiting";
+        });
+      }, { root, threshold: 0, rootMargin: "80px 0px 80px 0px" });
 
       const viewportBottom = root.getBoundingClientRect().bottom;
       targets.forEach((element, index) => {
         element.style.setProperty("--landing-reveal-delay", `${(index % 3) * 70}ms`);
         if (element.getBoundingClientRect().top >= viewportBottom) {
           element.dataset.landingReveal = "waiting";
-          revealObserver?.observe(element);
         } else {
           element.dataset.landingReveal = "visible";
         }
+        revealObserver?.observe(element);
+        resetObserver?.observe(element);
       });
 
       ambientObserver = new IntersectionObserver(entries => {

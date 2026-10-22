@@ -28,6 +28,8 @@ before(async () => {
   await db.exec(await read('migrations/202610100001_public_landing.sql'));
   await db.exec(await read('migrations/202610110001_admin_place_deletion.sql'));
   await db.exec(await read('migrations/202610210001_public_place_cards.sql'));
+  await db.exec(await read('migrations/202610210002_public_place_preview.sql'));
+  await db.exec(await read('migrations/202610210003_public_place_card_addresses.sql'));
   for (const key of ['admin','student','suspended','delegate']) await db.query('INSERT INTO auth.users(id,email,email_confirmed_at) VALUES($1,$2,NOW())', [ids[key],key + '@pinwi.test']);
   await db.query("UPDATE public.users SET role='admin',status='active' WHERE id=$1", [ids.admin]);
   await db.query("UPDATE public.users SET role='admin',status='suspended' WHERE id=$1", [ids.suspended]);
@@ -36,12 +38,13 @@ before(async () => {
 });
 after(() => db.close());
 
-test('anonymous catalogue exposes only active names and main photos, with no coordinates, details or accounts', async () => {
+test('anonymous catalogue exposes only active names, addresses and main photos, with no coordinates, private details or accounts', async () => {
   const rows = (await asRole('anon',null,'SELECT * FROM get_public_place_cards()')).rows;
   assert.equal(rows.length,1);
   assert.equal(rows[0].id,ids.place);
-  assert.deepEqual(Object.keys(rows[0]).sort(),['id','image_url','name']);
+  assert.deepEqual(Object.keys(rows[0]).sort(),['address','id','image_url','name']);
   assert.equal(rows[0].image_url,'https://example.test/main.jpg');
+  assert.equal(rows[0].address,'Direcci\u00f3n de la ficha');
   await assert.rejects(asRole('anon',null,'SELECT * FROM get_public_map_pins()'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM list_public_places()'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM public.places'), /permission denied/);
@@ -55,8 +58,30 @@ test('anonymous catalogue exposes only active names and main photos, with no coo
   await assert.rejects(asRole('authenticated',ids.student,"SELECT email_account_exists('any@pinwi.test')"), /permission denied/);
   const allowed=(await db.query(`SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='public' AND p.prokind='f' AND has_function_privilege('anon',p.oid,'EXECUTE') ORDER BY p.proname`)).rows.map(row=>row.proname);
-  assert.deepEqual(allowed,['get_delegate_invitation','get_public_place_cards']);
+  assert.deepEqual(allowed,['get_delegate_invitation','get_public_place_cards','get_public_place_preview']);
   assert.equal((await asRole('authenticated',ids.student,'SELECT * FROM list_public_places()')).rows[0].description,'Información solo para cuentas');
+});
+
+test('public preview reveals only one active place name and address without opening tables or other fields', async () => {
+  const rows = (await asRole('anon',null,'SELECT * FROM get_public_place_preview($1)',[ids.place])).rows;
+  assert.deepEqual(rows,[{ id: ids.place, name: 'Espacio de prueba', address: 'Dirección de la ficha' }]);
+  assert.deepEqual((await asRole('authenticated',ids.student,'SELECT * FROM get_public_place_preview($1)',[ids.place])).rows, rows);
+  for (const id of [ids.inactive, ids.student, 'ffffffff-ffff-4fff-8fff-ffffffffffff', null]) {
+    assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_preview($1)',[id])).rows.length,0);
+  }
+  await assert.rejects(asRole('anon',null,'SELECT address FROM places'),/permission denied/);
+  await assert.rejects(asRole('anon',null,'SELECT description FROM get_public_place_preview($1)',[ids.place]),/does not exist/);
+  await db.exec('CREATE ROLE preview_outsider NOLOGIN;');
+  await assert.rejects(asRole('preview_outsider',null,'SELECT * FROM get_public_place_preview($1)',[ids.place]),/permission denied/);
+  const config=(await db.query("SELECT proconfig FROM pg_proc WHERE oid='public.get_public_place_preview(uuid)'::regprocedure")).rows[0].proconfig;
+  assert.ok(config.includes('search_path=""'));
+  await db.exec('BEGIN;');
+  try {
+    for (const status of ['inactive','pending','deleted']) {
+      await db.query('UPDATE places SET status=$1 WHERE id=$2',[status,ids.place]);
+      assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_preview($1)',[ids.place])).rows.length,0);
+    }
+  } finally { await db.exec('ROLLBACK;'); }
 });
 
 test('public cards paginate all active places, cap page size and omit unpublished states', async () => {
@@ -76,7 +101,7 @@ test('public cards paginate all active places, cap page size and omit unpublishe
     }
     assert.equal(rows.length,206);
     assert.equal(new Set(rows.map(row=>row.id)).size,206);
-    assert.ok(rows.every(row=>Object.keys(row).length===3));
+    assert.ok(rows.every(row=>Object.keys(row).length===4));
     assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,500)')).rows.length,100);
     assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,0)')).rows.length,1);
   } finally { await db.exec('ROLLBACK;'); }
@@ -89,7 +114,9 @@ test('only an active administrator changes public links, and new deployments pre
   await assert.rejects(asRole('authenticated',ids.admin,"DELETE FROM site_settings"), /permission denied/);
   await assert.rejects(asRole('authenticated',ids.admin,"UPDATE site_settings SET id='other'"), /permission denied/);
   await db.exec(await read('migrations/202610100001_public_landing.sql'));
-  await db.exec(await read('migrations/202610210001_public_place_cards.sql'));
+  // Reapply current migrations; an older return signature must not downgrade the catalogue.
+  await db.exec(await read('migrations/202610210002_public_place_preview.sql'));
+  await db.exec(await read('migrations/202610210003_public_place_card_addresses.sql'));
   assert.equal((await asRole('anon',null,'SELECT instagram_url,whatsapp_number FROM site_settings')).rows[0].instagram_url,'https://www.instagram.com/pinwi/');
   assert.equal((await db.query('SELECT count(*)::integer AS total FROM places')).rows[0].total,2);
 });

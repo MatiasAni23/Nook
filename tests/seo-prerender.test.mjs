@@ -13,7 +13,7 @@ test('public prerender renders minimal place cards and never requests account or
   });
   try {
     const { renderPublicPage } = await server.ssrLoadModule('/src/app/seo/prerender.tsx');
-    const places = Array.from({ length: 205 }, (_, index) => ({ id: `public-${index}`, name: `Biblioteca ${index}`, imageUrl: 'https://example.test/cover.jpg' }));
+    const places = Array.from({ length: 205 }, (_, index) => ({ id: `public-${index}`, name: `Biblioteca ${index}`, address: `Dirección pública ${index}`, imageUrl: 'https://example.test/cover.jpg' }));
     const landing = renderPublicPage('/', places);
     assert.equal([...landing.matchAll(/<h1\b/g)].length, 1);
     assert.ok(landing.includes('Encuentra tu espacio para') && landing.includes('Un espacio para cada idea.'));

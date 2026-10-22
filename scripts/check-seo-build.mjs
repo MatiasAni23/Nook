@@ -21,7 +21,8 @@ for (const [file, canonical, indexable] of [['index.html', 'https://www.pinwi.cl
     const places = JSON.parse(snapshot[1]);
     assert.equal([...html.matchAll(/class="landing-place-card"/g)].length, places.length, 'Every public place is present before JavaScript');
     for (const place of places) {
-      assert.deepEqual(Object.keys(place).sort(), ['id', 'imageUrl', 'name']);
+      assert.deepEqual(Object.keys(place).sort(), ['address', 'id', 'imageUrl', 'name']);
+      assert.ok(place.address === null || typeof place.address === 'string', 'Public addresses accompany the catalogue snapshot');
       assert.ok(html.includes('continuar=%2Fapp%2Fplace%2F' + place.id));
     }
   }
