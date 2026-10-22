@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
-test('public prerender uses the actual views, retains the map, and never requests account or place data', async () => {
+test('public prerender renders minimal place cards and never requests account or place details', async () => {
   const originalFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async target => { requests.push(target); throw new Error('Network is forbidden during prerender'); };
@@ -13,14 +13,26 @@ test('public prerender uses the actual views, retains the map, and never request
   });
   try {
     const { renderPublicPage } = await server.ssrLoadModule('/src/app/seo/prerender.tsx');
-    const landing = renderPublicPage('/');
+    const places = Array.from({ length: 205 }, (_, index) => ({ id: `public-${index}`, name: `Biblioteca ${index}`, imageUrl: 'https://example.test/cover.jpg' }));
+    const landing = renderPublicPage('/', places);
     assert.equal([...landing.matchAll(/<h1\b/g)].length, 1);
-    assert.ok(landing.includes('Encuentra tu lugar.') && landing.includes('Mapa público de espacios'));
+    assert.ok(landing.includes('Encuentra tu espacio para') && landing.includes('Un espacio para cada idea.'));
+    assert.equal([...landing.matchAll(/class="landing-place-card"/g)].length, 205);
+    assert.ok(landing.includes('Biblioteca 204') && landing.includes('https://example.test/cover.jpg'));
+    assert.ok(landing.includes('continuar=%2Fapp%2Fplace%2Fpublic-204'));
+    assert.ok(!landing.includes('Mapa público de espacios'));
+    assert.doesNotMatch(landing, /lugares por descubrir|Mostrando \d|Página \d+ de \d+/);
     assert.ok(landing.includes('Estudiantes') || landing.includes('estudiantes y trabajadores'));
     for (const pathname of ['/terminos', '/privacidad']) {
       const legal = renderPublicPage(pathname);
       assert.equal([...legal.matchAll(/<h1\b/g)].length, 1);
-      assert.ok(legal.includes('Documento en preparación'));
+      if (pathname === '/terminos') {
+        assert.ok(legal.includes('Condiciones de uso de Pinwi'));
+        assert.ok(legal.includes('info@pinwi.cl'));
+        assert.doesNotMatch(legal, /borrador|demostraci[oó]n|simulaci[oó]n|modo (?:de )?prueba|pendiente antes de publicaci[oó]n|documento en preparaci[oó]n/i);
+      } else {
+        assert.ok(legal.includes('Documento en preparación'));
+      }
     }
     for (const pathname of ['/app', '/admin', '/delegate-invite']) assert.throws(() => renderPublicPage(pathname), /Only reviewed public/);
     assert.deepEqual(requests, []);

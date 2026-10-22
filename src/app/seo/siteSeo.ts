@@ -13,16 +13,16 @@ export interface PageSeo {
   lastModified?: string;
 }
 
-// Only reviewed public pages belong here. Legal drafts remain accessible, but unindexed.
+// Only reviewed public pages belong here. Legal documents remain accessible, but unindexed.
 export const PUBLIC_PAGES: readonly PageSeo[] = [
   {
     path: "/", title: "Pinwi | Espacios para estudiar y trabajar en Chile",
-    description: "Descubre bibliotecas, cafés y coworking en Chile. Explora el mapa público de Pinwi y crea tu cuenta para conocer los espacios y guardar tus favoritos.",
+    description: "Encuentra tu espacio para estudiar y trabajar en Chile. Descubre fotos de bibliotecas, cafés y coworking, y crea tu cuenta para conocer sus detalles.",
     indexable: true, canonical: SITE_ORIGIN + "/", structuredData: true,
   },
   {
     path: "/terminos", title: "Términos y condiciones | Pinwi",
-    description: "Consulta el borrador de los términos de Pinwi, su estado de preparación y las condiciones relacionadas con el uso de la aplicación.",
+    description: "Conoce los términos y condiciones de Pinwi: uso de cuentas, espacios, solicitudes de reserva, responsabilidades y canales de contacto.",
     indexable: false, canonical: SITE_ORIGIN + "/terminos",
   },
   {

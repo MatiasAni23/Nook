@@ -8,11 +8,7 @@ import {
 } from "../../components/ui/dialog";
 
 import {
-  LEGAL_PUBLICATION_NOTICE,
-  LEGAL_REVIEW_DATE,
-  LEGAL_SOURCE_URL,
-  LEGAL_STATUS,
-  LEGAL_VERSION,
+  LEGAL_DOCUMENT_DETAILS,
   PRIVACY_SECTIONS,
   TERMS_SECTIONS,
   type LegalDocument,
@@ -45,6 +41,7 @@ export function LegalDocumentsDialog({
   const activeDocument = document ?? "terms";
   const isTerms = activeDocument === "terms";
   const sections = isTerms ? TERMS_SECTIONS : PRIVACY_SECTIONS;
+  const details = LEGAL_DOCUMENT_DETAILS[activeDocument];
   const Icon = isTerms ? FileText : LockKeyhole;
 
   return (
@@ -60,7 +57,7 @@ export function LegalDocumentsDialog({
                 {isTerms ? "Términos de uso" : "Política de privacidad"}
               </DialogTitle>
               <DialogDescription className="mt-1 text-xs font-medium text-slate-400">
-                Versión {LEGAL_VERSION} · Revisado el {LEGAL_REVIEW_DATE}
+                Versión {details.version} · {isTerms ? "Actualizado" : "Revisado"} el {details.reviewDate}
               </DialogDescription>
             </div>
           </div>
@@ -90,14 +87,14 @@ export function LegalDocumentsDialog({
             <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#E0E7FF] bg-[#F8FAFF] px-4 py-3 text-xs leading-5 text-slate-500">
               <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#4F46E5]" />
               <p>
-                <strong className="block font-semibold text-slate-700">{LEGAL_STATUS}</strong>
-                {LEGAL_PUBLICATION_NOTICE}
+                <strong className="block font-semibold text-slate-700">{details.summaryTitle}</strong>
+                {details.summary}
               </p>
             </div>
             <div className="space-y-5">{sections.map((section) => <DocumentSection key={section.title} section={section} />)}</div>
             <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-4 text-sm text-[#4F46E5]">
               <a href={isTerms ? "/terminos" : "/privacidad"} className="underline underline-offset-4">Abrir documento completo</a>
-              <a href={LEGAL_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">Consultar Ley N.º 21.719 (BCN)</a>
+              <a href={details.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">{details.sourceLabel}</a>
             </div>
           </div>
         </div>

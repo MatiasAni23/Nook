@@ -2,7 +2,7 @@ import { validateImageUpload } from "../lib/imageUploadSecurity";
 import { validateWebsiteUrl } from "../lib/externalUrl";
 import { supabase } from "../lib/supabase";
 import { clearAdminDataCaches, createAdminDataCache } from "./adminDataCache";
-import { clearPublicMapCache } from "./publicMapService";
+import { clearPublicPlaceCache } from "./publicPlaceService";
 
 export type PlaceCategory = "study" | "work";
 
@@ -138,7 +138,7 @@ const placeDetailsRequests = new Map<string, Promise<AppPlace | null>>();
 const managedPlacesCache = createAdminDataCache<ManagedPlace[]>();
 
 export function clearPlacesCache() {
-  clearPublicMapCache();
+  clearPublicPlaceCache();
   clearAdminDataCaches();
   placesCacheGeneration += 1;
   placesCache = null;

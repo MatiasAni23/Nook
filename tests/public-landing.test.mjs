@@ -27,24 +27,59 @@ before(async () => {
   await db.exec('GRANT SELECT ON places,place_hours,place_amenities,place_spaces,places_with_stats TO anon,PUBLIC;');
   await db.exec(await read('migrations/202610100001_public_landing.sql'));
   await db.exec(await read('migrations/202610110001_admin_place_deletion.sql'));
+  await db.exec(await read('migrations/202610210001_public_place_cards.sql'));
   for (const key of ['admin','student','suspended','delegate']) await db.query('INSERT INTO auth.users(id,email,email_confirmed_at) VALUES($1,$2,NOW())', [ids[key],key + '@pinwi.test']);
   await db.query("UPDATE public.users SET role='admin',status='active' WHERE id=$1", [ids.admin]);
   await db.query("UPDATE public.users SET role='admin',status='suspended' WHERE id=$1", [ids.suspended]);
   for (const key of ['place','inactive']) await db.query(`INSERT INTO places(id,name,type,category,address,latitude,longitude,status,description,created_by) VALUES($1,'Espacio de prueba','library','study','Dirección de la ficha',-33.45,-70.65,$2,'Información solo para cuentas',$3)`, [ids[key],key === 'place' ? 'active' : 'inactive',ids.admin]);
+  await db.query('UPDATE places SET images=$1 WHERE id=$2', [['https://example.test/main.jpg','https://example.test/private-second.jpg'],ids.place]);
 });
 after(() => db.close());
 
-test('anonymous map exposes only pins of active places, with no access to complete records or accounts', async () => {
-  const rows = (await asRole('anon',null,'SELECT * FROM get_public_map_pins()')).rows;
+test('anonymous catalogue exposes only active names and main photos, with no coordinates, details or accounts', async () => {
+  const rows = (await asRole('anon',null,'SELECT * FROM get_public_place_cards()')).rows;
   assert.equal(rows.length,1);
   assert.equal(rows[0].id,ids.place);
-  assert.deepEqual(Object.keys(rows[0]).sort(),['category','id','latitude','longitude','name','type']);
+  assert.deepEqual(Object.keys(rows[0]).sort(),['id','image_url','name']);
+  assert.equal(rows[0].image_url,'https://example.test/main.jpg');
+  await assert.rejects(asRole('anon',null,'SELECT * FROM get_public_map_pins()'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM list_public_places()'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM public.places'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM public.places_with_stats'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT * FROM public.place_amenities'), /permission denied/);
   await assert.rejects(asRole('anon',null,'SELECT email FROM public.users'), /permission denied/);
+  for (const table of ['user_profiles','users_with_stats','delegates','delegates_with_places','delegate_invitations','favorites','reviews','reservations','regions','cities','institutions']) {
+    await assert.rejects(asRole('anon',null,`SELECT * FROM public.${table}`), /permission denied/);
+  }
+  await assert.rejects(asRole('anon',null,"SELECT email_account_exists('any@pinwi.test')"), /permission denied/);
+  await assert.rejects(asRole('authenticated',ids.student,"SELECT email_account_exists('any@pinwi.test')"), /permission denied/);
+  const allowed=(await db.query(`SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.prokind='f' AND has_function_privilege('anon',p.oid,'EXECUTE') ORDER BY p.proname`)).rows.map(row=>row.proname);
+  assert.deepEqual(allowed,['get_delegate_invitation','get_public_place_cards']);
   assert.equal((await asRole('authenticated',ids.student,'SELECT * FROM list_public_places()')).rows[0].description,'Información solo para cuentas');
+});
+
+test('public cards paginate all active places, cap page size and omit unpublished states', async () => {
+  await db.exec('BEGIN;');
+  try {
+    await db.query(`INSERT INTO places(id,name,type,category,address,latitude,longitude,status)
+      SELECT ('80000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid,'Lugar ' || n,'library','study','Privada',0,0,
+      CASE WHEN n=206 THEN 'pending' WHEN n=207 THEN 'deleted' ELSE 'active' END
+      FROM generate_series(1,207) n;`);
+    const rows=[];
+    let cursor=null;
+    for (;;) {
+      const page=(await asRole('anon',null,'SELECT * FROM get_public_place_cards($1,100)',[cursor])).rows;
+      rows.push(...page);
+      if(page.length<100) break;
+      cursor=page.at(-1).id;
+    }
+    assert.equal(rows.length,206);
+    assert.equal(new Set(rows.map(row=>row.id)).size,206);
+    assert.ok(rows.every(row=>Object.keys(row).length===3));
+    assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,500)')).rows.length,100);
+    assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,0)')).rows.length,1);
+  } finally { await db.exec('ROLLBACK;'); }
 });
 test('only an active administrator changes public links, and new deployments preserve configuration', async () => {
   assert.equal((await asRole('anon',null,'SELECT instagram_url FROM site_settings')).rows[0].instagram_url,'');
@@ -54,6 +89,7 @@ test('only an active administrator changes public links, and new deployments pre
   await assert.rejects(asRole('authenticated',ids.admin,"DELETE FROM site_settings"), /permission denied/);
   await assert.rejects(asRole('authenticated',ids.admin,"UPDATE site_settings SET id='other'"), /permission denied/);
   await db.exec(await read('migrations/202610100001_public_landing.sql'));
+  await db.exec(await read('migrations/202610210001_public_place_cards.sql'));
   assert.equal((await asRole('anon',null,'SELECT instagram_url,whatsapp_number FROM site_settings')).rows[0].instagram_url,'https://www.instagram.com/pinwi/');
   assert.equal((await db.query('SELECT count(*)::integer AS total FROM places')).rows[0].total,2);
 });
@@ -76,10 +112,10 @@ test('administrators can inspect hidden places and toggle publication without lo
     assert.equal((await asRole('authenticated',ids[key],"UPDATE places SET status='inactive' WHERE id=$1 RETURNING id",[ids.place])).rows.length,0);
   }
   await asRole('authenticated',ids.admin,"UPDATE places SET status='active' WHERE id=$1",[ids.inactive]);
-  assert.equal((await asRole('anon',null,'SELECT * FROM get_public_map_pins()')).rows.length,2);
+  assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards()')).rows.length,2);
   assert.equal((await asRole('authenticated',ids.student,'SELECT * FROM list_public_places()')).rows.length,2);
   await asRole('authenticated',ids.admin,"UPDATE places SET status='inactive' WHERE id=$1",[ids.inactive]);
-  assert.equal((await asRole('anon',null,'SELECT * FROM get_public_map_pins()')).rows.length,1);
+  assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards()')).rows.length,1);
   assert.equal((await asRole('authenticated',ids.student,'SELECT * FROM list_public_places()')).rows.length,1);
   assert.equal((await db.query('SELECT name FROM place_spaces WHERE place_id=$1',[ids.inactive])).rows[0].name,'Sala conservada');
   assert.equal((await db.query('SELECT description FROM places WHERE id=$1',[ids.inactive])).rows[0].description,'Información solo para cuentas');

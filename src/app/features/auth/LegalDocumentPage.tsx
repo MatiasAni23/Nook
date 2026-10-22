@@ -2,11 +2,7 @@ import { Link } from "react-router";
 import { BrandLogo } from "../../components/BrandLogo";
 import { DocumentSection } from "./LegalDocumentsDialog";
 import {
-  LEGAL_PUBLICATION_NOTICE,
-  LEGAL_REVIEW_DATE,
-  LEGAL_SOURCE_URL,
-  LEGAL_STATUS,
-  LEGAL_VERSION,
+  LEGAL_DOCUMENT_DETAILS,
   PRIVACY_SECTIONS,
   TERMS_SECTIONS,
   type LegalDocument,
@@ -15,6 +11,7 @@ import {
 export function LegalDocumentPage({ document }: { document: LegalDocument }) {
   const isTerms = document === "terms";
   const sections = isTerms ? TERMS_SECTIONS : PRIVACY_SECTIONS;
+  const details = LEGAL_DOCUMENT_DETAILS[document];
 
   return (
     <div className="h-dvh overflow-y-auto bg-[#F8FAFF] text-slate-700">
@@ -29,14 +26,14 @@ export function LegalDocumentPage({ document }: { document: LegalDocument }) {
       </header>
       <main className="mx-auto max-w-4xl px-5 py-8 sm:px-8 sm:py-12">
         <h1 className="text-3xl font-black text-[#1E1B4B]">{isTerms ? "Términos y condiciones de uso" : "Política de privacidad"}</h1>
-        <p className="mt-3 text-sm text-slate-500">Versión {LEGAL_VERSION} · Revisado el {LEGAL_REVIEW_DATE}</p>
+        <p className="mt-3 text-sm text-slate-500">Versión {details.version} · {isTerms ? "Actualizado" : "Revisado"} el {details.reviewDate}</p>
         <aside className="my-7 rounded-xl border border-indigo-100 bg-white p-5 text-sm leading-6">
-          <strong className="block text-[#1E1B4B]">{LEGAL_STATUS}</strong>
-          <p>{LEGAL_PUBLICATION_NOTICE}</p>
+          <strong className="block text-[#1E1B4B]">{details.summaryTitle}</strong>
+          <p>{details.summary}</p>
         </aside>
         <div className="space-y-6">{sections.map((section) => <DocumentSection key={section.title} section={section} headingLevel={2} />)}</div>
         <footer className="mt-8 border-t border-indigo-100 pt-5 text-sm">
-          <a href={LEGAL_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-[#4F46E5] underline underline-offset-4">Consultar Ley N.º 21.719 en la Biblioteca del Congreso Nacional</a>
+          <a href={details.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-[#4F46E5] underline underline-offset-4">{details.sourceLabel}</a>
           <p className="mt-3"><Link to="/" className="text-[#4F46E5] underline underline-offset-4">Volver a Pinwi</Link></p>
         </footer>
       </main>

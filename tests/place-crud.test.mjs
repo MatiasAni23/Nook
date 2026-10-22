@@ -379,29 +379,29 @@ test("management includes inactive records, preserves nested details and caches 
   } finally { Date.now = originalNow; }
 });
 
-test("disable and enable preserve the record and invalidate management, catalogue and public pins", async () => {
+test("disable and enable preserve the record and invalidate management, catalogue and public cards", async () => {
   const created = await service.createPlace(input);
-  const publicMap = await server.ssrLoadModule("/src/app/services/publicMapService.ts");
+  const publicPlaces = await server.ssrLoadModule("/src/app/services/publicPlaceService.ts");
   const previousFetch = globalThis.fetch;
   globalThis.fetch = async (target, options) => {
     const url = new URL(typeof target === "string" ? target : target.url);
-    if (url.pathname.endsWith("/rpc/get_public_map_pins"))
+    if (url.pathname.endsWith("/rpc/get_public_place_cards"))
       return response([...database.values()].filter((row) => row.status === "active"));
     return previousFetch(target, options);
   };
-  await publicMap.listPublicMapPins();
+  await publicPlaces.listPublicPlaces();
   await service.listManagedPlaces();
   await service.listPlaces();
   assert.equal(await service.setManagedPlaceStatus(created.id, "inactive"), "inactive");
   assert.equal(service.getCachedManagedPlaces(), null);
   assert.equal(service.getCachedPlaces(), null);
-  assert.equal(publicMap.getCachedPublicPins(), null);
+  assert.equal(publicPlaces.getCachedPublicPlaces(), null);
   assert.deepEqual(await service.listPlaces(), []);
-  assert.deepEqual(await publicMap.listPublicMapPins(), []);
+  assert.deepEqual(await publicPlaces.listPublicPlaces(), []);
   assert.equal((await service.listManagedPlaces())[0].status, "inactive");
   assert.equal(await service.setManagedPlaceStatus(created.id, "active"), "active");
   assert.equal((await service.listPlaces())[0].id, created.id);
-  assert.equal((await publicMap.listPublicMapPins())[0].id, created.id);
+  assert.equal((await publicPlaces.listPublicPlaces())[0].id, created.id);
   assert.equal(database.get(created.id).description, input.description);
 });
 

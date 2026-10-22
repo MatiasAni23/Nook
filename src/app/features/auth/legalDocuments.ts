@@ -5,65 +5,130 @@ export interface LegalSection {
   paragraphs: string[];
 }
 
-export const LEGAL_VERSION = "1.0-borrador";
-export const LEGAL_REVIEW_DATE = "6 de octubre de 2026";
-export const LEGAL_STATUS = "Documento en preparación: aún no tiene fecha de vigencia.";
-export const LEGAL_PUBLICATION_NOTICE =
-  "Antes de publicar esta versión deben completarse la identificación del responsable, su domicilio y el canal de privacidad, y ponerse en funcionamiento los procedimientos descritos. Tener un dominio no sustituye estos requisitos.";
-export const LEGAL_SOURCE_URL = "https://www.bcn.cl/leychile/navegar?idNorma=1209272";
+export const LEGAL_DOCUMENT_DETAILS: Record<LegalDocument, {
+  version: string;
+  reviewDate: string;
+  summaryTitle: string;
+  summary: string;
+  sourceUrl: string;
+  sourceLabel: string;
+}> = {
+  terms: {
+    version: "1.1",
+    reviewDate: "21 de octubre de 2026",
+    summaryTitle: "Condiciones de uso de Pinwi",
+    summary: "Conoce las condiciones para utilizar tu cuenta, descubrir espacios y relacionarte con la comunidad. Aquí se describen tus responsabilidades, el alcance del servicio y los canales de contacto.",
+    sourceUrl: "https://www.sernac.gov.cl/portal/618/w3-article-21568.html",
+    sourceLabel: "Consultar derechos del consumidor en SERNAC",
+  },
+  privacy: {
+    version: "1.0-borrador",
+    reviewDate: "6 de octubre de 2026",
+    summaryTitle: "Documento en preparación: aún no tiene fecha de vigencia.",
+    summary: "Antes de publicar esta versión deben completarse la identificación del responsable, su domicilio y el canal de privacidad, y ponerse en funcionamiento los procedimientos descritos. Tener un dominio no sustituye estos requisitos.",
+    sourceUrl: "https://www.bcn.cl/leychile/navegar?idNorma=1209272",
+    sourceLabel: "Consultar Ley N.º 21.719 en la Biblioteca del Congreso Nacional",
+  },
+};
 
 export const TERMS_SECTIONS: LegalSection[] = [
   {
-    title: "1. Servicio e identificación del operador",
+    title: "1. Objeto y alcance del servicio",
     paragraphs: [
-      "Pinwi permite descubrir espacios para estudiar o trabajar, guardar lugares, comunicarse y gestionar solicitudes según las funciones disponibles y el tipo de cuenta. Algunas pantallas siguen siendo demostraciones; una simulación no constituye una reserva ni un pago real.",
-      "Pendiente antes de publicación: nombre o razón social del operador, RUT, representante legal cuando corresponda, domicilio y contacto. Pinwi es el nombre de la aplicación y no identifica por sí solo a la persona responsable del servicio.",
+      "Estos términos regulan el uso de Pinwi, disponible en www.pinwi.cl, una plataforma para descubrir espacios de estudio y trabajo, guardar lugares favoritos, comunicarse con otras personas y gestionar solicitudes de reserva en los espacios que tengan habilitada esa función.",
+      "Las funciones disponibles dependen del tipo de cuenta y de los servicios habilitados para cada lugar. La publicación de un espacio en Pinwi no implica que la plataforma sea su propietaria o administradora. La gestión del recinto y las condiciones de acceso corresponden a quienes lo operan, sin perjuicio de las responsabilidades propias de Pinwi.",
     ],
   },
   {
-    title: "2. Aceptación y cambios",
+    title: "2. Consulta y aceptación de condiciones",
     paragraphs: [
-      "La versión definitiva deberá presentarse antes de crear una cuenta o contratar un servicio, con una acción expresa de aceptación y constancia de la versión aceptada. La mera navegación no se considera consentimiento para usos opcionales de datos personales.",
-      "La política de privacidad informa sobre el tratamiento de datos; leerla o aceptar estos términos no autoriza cualquier uso de tu información. Una finalidad opcional que requiera consentimiento debe ofrecerse por separado.",
-      "Los cambios sustanciales deberán comunicarse antes de aplicarse, indicando la nueva versión y fecha. No se entenderán aceptadas automáticamente futuras finalidades de tratamiento por el solo uso de Pinwi.",
+      "Puedes consultar estas condiciones desde el inicio de sesión y en la página pública de términos. La sola visita al sitio no genera una obligación de contratar ni una autorización general para utilizar tus datos personales.",
+      "Cada solicitud de reserva se rige, además, por la información del espacio y las condiciones comunicadas antes de enviarla. Una operación que requiera aceptación debe contar con una manifestación expresa de tu voluntad; consultar una ficha o un horario no equivale a contratar.",
     ],
   },
   {
-    title: "3. Cuenta, seguridad y menores de edad",
+    title: "3. Registro y seguridad de la cuenta",
     paragraphs: [
-      "Entrega información exacta y protege tu contraseña. Las cuentas y funciones de administración de espacios deben usarse sólo por las personas autorizadas. Está prohibido acceder a datos ajenos, suplantar identidades o interferir con el servicio.",
-      "Podrán adoptarse medidas proporcionadas ante fraude, abuso o riesgos de seguridad, informando sus motivos cuando resulte procedente y habilitando un canal de revisión. Una suspensión no elimina tus derechos sobre tus datos.",
-      "La modalidad de acceso para menores de edad está pendiente de definición. Antes de habilitarla deben existir controles de edad y representación, protección de perfiles y reglas de comunicación acordes con la normativa. Este borrador no acredita que esos controles estén implementados.",
+      "Para utilizar las funciones que requieren identificación debes crear una cuenta, proporcionar información veraz y mantener actualizados tus datos de contacto. Utiliza únicamente identidades, fotografías y antecedentes que te pertenezcan o que estés autorizado a utilizar.",
+      "Protege tu contraseña y evita compartir tus credenciales. Si detectas un acceso que no reconoces, cambia tu contraseña y comunícalo a info@pinwi.cl. Pinwi no te solicitará tu contraseña ni tus códigos de verificación por correo o chat.",
+      "Las funciones de administración y gestión de lugares sólo pueden utilizarse con los permisos asignados a la cuenta. Registrarte en la plataforma o indicar una vinculación con un establecimiento no otorga por sí solo facultades para representarlo.",
     ],
   },
   {
-    title: "4. Lugares, reservas y cobros",
+    title: "4. Uso responsable de la plataforma",
     paragraphs: [
-      "Los horarios, precios, servicios y disponibilidad deben verificarse con la información del lugar. Las solicitudes sólo serán vinculantes conforme al mecanismo de confirmación y las condiciones informadas en cada operación.",
-      "Antes de habilitar cobros reales deberán informarse el prestador del servicio, precio total y cargos, medios de pago, cancelación, reembolso y atención de reclamos. El checkout de demostración no procesa pagos ni confirma una reserva ante el lugar.",
-      "Estos términos no excluyen las obligaciones legales del operador o del prestador ni limitan derechos que la legislación del consumidor reconozca cuando corresponda.",
+      "Utiliza Pinwi de forma lícita y respetuosa. No se permite suplantar identidades, acosar, amenazar, discriminar, enviar publicidad no solicitada, publicar información engañosa ni compartir contenido que vulnere derechos de otras personas.",
+      "Está prohibido intentar acceder a cuentas o datos ajenos, eludir controles de acceso, introducir código malicioso, extraer datos personales sin autorización o interferir con el funcionamiento de la plataforma.",
+      "En los espacios físicos debes respetar las normas del recinto, su capacidad, los horarios autorizados y las indicaciones de sus responsables, además de cuidar las instalaciones y la convivencia con otras personas.",
     ],
   },
   {
-    title: "5. Contenido y comunicaciones",
+    title: "5. Información de los lugares",
+    paragraphs: [
+      "Las fichas reúnen información sobre ubicación, horarios, servicios, accesibilidad, capacidad y otras características de los espacios. Esa información puede actualizarse y debe leerse junto con los avisos y condiciones particulares del lugar.",
+      "La aparición de un lugar en el mapa o en los resultados no asegura disponibilidad inmediata ni acceso sin restricciones. Antes de trasladarte, revisa sus horarios y requisitos de ingreso; si adviertes información incorrecta, puedes comunicarla mediante las opciones de reporte disponibles o por correo.",
+      "Quienes gestionan un lugar deben mantener su información actualizada, publicar únicamente contenidos que estén autorizados a utilizar y gestionar las solicitudes dentro del alcance de sus permisos.",
+    ],
+  },
+  {
+    title: "6. Solicitudes de reserva y pagos",
+    paragraphs: [
+      "En los lugares con reservas habilitadas puedes solicitar una franja publicada para un espacio y un grupo de personas. Revisa el lugar, la fecha, el horario y la capacidad antes de enviar la solicitud.",
+      "Una solicitud enviada queda pendiente de aprobación. La reserva se considera confirmada cuando su estado figure como Confirmada en Mis reservas. La visualización de una franja disponible o el envío de una solicitud no equivalen a una confirmación.",
+      "Pinwi no procesa pagos a través de la plataforma. Enviar una solicitud de reserva no realiza un cargo. Cualquier servicio adicional ofrecido directamente por un establecimiento debe informar previamente su prestador, precio total, condiciones de contratación, cancelación y devolución, cuando corresponda.",
+      "Si necesitas cancelar una solicitud, utiliza la opción disponible en Mis reservas. Si una condición particular no está clara o necesitas resolver una incidencia, consulta con el responsable del lugar o escribe a info@pinwi.cl. Estas condiciones no restringen los derechos de cancelación, retracto o devolución que reconozca la legislación aplicable.",
+    ],
+  },
+  {
+    title: "7. Contenido y comunicaciones",
     paragraphs: [
       "Conservas los derechos sobre el contenido que compartes. La autorización para alojarlo y mostrarlo se limita a prestar la función elegida, sus destinatarios y el período necesario; no constituye una cesión general de propiedad ni una autorización para publicidad ajena al servicio.",
-      "No publiques datos de terceros sin autorización ni información sensible innecesaria. Las reseñas y reportes visibles para la comunidad pueden identificar a su autor; evita incluir datos de contacto o antecedentes privados en esos espacios.",
+      "Comparte reseñas y reportes basados en tu experiencia, con información pertinente y respetuosa. No publiques datos personales de terceros sin autorización ni antecedentes sensibles innecesarios. Evita incluir teléfonos, direcciones particulares u otros datos privados en contenido visible para la comunidad.",
       "El contenido ilícito o que afecte derechos de otras personas podrá moderarse de forma proporcionada. Los mensajes se destinan a sus participantes; el acceso para soporte, investigación de abuso o requerimientos legales debe justificarse y limitarse a lo necesario.",
     ],
   },
   {
-    title: "6. Datos personales y derechos",
+    title: "8. Propiedad intelectual",
     paragraphs: [
-      "La política de privacidad complementa estos términos y describe los datos, finalidades, destinatarios y pendientes de preparación. Los derechos sobre datos personales no se renuncian al usar Pinwi, cerrar una cuenta o aceptar condiciones del servicio.",
-      "Los permisos del dispositivo y los consentimientos opcionales deberán poder retirarse sin afectar las funciones que no los necesiten. Cerrar sesión no equivale a borrar tu cuenta ni los datos almacenados por el servicio.",
+      "La marca Pinwi, su identidad visual, los diseños, textos y demás elementos de la plataforma están sujetos a los derechos de sus respectivos titulares. El acceso al servicio te permite utilizar sus funciones, sin transferirte derechos sobre esos elementos.",
+      "No utilices la marca para aparentar una relación oficial con Pinwi ni reproduzcas o distribuyas contenido protegido sin autorización, salvo los usos permitidos por la ley. Los contenidos aportados por usuarios y establecimientos conservan la titularidad que les corresponda.",
     ],
   },
   {
-    title: "7. Disponibilidad, cierre y contacto",
+    title: "9. Privacidad y datos personales",
     paragraphs: [
-      "El servicio puede experimentar mantenimiento o fallas. Las limitaciones técnicas no eximen al operador de sus obligaciones legales ni permiten conservar datos sin una finalidad y fundamento válidos.",
-      "Pendiente antes de publicación: canal operativo de soporte, cierre de cuenta y ejercicio de derechos. No se fija una jurisdicción exclusiva ni se limita el acceso a las autoridades competentes mediante este borrador.",
+      "La política de privacidad, disponible en www.pinwi.cl/privacidad, complementa estos términos con información sobre el tratamiento de datos personales. Aceptar condiciones de uso no implica autorizar cualquier finalidad ni renunciar a tus derechos sobre los datos.",
+      "Las elecciones opcionales de visibilidad de perfil y los permisos del dispositivo deben distinguirse de las funciones necesarias para prestar el servicio. Puedes gestionar la visibilidad de tu perfil desde sus ajustes y los permisos de ubicación desde tu navegador.",
+      "Cerrar sesión no elimina tu cuenta ni los datos almacenados. Para consultas sobre tus datos o para solicitar el cierre de tu cuenta, escribe a info@pinwi.cl indicando tu solicitud, sin incluir contraseñas ni códigos de acceso.",
+    ],
+  },
+  {
+    title: "10. Disponibilidad y servicios de terceros",
+    paragraphs: [
+      "Pinwi puede experimentar interrupciones por mantenimiento, fallas técnicas o problemas de conectividad. Ante una incidencia, evita repetir operaciones sin revisar antes su estado, especialmente si ya enviaste una solicitud de reserva.",
+      "Los mapas, enlaces externos y servicios de otros proveedores pueden estar sujetos a condiciones propias. Sus condiciones no sustituyen las obligaciones que correspondan a Pinwi por el servicio que presta.",
+      "Las interrupciones y limitaciones técnicas no excluyen las responsabilidades establecidas por la ley ni los derechos de quienes utilizan la plataforma.",
+    ],
+  },
+  {
+    title: "11. Restricciones de acceso y cierre de cuenta",
+    paragraphs: [
+      "Pinwi podrá restringir contenido o suspender funciones de una cuenta cuando existan antecedentes de fraude, suplantación, acoso, acceso no autorizado u otros incumplimientos de estas condiciones. Las medidas deben ser proporcionales a la situación y se informarán sus motivos cuando corresponda, sin comprometer una investigación o la seguridad de otras personas.",
+      "Puedes solicitar la revisión de una restricción o el cierre de tu cuenta mediante info@pinwi.cl. Una suspensión o un cierre no extinguen tus derechos sobre datos personales ni las obligaciones que deban mantenerse por una operación anterior o por disposición legal.",
+    ],
+  },
+  {
+    title: "12. Actualizaciones de estas condiciones",
+    paragraphs: [
+      "La versión y la fecha de actualización se indican al inicio de este documento. Los cambios sustanciales se comunicarán antes de su aplicación por los canales de la plataforma o mediante el correo asociado a tu cuenta, según corresponda.",
+      "Las modificaciones no alteran retroactivamente las condiciones de operaciones ya confirmadas ni suponen una autorización automática para nuevas finalidades de tratamiento de datos. Cuando un cambio requiera aceptación expresa o un consentimiento específico, deberá solicitarse por separado.",
+    ],
+  },
+  {
+    title: "13. Contacto y legislación aplicable",
+    paragraphs: [
+      "Para consultas sobre el uso de Pinwi, reportar incidencias o presentar una solicitud relacionada con estas condiciones, escribe a info@pinwi.cl. Incluye una descripción de lo ocurrido y, si corresponde, la referencia del lugar o de la reserva, evitando compartir información sensible innecesaria.",
+      "Estas condiciones se interpretan conforme a la legislación de la República de Chile. Ninguna disposición implica una renuncia a los derechos irrenunciables reconocidos por la normativa de protección al consumidor o de datos personales, ni limita el acceso a las autoridades y tribunales competentes.",
     ],
   },
 ];

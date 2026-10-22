@@ -2,7 +2,7 @@ import { before, after, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
 
-let server, settings, map, navigation, requests, denyWrite, failRead;
+let server, settings, places, catalog, buildCatalog, navigation, requests, denyWrite, failRead, publicRows;
 const originalFetch = globalThis.fetch;
 const row = () => ({instagram_url:'',facebook_url:'',tiktok_url:'',linkedin_url:'',youtube_url:'',x_url:'',whatsapp_number:''});
 let database;
@@ -10,18 +10,25 @@ const response = (data,status=200) => new Response(JSON.stringify(data),{status,
 before(async () => {
   server = await createServer({server:{middlewareMode:true,hmr:{port:24685}},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')}});
   settings = await server.ssrLoadModule('/src/app/services/siteSettingsService.ts');
-  map = await server.ssrLoadModule('/src/app/services/publicMapService.ts');
+  places = await server.ssrLoadModule('/src/app/services/publicPlaceService.ts');
+  catalog = await server.ssrLoadModule('/src/app/services/publicPlaceCatalog.ts');
+  buildCatalog = await server.ssrLoadModule('/scripts/publicPlaceCatalog.ts');
   navigation = await server.ssrLoadModule('/src/app/features/auth/authNavigation.ts');
 });
 after(async () => {globalThis.fetch=originalFetch;await server?.close();});
 beforeEach(() => {
   database=row();requests=[];denyWrite=false;failRead=false;
-  settings.clearSiteSettingsCache();map.clearPublicMapCache();
+  settings.clearSiteSettingsCache();places.clearPublicPlaceCache();
+  publicRows = [{id:'public-card',name:'Espacio',image_url:'https://example.test/main.jpg',description:'Unexpected private field',address:'Private address',latitude:-33.45}];
   globalThis.fetch = async (target,options={}) => {
-    const url=new URL(typeof target==='string'?target:target.url);
+    const url=new URL(typeof target==='string' || target instanceof URL ? target : target.url);
     assert.equal(url.origin,'http://127.0.0.1:9','No live backend request is allowed');
-    requests.push({path:url.pathname,method:options.method??'GET'});
-    if(url.pathname.endsWith('/rpc/get_public_map_pins')) return response([{id:'public-pin',name:'Espacio',type:'cafe',category:'study',latitude:-33.45,longitude:-70.65,description:'Unexpected private field'}]);
+    requests.push({path:url.pathname,method:options.method??'GET',body:options.body});
+    if(url.pathname.endsWith('/rpc/get_public_place_cards')) {
+      if(failRead) return response({message:'Unavailable'},503);
+      const {after_id,page_size}=JSON.parse(options.body);
+      return response(publicRows.filter(row=>!after_id || row.id>after_id).slice(0,page_size));
+    }
     assert.ok(url.pathname.endsWith('/site_settings'));
     if(options.method==='PATCH') {
       if(denyWrite) return response({message:'Denied',code:'42501'},403);
@@ -30,13 +37,46 @@ beforeEach(() => {
     return response(database);
   };
 });
-test('public map requests only the limited RPC, projects fields, and reuses its cache',async()=>{
-  const [left,right]=await Promise.all([map.listPublicMapPins(),map.listPublicMapPins()]);
+test('public cards request only the limited RPC, project name and main photo, and reuse their cache',async()=>{
+  const [left,right]=await Promise.all([places.listPublicPlaces(),places.listPublicPlaces()]);
   assert.deepEqual(left,right);
-  assert.deepEqual(Object.keys(left[0]).sort(),['category','id','lat','lng','name','type']);
-  await map.listPublicMapPins();
+  assert.deepEqual(Object.keys(left[0]).sort(),['id','imageUrl','name']);
+  await places.listPublicPlaces();
   assert.equal(requests.length,1);
-  assert.equal(requests[0].path,'/rest/v1/rpc/get_public_map_pins');
+  assert.equal(requests[0].path,'/rest/v1/rpc/get_public_place_cards');
+});
+
+test('public catalogue and SEO loader include all pages without private fields or Auth calls',async()=>{
+  publicRows=Array.from({length:205},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:`Lugar ${index}`,image_url:null,address:'private'}));
+  const result=await places.listPublicPlaces();
+  assert.equal(result.length,205);assert.equal(requests.length,3);
+  assert.equal(JSON.parse(requests[1].body).after_id,'place-0099');
+  requests=[];
+  const built=await buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch);
+  assert.deepEqual(built,result);assert.equal(requests.length,3);
+  assert.ok(!JSON.stringify(built).includes('private'));
+});
+
+test('public catalogue rejects backend failures and invalid rows without manufacturing a demo result',async()=>{
+  failRead=true;
+  await assert.rejects(places.listPublicPlaces());assert.equal(places.getCachedPublicPlaces(),null);
+  await assert.rejects(buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch),/202610210001/);
+  failRead=false;publicRows=[{id:'bad/id',name:'Invalid',image_url:null}];
+  await assert.rejects(places.listPublicPlaces(),/no es válida/);
+  assert.equal(places.getCachedPublicPlaces(),null);
+});
+
+test('public snapshot escapes script injection, drops extra fields and rejects unsafe photo URLs',()=>{
+  const rows=catalog.parsePublicPlaceCards([{id:'place',name:'</script><script>alert(1)</script>',image_url:'javascript:alert(1)',address:'hidden'}]);
+  assert.equal(rows[0].imageUrl,null);
+  const serialized=catalog.serializePublicPlaceCards(rows);
+  assert.ok(!serialized.includes('</script>') && !serialized.includes('hidden'));
+  assert.deepEqual(JSON.parse(serialized),rows);
+});
+
+test('public catalogue fails on repeated cursors instead of looping or truncating the listing',async()=>{
+  const page=Array.from({length:100},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:'Lugar',image_url:null}));
+  await assert.rejects(catalog.readPublicPlaceCatalog(async()=>page),/completar/);
 });
 test('saving updates public cache only after confirmation, and denied writes preserve old links',async()=>{
   const value=await settings.getSiteSettings();

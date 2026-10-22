@@ -19,9 +19,9 @@ Este proyecto viene de un diseno de Figma exportado como React + Vite. La primer
 
 ## Comandos
 
-La ruta `/` presenta la landing con un mapa público. Las fichas y el resto de la app requieren iniciar sesión en `/iniciar-sesion`; el modo demo también exige entrar por ese flujo. Las redes y WhatsApp del footer se gestionan en **Administración → Gestión → Sitio público**.
+La ruta `/` presenta una landing con tarjetas de todos los lugares activos, mostrando sólo su nombre y foto principal, y un buscador por nombre. El HTML de producción incluye las tarjetas antes de ejecutar JavaScript. Las fichas y el resto de la app requieren iniciar sesión en `/iniciar-sesion`; el modo demo también exige entrar por ese flujo. Las redes y WhatsApp del footer se gestionan en **Administración → Gestión → Sitio público**.
 
-La conexión del mapa público y del footer requiere la migración incremental local documentada en `docs-local/supabase/PUBLIC_LANDING.md`, antes de publicar este frontend. Los SQL y esa documentación están excluidos de Git; no se despliegan al compilar la aplicación.
+La conexión del catálogo público requiere `202610210001_public_place_cards.sql`, posterior a la configuración inicial del footer, como se documenta en `docs-local/supabase/PUBLIC_LANDING.md`. Aplicar la migración antes de compilar y publicar: el build consulta únicamente la RPC mínima con una clave pública y falla si no obtiene el catálogo completo. Las fichas, coordenadas y datos de cuentas no se incluyen en esa consulta. Los SQL y esa documentación están excluidos de Git; no se despliegan al compilar la aplicación.
 
 Instalar dependencias:
 
@@ -110,7 +110,7 @@ estudiante@demo.cl / estudiante123
 
 ## Nota
 
-La auditoría de privacidad y seguridad se conserva en `docs-local/PRIVACY_AUDIT.md`, si dispones de la documentación local. Los documentos públicos de desarrollo están en `/terminos` y `/privacidad`; su contenido compartido está en `src/app/features/auth/legalDocuments.ts`. Son borradores y aún requieren identidad del responsable, contacto y procedimientos operativos antes de publicar una versión definitiva.
+La auditoría de privacidad y seguridad se conserva en `docs-local/PRIVACY_AUDIT.md`, si dispones de la documentación local. Los documentos públicos están en `/terminos` y `/privacidad`; su contenido compartido está en `src/app/features/auth/legalDocuments.ts`, con versión y presentación independientes. Los términos tienen redacción pública y usan el contacto existente `info@pinwi.cl`; la política de privacidad conserva su estado de borrador. La revisión formal, la identificación legal del operador y la validación de los procedimientos operativos siguen pendientes antes de publicar una versión definitiva.
 
 Por ahora varias pantallas usan datos mock y logica demo. La idea es reemplazar eso despues por autenticacion, base de datos y servicios reales.
 
