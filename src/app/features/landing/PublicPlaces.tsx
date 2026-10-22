@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, ImageOff, LockKeyhole, Pause, Play, RefreshCw, Search, X } from "lucide-react";
+import { ArrowRight, ImageOff, LockKeyhole, Pause, Play, RefreshCw } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "../../components/ui/dialog";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "../../components/ui/carousel";
 import { useCurrentUser } from "../../context/CurrentUserContext";
@@ -9,6 +9,7 @@ import { getDemoSession } from "../../services/demoSessionService";
 import { getCachedPublicPlaces, listPublicPlaces, type PublicPlaceCard } from "../../services/publicPlaceService";
 import { readPublicPlaceSnapshot } from "../../services/publicPlaceCatalog";
 import { authLink } from "../auth/authNavigation";
+import { LandingGuide } from "./LandingGuide";
 
 const carouselOptions = { align: "start" as const, loop: true, breakpoints: { "(prefers-reduced-motion: reduce)": { duration: 0 } } };
 const AUTOPLAY_DELAY_MS = 6000;
@@ -28,7 +29,6 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
   const [loading, setLoading] = useState(places === null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState("");
   const [pageSize, setPageSize] = useState(12);
   const [carousel, setCarousel] = useState<CarouselApi>();
   const [currentPage, setCurrentPage] = useState(0);
@@ -94,24 +94,19 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
     return () => { mounted = false; };
   }, [attempt]);
 
-  const visiblePlaces = useMemo(() => {
-    const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-CL");
-    const search = normalize(query.trim());
-    return (places ?? []).filter(place => normalize(place.name).includes(search));
-  }, [places, query]);
-  const pages = useMemo(() => Array.from({ length: Math.ceil(visiblePlaces.length / pageSize) }, (_, index) =>
-    visiblePlaces.slice(index * pageSize, (index + 1) * pageSize)), [visiblePlaces, pageSize]);
+  const pages = useMemo(() => Array.from({ length: Math.ceil((places?.length ?? 0) / pageSize) }, (_, index) =>
+    (places ?? []).slice(index * pageSize, (index + 1) * pageSize)), [places, pageSize]);
   const activePage = Math.min(currentPage, Math.max(0, pages.length - 1));
 
   useEffect(() => {
     carousel?.reInit({ startIndex: 0 });
-  }, [carousel, visiblePlaces, pageSize]);
+  }, [carousel, places, pageSize]);
 
   useEffect(() => {
-    if (!carousel || pages.length < 2 || paused || reducedMotion || hovered || focused || dragging || !inView || !tabVisible || selected || query.trim()) return;
+    if (!carousel || pages.length < 2 || paused || reducedMotion || hovered || focused || dragging || !inView || !tabVisible || selected) return;
     const timer = window.setTimeout(() => carousel.scrollNext(), AUTOPLAY_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [carousel, pages.length, activePage, paused, reducedMotion, hovered, focused, dragging, inView, tabVisible, selected, query]);
+  }, [carousel, pages.length, activePage, paused, reducedMotion, hovered, focused, dragging, inView, tabVisible, selected]);
 
   const destination = selected ? "/app/place/" + selected.id : "/app/discover";
 
@@ -120,12 +115,9 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
       <div className="landing-catalog-heading">
         <div><p className="landing-eyebrow">ENCUENTRA TU PRÓXIMO LUGAR</p><h2 id="landing-places-heading">Un espacio para cada idea.</h2>
           <p>Bibliotecas, cafés y espacios de trabajo. ¿Cuál va contigo?</p></div>
-        <a className="landing-inline-link" href="#como-funciona">¿Cómo funciona?<ArrowRight size={17} aria-hidden="true" /></a>
+        <LandingGuide />
       </div>
       <div className="landing-catalog-toolbar">
-        <div className="landing-search"><Search size={18} aria-hidden="true" /><label className="sr-only" htmlFor="landing-place-search">Buscar lugares por nombre</label>
-          <input id="landing-place-search" type="search" placeholder="Busca un lugar por su nombre" value={query} onChange={event => setQuery(event.target.value)} />
-          {query && <button type="button" aria-label="Limpiar búsqueda" onClick={() => setQuery("")}><X size={17} aria-hidden="true" /></button>}</div>
         {!reducedMotion && pages.length > 1 && <button type="button" className="landing-autoplay-toggle" disabled={!carousel} onClick={() => setPaused(value => !value)} aria-label={paused ? "Reanudar carrusel automático" : "Pausar carrusel automático"} title={paused ? "Reanudar carrusel" : "Pausar carrusel"}>{paused ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>}
       </div>
       {!isSupabaseConfigured && <p className="landing-demo-note">Vista de ejemplo. Los lugares conectados se mostrarán al configurar el servicio.</p>}
@@ -153,7 +145,7 @@ export function PublicPlaces({ initialPlaces }: { initialPlaces?: PublicPlaceCar
           {pages.length > 1 && <div className="landing-carousel-controls"><CarouselPrevious className="landing-carousel-arrow" aria-label="Ver lugares anteriores" /><CarouselNext className="landing-carousel-arrow" aria-label="Ver más lugares" /></div>}
         </Carousel>
       )}
-      {!loading && !error && visiblePlaces.length === 0 && <div className="landing-catalog-status"><p>{query ? "No encontramos lugares con ese nombre." : "Pronto encontrarás nuevos espacios aquí."}</p>{query && <button type="button" onClick={() => setQuery("")}>Ver todos los lugares<ArrowRight size={16} aria-hidden="true" /></button>}</div>}
+      {!loading && !error && !places?.length && <div className="landing-catalog-status"><p>Pronto encontrarás nuevos espacios aquí.</p></div>}
       <p className="landing-catalog-note"><LockKeyhole size={15} aria-hidden="true" />Inicia sesión para ver direcciones, horarios y todos los detalles.</p>
 
       <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open) setSelected(null); }}>
