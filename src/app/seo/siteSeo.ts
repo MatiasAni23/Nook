@@ -1,4 +1,5 @@
 import type { PublicPlaceCard } from "../services/publicPlaceCatalog";
+import { getPlaceKind, getPlaceLocality, getPublicCollections, getPublicPlaceDescription, isPublicPlaceIndexable, type PublicCollection } from "./publicPlaceDiscovery";
 
 export const SITE_ORIGIN = "https://www.pinwi.cl";
 export const SITE_NAME = "Pinwi";
@@ -22,12 +23,12 @@ export interface PageSeo {
 export const PUBLIC_PAGES: readonly PageSeo[] = [
   {
     path: "/", title: "Pinwi | Espacios para estudiar y trabajar en Chile",
-    description: "Descubre bibliotecas, cafés para estudiar y coworking en Chile. Consulta fotos y direcciones, y entra a Pinwi para explorar horarios y servicios.",
+    description: "Descubre bibliotecas, cafés para estudiar y coworking en Chile. Explora fotos, direcciones y descripciones para encontrar tu próximo espacio.",
     indexable: true, canonical: SITE_ORIGIN + "/", structuredData: true,
   },
   {
     path: "/lugares", title: "Bibliotecas, cafés para estudiar y coworking en Chile | Pinwi",
-    description: "Explora lugares para estudiar y trabajar en Chile. Conoce el nombre, la foto y la dirección de cada espacio; consulta sus demás detalles con tu cuenta.",
+    description: "Explora bibliotecas y lugares para estudiar y trabajar en Chile por tipo y comuna. Compara fotos, direcciones y descripciones para preparar tu próxima jornada.",
     indexable: true, canonical: SITE_ORIGIN + "/lugares", structuredData: true,
   },
   {
@@ -57,21 +58,26 @@ export function getPublicPlacePath(place: PublicPlaceCard): string {
 }
 
 export function getPublicPages(places: readonly PublicPlaceCard[] = []): PageSeo[] {
-  return [...PUBLIC_PAGES, ...places.map(getPublicPlaceSeo)];
+  return [...PUBLIC_PAGES, ...places.map(getPublicPlaceSeo), ...getPublicCollections(places).map(getPublicCollectionSeo)];
 }
 
 export function getPublicPlaceSeo(place: PublicPlaceCard): PageSeo {
   const path = getPublicPlacePath(place), canonical = SITE_ORIGIN + path;
-  const description = `${place.name}${place.address ? ": " + place.address : " en Pinwi"}. Consulta su foto y dirección. Inicia sesión para conocer horarios, servicios y más detalles.`;
+  const kind = getPlaceKind(place), locality = getPlaceLocality(place);
+  const location = locality?.name ?? place.zone;
+  const summary = getPublicPlaceDescription(place)?.replace(/\s+/g, " ");
+  const text = `${place.name}${location ? " en " + location : ""}. ${summary ?? "Explora su ubicación y su foto para preparar tu próxima jornada de estudio o trabajo."}`;
+  const description = text.length > 165 ? text.slice(0, 162).replace(/\s+\S*$/, "") + "…" : text;
   return {
-    path, canonical, title: place.name + ": dirección y foto | Pinwi", description, indexable: true, structuredData: true,
+    path, canonical, title: `${place.name}${location ? " en " + location : ""}: ${kind?.intent ?? "para estudiar y trabajar"} | Pinwi`, description, indexable: isPublicPlaceIndexable(place), structuredData: true,
     ...(place.imageUrl ? { image: place.imageUrl, imageAlt: "Foto principal de " + place.name } : {}),
     schema: {
       "@context": "https://schema.org", "@graph": [
         ...getStructuredData()["@graph"],
         { "@type": "WebPage", "@id": canonical, url: canonical, name: place.name, description, inLanguage: "es-CL", isPartOf: { "@id": SITE_ORIGIN + "/#website" }, mainEntity: { "@id": canonical + "#place" }, breadcrumb: { "@id": canonical + "#breadcrumbs" } },
-        { "@type": "Place", "@id": canonical + "#place", name: place.name, url: canonical,
-          ...(place.address ? { address: place.address } : {}), ...(place.imageUrl ? { image: place.imageUrl } : {}) },
+        { "@type": kind?.schemaType ?? "Place", "@id": canonical + "#place", name: place.name, url: canonical,
+          ...(place.address ? { address: { "@type": "PostalAddress", streetAddress: place.address, ...(locality ? { addressLocality: locality.name } : {}), addressCountry: "CL" } } : {}),
+          ...(summary ? { description: summary } : {}), ...(place.imageUrl ? { image: place.imageUrl } : {}) },
         { "@type": "BreadcrumbList", "@id": canonical + "#breadcrumbs", itemListElement: [
           { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_ORIGIN + "/" },
           { "@type": "ListItem", position: 2, name: "Lugares", item: SITE_ORIGIN + "/lugares" },
@@ -79,6 +85,22 @@ export function getPublicPlaceSeo(place: PublicPlaceCard): PageSeo {
         ] },
       ],
     },
+  };
+}
+
+export function getPublicCollectionSeo(collection: PublicCollection): PageSeo {
+  const canonical = SITE_ORIGIN + collection.path;
+  return { path: collection.path, canonical, title: collection.title + " | Pinwi", description: collection.description, indexable: true, structuredData: true,
+    schema: { "@context": "https://schema.org", "@graph": [
+      ...getStructuredData()["@graph"],
+      { "@type": "CollectionPage", "@id": canonical, url: canonical, name: collection.title, description: collection.description, inLanguage: "es-CL", mainEntity: { "@id": canonical + "#places" }, breadcrumb: { "@id": canonical + "#breadcrumbs" } },
+      { "@type": "ItemList", "@id": canonical + "#places", itemListElement: collection.places.map((place, index) => ({ "@type": "ListItem", position: index + 1, name: place.name, url: SITE_ORIGIN + getPublicPlacePath(place) })) },
+      { "@type": "BreadcrumbList", "@id": canonical + "#breadcrumbs", itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_ORIGIN + "/" },
+        { "@type": "ListItem", position: 2, name: "Lugares", item: SITE_ORIGIN + "/lugares" },
+        { "@type": "ListItem", position: 3, name: collection.title, item: canonical },
+      ] },
+    ] },
   };
 }
 
@@ -90,6 +112,8 @@ export function getPageSeo(pathname: string, places: readonly PublicPlaceCard[] 
     const place = places.find(place => getPublicPlacePath(place) === path);
     if (place) return getPublicPlaceSeo(place);
   }
+  const collection = getPublicCollections(places).find(collection => collection.path === path);
+  if (collection) return getPublicCollectionSeo(collection);
   const prefix = path.split("/")[1];
   const title = authTitles[path] ?? (prefix === "admin" ? "Administración | Pinwi"
     : prefix === "delegate" ? "Panel de delegado | Pinwi"

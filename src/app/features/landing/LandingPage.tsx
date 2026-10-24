@@ -74,7 +74,7 @@ export function LandingPage({ placeModalOpen = false, onPlaceOpen, initialView, 
         <LandingJourney />
 
         <section className="landing-container landing-faq" aria-labelledby="landing-faq-heading"><div data-landing-from="left"><p className="landing-eyebrow">POR SI TE LO PREGUNTABAS</p><h2 id="landing-faq-heading">Antes de empezar.</h2><p className="landing-faq-intro">Para que tu única duda sea<br />qué lugar probar primero.</p></div><div className="landing-faq-list" data-landing-from="right">
-          <details><summary>¿Necesito una cuenta para explorar?<span aria-hidden="true">+</span></summary><p>Puedes explorar las fotos y los nombres sin una cuenta. Al abrir un lugar también puedes ver su dirección. Para consultar horarios, servicios y los demás detalles, inicia sesión o crea tu cuenta.</p></details>
+          <details><summary>¿Necesito una cuenta para explorar?<span aria-hidden="true">+</span></summary><p>Puedes explorar las fotos y los nombres sin una cuenta. Al abrir un lugar también puedes consultar su dirección, tipo, zona y descripción. Para ver horarios, servicios y los demás detalles, inicia sesión o crea tu cuenta.</p></details>
           <details><summary>¿Qué espacios puedo encontrar?<span aria-hidden="true">+</span></summary><p>Pinwi reúne bibliotecas, cafés, coworking, salas y oficinas para estudiar o trabajar. Los lugares disponibles aparecen en el catálogo de esta página.</p></details>
           <details><summary>¿Puedo guardar un lugar para después?<span aria-hidden="true">+</span></summary><p>Sí. Con tu cuenta puedes guardar lugares en favoritos y volver a consultarlos desde la aplicación.</p></details>
         </div></section>

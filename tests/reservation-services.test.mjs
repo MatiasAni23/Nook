@@ -6,7 +6,7 @@ const calls=[];
 const slotId='72000000-0000-4000-8000-000000000001';
 const requestId='72000000-0000-4000-8000-000000000002';
 before(async()=>{
-  server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24704}},define:{
+  server=await createServer({cacheDir:'node_modules/.vite-tests-reservations',optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24704}},define:{
     'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')
   }});

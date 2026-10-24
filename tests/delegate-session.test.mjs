@@ -4,6 +4,7 @@ import { createServer } from 'vite';
 
 test('accepting an invitation invalidates the student profile cached before promotion', async () => {
   const server = await createServer({
+    cacheDir: 'node_modules/.vite-tests-delegate-session',
     server: { middlewareMode: true, hmr: { port: 24679 } },
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('http://127.0.0.1:9'),

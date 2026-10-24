@@ -4,7 +4,7 @@ import { createServer } from 'vite';
 let server, client, service, management, caches, calls, pageLoader;
 const row = (index=0) => ({id:'reservation-'+index,user_id:'user',user_name:'Persona de prueba',place_id:'place',place_name:'Lugar',reservation_dates:['2026-10-19'],start_time:'08:00',end_time:'09:00',status:'pending',total_amount:0,payment_method:'trial_no_payment',created_at:'2026-10-12T12:00:00Z',space_name:'Sala',guests_count:2,special_requests:'Estudio',is_trial:true,starts_at:'2026-10-19T11:00:00Z',ends_at:'2026-10-19T12:00:00Z'});
 before(async()=>{
-  server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24708}},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')}});
+  server=await createServer({cacheDir:'node_modules/.vite-tests-delegate-efficiency',optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24708}},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')}});
   ({supabase:client}=await server.ssrLoadModule('/src/app/lib/supabase.ts'));
   service=await server.ssrLoadModule('/src/app/services/delegateService.ts');
   management=await server.ssrLoadModule('/src/app/services/adminManagementService.ts');

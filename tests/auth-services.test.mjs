@@ -6,7 +6,7 @@ let server, auth, attempts, publicConfig, images, websites, supabase;
 const originalFetch = globalThis.fetch;
 const originalWindow = globalThis.window;
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true, hmr: { port: 24698 } }, define: {
+  server = await createServer({ cacheDir: 'node_modules/.vite-tests-auth', server: { middlewareMode: true, hmr: { port: 24698 } }, define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('http://127.0.0.1:9'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify('test-key'),
     'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify('test-site-key'),

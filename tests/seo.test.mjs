@@ -1,13 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import ts from 'typescript';
-import vm from 'node:vm';
+import { loadTypescript } from './helpers/loadTypescript.mjs';
 
-const module = { exports: {} };
-const compiled = ts.transpileModule(readFileSync('src/app/seo/siteSeo.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-vm.runInNewContext('(function(exports,module){' + compiled + '\n})', {})(module.exports, module);
-const seo = module.exports;
+const seo = loadTypescript('src/app/seo/siteSeo.ts');
 
 test('the sitemap contains only reviewed indexable public canonicals, with no invented dates', () => {
   const xml = seo.renderSitemap();
@@ -35,7 +31,7 @@ test('public place URLs and metadata are distinct, minimal and truthful', () => 
     const graph = page.schema['@graph'];
     const entity = graph.find(entity => entity['@type'] === 'Place');
     assert.equal(entity.name, place.name);
-    assert.equal(entity.address, place.address ?? undefined);
+    assert.equal(entity.address?.streetAddress, place.address ?? undefined);
     assert.equal(entity.image, place.imageUrl ?? undefined);
     assert.equal(graph.find(entity => entity['@type'] === 'BreadcrumbList').itemListElement.length, 3);
     for (const field of ['geo', 'openingHours', 'priceRange', 'aggregateRating', 'telephone', 'amenityFeature']) assert.ok(!(field in entity));

@@ -39,7 +39,16 @@ export function seoPlugin(): Plugin {
       const directory = path.resolve(config.root, config.build.outDir);
       const template = await readFile(path.join(directory, "index.html"), "utf8");
       const places = await loadPublicPlaceCatalog(config.env);
-      const server = await createServer({ root: config.root, mode: config.mode, server: { middlewareMode: true, watch: null, hmr: false }, appType: "custom" });
+      const server = await createServer({
+        root: config.root,
+        mode: config.mode,
+        // A build may run while the development app is open. Its production React
+        // must never replace dependencies already loaded by that browser.
+        cacheDir: path.resolve(config.root, "node_modules/.vite-seo-prerender"),
+        optimizeDeps: { noDiscovery: true, entries: [], include: [] },
+        server: { middlewareMode: true, watch: null, hmr: false },
+        appType: "custom",
+      });
       try {
         const entry = await server.ssrLoadModule("/src/app/seo/prerender.tsx") as { renderPublicPage: (pathname: string, places: PublicPlaceCard[]) => string };
         for (const page of getPublicPages(places)) {
@@ -57,7 +66,7 @@ export function seoPlugin(): Plugin {
             }
             throw new Error("Missing built public asset: " + filename);
           });
-          const snapshot = page.path === "/" || page.path === "/lugares" || page.path.startsWith("/lugar/") ? `<script id="${PUBLIC_PLACE_SNAPSHOT_ID}" type="application/json">${serializePublicPlaceCards(places)}</script>` : "";
+          const snapshot = !["/terminos", "/privacidad"].includes(page.path) ? `<script id="${PUBLIC_PLACE_SNAPSHOT_ID}" type="application/json">${serializePublicPlaceCards(places)}</script>` : "";
           const html = replaceSeoHead(template, page).replace('<div id="root"></div>', () => `<div id="root">${content}</div>${snapshot}`);
           const filename = page.path === "/" ? "index.html" : page.path.slice(1) + ".html";
           await mkdir(path.dirname(path.join(directory, filename)), { recursive: true });

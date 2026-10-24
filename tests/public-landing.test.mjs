@@ -30,6 +30,7 @@ before(async () => {
   await db.exec(await read('migrations/202610210001_public_place_cards.sql'));
   await db.exec(await read('migrations/202610210002_public_place_preview.sql'));
   await db.exec(await read('migrations/202610210003_public_place_card_addresses.sql'));
+  await db.exec(await read('migrations/202610240001_public_place_editorial.sql'));
   for (const key of ['admin','student','suspended','delegate']) await db.query('INSERT INTO auth.users(id,email,email_confirmed_at) VALUES($1,$2,NOW())', [ids[key],key + '@pinwi.test']);
   await db.query("UPDATE public.users SET role='admin',status='active' WHERE id=$1", [ids.admin]);
   await db.query("UPDATE public.users SET role='admin',status='suspended' WHERE id=$1", [ids.suspended]);
@@ -42,7 +43,10 @@ test('anonymous catalogue exposes only active names, addresses and main photos, 
   const rows = (await asRole('anon',null,'SELECT * FROM get_public_place_cards()')).rows;
   assert.equal(rows.length,1);
   assert.equal(rows[0].id,ids.place);
-  assert.deepEqual(Object.keys(rows[0]).sort(),['address','id','image_url','name']);
+  assert.deepEqual(Object.keys(rows[0]).sort(),['address','description','id','image_url','name','type','zone']);
+  assert.equal(rows[0].type,'library');
+  assert.equal(rows[0].description,'Información solo para cuentas');
+  for (const field of ['hours','wifi','outlets','price_per_hour','latitude','longitude','created_by']) assert.ok(!(field in rows[0]));
   assert.equal(rows[0].image_url,'https://example.test/main.jpg');
   assert.equal(rows[0].address,'Direcci\u00f3n de la ficha');
   await assert.rejects(asRole('anon',null,'SELECT * FROM get_public_map_pins()'), /permission denied/);
@@ -101,7 +105,7 @@ test('public cards paginate all active places, cap page size and omit unpublishe
     }
     assert.equal(rows.length,206);
     assert.equal(new Set(rows.map(row=>row.id)).size,206);
-    assert.ok(rows.every(row=>Object.keys(row).length===4));
+    assert.ok(rows.every(row=>Object.keys(row).length===7));
     assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,500)')).rows.length,100);
     assert.equal((await asRole('anon',null,'SELECT * FROM get_public_place_cards(NULL,0)')).rows.length,1);
   } finally { await db.exec('ROLLBACK;'); }

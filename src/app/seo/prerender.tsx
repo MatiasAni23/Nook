@@ -6,14 +6,16 @@ import { LegalDocumentPage } from "../features/auth/LegalDocumentPage";
 import type { PublicPlaceCard } from "../services/publicPlaceCatalog";
 import { getPublicPlacePath } from "./siteSeo";
 import { PublicCatalogProvider } from "../features/landing/PublicCatalogContext";
-import { PublicDirectory, PublicPageFrame, PublicPlaceContent } from "../features/public-places/PublicPlacePage";
+import { PublicCollectionContent, PublicDirectory, PublicPageFrame, PublicPlaceContent } from "../features/public-places/PublicPlacePage";
+import { getPublicCollections } from "./publicPlaceDiscovery";
 
 /** Build-time rendering only. The caller supplies the minimal public catalogue; effects and Auth never run. */
 export function renderPublicPage(path: string, places: PublicPlaceCard[] = []): string {
   const place = places.find(place => getPublicPlacePath(place) === path);
+  const collection = getPublicCollections(places).find(collection => collection.path === path);
   const page = path === "/" ? <LandingPage onPlaceOpen={() => undefined} /> : path === "/terminos" ? <LegalDocumentPage document="terms" />
     : path === "/privacidad" ? <LegalDocumentPage document="privacy" /> : path === "/lugares" ? <PublicDirectory />
-      : place ? <PublicPageFrame><PublicPlaceContent place={place} places={places} /></PublicPageFrame> : null;
+      : place ? <PublicPageFrame><PublicPlaceContent place={place} places={places} /></PublicPageFrame> : collection ? <PublicCollectionContent collection={collection} places={places} /> : null;
   if (!page) throw new Error("Only reviewed public routes can be prerendered");
   return renderToString(<CurrentUserProvider><StaticRouter location={path}><PublicCatalogProvider initialPlaces={places}>{page}</PublicCatalogProvider></StaticRouter></CurrentUserProvider>);
 }

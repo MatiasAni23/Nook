@@ -6,7 +6,7 @@ let server, chat, profiles;
 const originalFetch = globalThis.fetch;
 const id = '50000000-0000-4000-8000-000000000001';
 before(async () => {
-  server = await createServer({ server: { middlewareMode: true, hmr: { port: 24680 } }, define: {
+  server = await createServer({ cacheDir: 'node_modules/.vite-tests-profiles', server: { middlewareMode: true, hmr: { port: 24680 } }, define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify('http://127.0.0.1:9'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify('test-key'),
   }});

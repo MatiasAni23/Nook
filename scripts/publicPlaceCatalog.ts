@@ -14,9 +14,11 @@ export async function loadPublicPlaceCatalog(environment: Record<string, string>
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) throw new Error("public_catalog_unavailable");
-      return response.json() as Promise<unknown>;
+      const rows: unknown = await response.json();
+      if (!Array.isArray(rows) || rows.some(row => !row || typeof row !== "object" || !["type", "zone", "description"].every(field => field in row))) throw new Error("public_catalog_migration_required");
+      return rows;
     });
   } catch {
-    throw new Error("No se pudo prerenderizar el catálogo público. Comprueba la conexión y aplica 202610210003_public_place_card_addresses.sql antes de compilar. No se generará una landing con lugares incompletos.");
+    throw new Error("No se pudo prerenderizar el catálogo público. Comprueba la conexión y aplica 202610240001_public_place_editorial.sql antes de compilar. No se generará una landing con lugares incompletos.");
   }
 }

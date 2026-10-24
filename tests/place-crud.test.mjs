@@ -46,6 +46,7 @@ const response = (body, status = 200) =>
 
 before(async () => {
   server = await createServer({
+    cacheDir: 'node_modules/.vite-tests-place-crud',
     optimizeDeps: { noDiscovery: true, include: [] },
     server: { middlewareMode: true, hmr: { port: 24683 } },
     define: {

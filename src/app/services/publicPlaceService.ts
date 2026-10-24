@@ -11,7 +11,7 @@ export const getCachedPublicPlaces = () => snapshot?.places ?? null;
 export function clearPublicPlaceCache() { generation++; snapshot = null; pending = null; }
 
 export async function listPublicPlaces(): Promise<PublicPlaceCard[]> {
-  if (!supabase) return demoPlaces.map(({ id, name, address }) => ({ id, name, address: address.trim() || null, imageUrl: null }));
+  if (!supabase) return demoPlaces.map(({ id, name, address, type, description }) => ({ id, name, address: address.trim() || null, imageUrl: null, type, zone: null, description }));
   const client = supabase;
   if (snapshot && Date.now() - snapshot.time < 300_000) return snapshot.places;
   if (pending) return pending;

@@ -1,9 +1,13 @@
-/** The complete public projection. Never add private place fields to this type. */
+/** Explicitly authorized public fields. Services, schedules and account data remain private. */
+export type PublicPlaceType = "library" | "cafe" | "coworking" | "office" | "meeting_room" | "private_office" | "park";
 export interface PublicPlaceCard {
   id: string;
   name: string;
   address: string | null;
   imageUrl: string | null;
+  type?: PublicPlaceType | null;
+  zone?: string | null;
+  description?: string | null;
 }
 
 export const PUBLIC_PLACE_PAGE_SIZE = 100;
@@ -13,11 +17,15 @@ export function parsePublicPlaceCards(value: unknown): PublicPlaceCard[] {
   if (!Array.isArray(value)) throw new Error("La respuesta de los lugares no es válida.");
   return value.map((row: unknown) => {
     if (!row || typeof row !== "object") throw new Error("La respuesta de los lugares no es válida.");
-    const { id, name, address, image_url, imageUrl } = row as Record<string, unknown>;
+    const { id, name, address, image_url, imageUrl, type, zone, description } = row as Record<string, unknown>;
     if (typeof id !== "string" || !/^[a-zA-Z0-9_-]+$/.test(id) || typeof name !== "string" || !name.trim() || (address != null && typeof address !== "string")) {
       throw new Error("La respuesta de los lugares no es válida.");
     }
     const image = image_url ?? imageUrl;
+    if ((type != null && !["library", "cafe", "coworking", "office", "meeting_room", "private_office", "park"].includes(String(type))) ||
+        (zone != null && typeof zone !== "string") || (description != null && typeof description !== "string")) {
+      throw new Error("La respuesta de los lugares no es válida.");
+    }
     let safeImage: string | null = null;
     if (typeof image === "string" && image) {
       try {
@@ -25,7 +33,9 @@ export function parsePublicPlaceCards(value: unknown): PublicPlaceCard[] {
         if (url.protocol === "https:" && !url.username && !url.password) safeImage = url.href;
       } catch { /* Missing or unsafe images use the neutral placeholder. */ }
     }
-    return { id, name: name.trim(), address: typeof address === "string" ? address.trim() || null : null, imageUrl: safeImage };
+    return { id, name: name.trim(), address: typeof address === "string" ? address.trim() || null : null, imageUrl: safeImage,
+      type: (type as PublicPlaceType | null | undefined) ?? null, zone: typeof zone === "string" ? zone.trim() || null : null,
+      description: typeof description === "string" ? description.trim() || null : null };
   });
 }
 

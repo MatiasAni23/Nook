@@ -7,7 +7,7 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
 before(async()=>{
-  server=await createServer({optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24705}},define:{
+  server=await createServer({cacheDir:'node_modules/.vite-tests-reservation-realtime',optimizeDeps:{noDiscovery:true,include:[]},server:{middlewareMode:true,hmr:{port:24705}},define:{
     'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')
   }});

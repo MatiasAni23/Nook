@@ -8,7 +8,7 @@ const row = () => ({instagram_url:'',facebook_url:'',tiktok_url:'',linkedin_url:
 let database;
 const response = (data,status=200) => new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 before(async () => {
-  server = await createServer({server:{middlewareMode:true,hmr:{port:24685}},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')}});
+  server = await createServer({cacheDir:'node_modules/.vite-tests-public-site',server:{middlewareMode:true,hmr:{port:24685}},define:{'import.meta.env.VITE_SUPABASE_URL':JSON.stringify('http://127.0.0.1:9'),'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':JSON.stringify('test-key')}});
   settings = await server.ssrLoadModule('/src/app/services/siteSettingsService.ts');
   places = await server.ssrLoadModule('/src/app/services/publicPlaceService.ts');
   catalog = await server.ssrLoadModule('/src/app/services/publicPlaceCatalog.ts');
@@ -19,7 +19,7 @@ after(async () => {globalThis.fetch=originalFetch;await server?.close();});
 beforeEach(() => {
   database=row();requests=[];denyWrite=false;failRead=false;
   settings.clearSiteSettingsCache();places.clearPublicPlaceCache();
-  publicRows = [{id:'public-card',name:'Espacio',image_url:'https://example.test/main.jpg',description:'Unexpected private field',address:'Public address',latitude:-33.45}];
+  publicRows = [{id:'public-card',name:'Espacio',image_url:'https://example.test/main.jpg',description:'Public description',type:'library',zone:'Santiago',address:'Public address',latitude:-33.45,wifi:true,hours:'private-hours'}];
   globalThis.fetch = async (target,options={}) => {
     const url=new URL(typeof target==='string' || target instanceof URL ? target : target.url);
     assert.equal(url.origin,'http://127.0.0.1:9','No live backend request is allowed');
@@ -40,7 +40,10 @@ beforeEach(() => {
 test('public cards request only the limited RPC, project name, address and main photo, and reuse their cache',async()=>{
   const [left,right]=await Promise.all([places.listPublicPlaces(),places.listPublicPlaces()]);
   assert.deepEqual(left,right);
-  assert.deepEqual(Object.keys(left[0]).sort(),['address','id','imageUrl','name']);
+  assert.deepEqual(Object.keys(left[0]).sort(),['address','description','id','imageUrl','name','type','zone']);
+  assert.equal(left[0].description,'Public description');
+  assert.equal(left[0].zone,'Santiago');
+  assert.equal(left[0].type,'library');
   assert.equal(left[0].address,'Public address');
   await places.listPublicPlaces();
   assert.equal(requests.length,1);
@@ -48,7 +51,7 @@ test('public cards request only the limited RPC, project name, address and main 
 });
 
 test('public catalogue and SEO loader include all pages without private fields or Auth calls',async()=>{
-  publicRows=Array.from({length:205},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:`Lugar ${index}`,image_url:null,address:'Public address',description:'private'}));
+  publicRows=Array.from({length:205},(_,index)=>({id:`place-${String(index).padStart(4,'0')}`,name:`Lugar ${index}`,image_url:null,address:'Public address',type:'library',zone:'Santiago',description:'Public description',wifi:true,hours:'private-hours'}));
   const result=await places.listPublicPlaces();
   assert.equal(result.length,205);assert.equal(requests.length,3);
   assert.equal(JSON.parse(requests[1].body).after_id,'place-0099');
@@ -61,14 +64,14 @@ test('public catalogue and SEO loader include all pages without private fields o
 test('public catalogue rejects backend failures and invalid rows without manufacturing a demo result',async()=>{
   failRead=true;
   await assert.rejects(places.listPublicPlaces());assert.equal(places.getCachedPublicPlaces(),null);
-  await assert.rejects(buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch),/202610210003/);
+  await assert.rejects(buildCatalog.loadPublicPlaceCatalog({VITE_SUPABASE_URL:'http://127.0.0.1:9',VITE_SUPABASE_PUBLISHABLE_KEY:'test-key'},globalThis.fetch),/202610240001/);
   failRead=false;publicRows=[{id:'bad/id',name:'Invalid',image_url:null}];
   await assert.rejects(places.listPublicPlaces(),/no es válida/);
   assert.equal(places.getCachedPublicPlaces(),null);
 });
 
 test('public snapshot escapes script injection, drops extra fields and rejects unsafe photo URLs',()=>{
-  const rows=catalog.parsePublicPlaceCards([{id:'place',name:'</script><script>alert(1)</script>',image_url:'javascript:alert(1)',address:'Calle </script> 123',description:'hidden'}]);
+  const rows=catalog.parsePublicPlaceCards([{id:'place',name:'</script><script>alert(1)</script>',image_url:'javascript:alert(1)',address:'Calle </script> 123',description:'Descripción </script>',hours:'hidden'}]);
   assert.equal(rows[0].imageUrl,null);assert.equal(rows[0].address,'Calle </script> 123');
   const serialized=catalog.serializePublicPlaceCards(rows);
   assert.ok(!serialized.includes('</script>') && !serialized.includes('hidden'));

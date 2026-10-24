@@ -18,6 +18,18 @@
 .public-place-address h2 { font-size: 11px; font-weight: 700; color: #5d4e70; }
 .public-place-address p { margin-top: 5px; font-size: 16px; line-height: 1.65; overflow-wrap: anywhere; }
 .public-place-intro { color: #50475d; font-size: 14px; line-height: 1.85; }
+.public-place-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.public-place-tags span { padding: 5px 10px; border-radius: 30px; background: #f2edf9; color: #58378c; font-size: 11px; font-weight: 650; }
+.public-place-private-note { margin-top: 14px; color: #5d526c; font-size: 11px; line-height: 1.7; }
+.public-place-source { margin-top: 12px; color: #61536c; font-size: 11px; line-height: 1.8; }
+.public-place-source a { display: inline-flex; align-items: center; gap: 4px; color: #58378c; text-decoration: underline; text-underline-offset: 3px; }
+.public-collection-links { display: flex; flex-wrap: wrap; gap: 12px; margin-block: 8px 24px; }
+.public-collection-links a, .public-collection-nav a { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 10px 15px; border: 1px solid #dfd5ef; border-radius: 22px; color: #58378c; font-size: 12px; }
+.public-collection-links a:hover, .public-collection-nav a:hover { background: #f5f0ff; }
+.public-collection-nav { padding-bottom: 32px; }
+.public-collection-nav h2 { margin-bottom: 16px; font-size: 20px; font-weight: 700; }
+.public-collection-nav > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.public-card-meta { margin-top: 5px; font-size: 11px; color: #61536c; line-height: 1.6; }
 .public-place-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 19px; margin-top: 26px; }
 .public-copy { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; gap: 9px; color: #52358c; font-size: 12px; cursor: pointer; }
 .public-copy-status { min-height: 20px; margin-top: 8px; color: #573e82; font-size: 11px; }
@@ -43,7 +55,7 @@
 .public-footer nav { display: flex; gap: 20px; }
 .public-directory-intro { max-width: 800px; padding-block: 28px 50px; }
 .public-directory-intro h1 { margin-top: 18px; font-size: clamp(34px, 4.9vw, 60px); line-height: 1.08; letter-spacing: -.045em; font-weight: 750; }
-.public-directory-intro > p:last-of-type { max-width: 660px; margin-top: 24px; font-size: 16px; line-height: 1.8; color: #50475d; }
+.public-directory-intro > p:not(.public-eyebrow) { max-width: 660px; margin-top: 24px; font-size: 16px; line-height: 1.8; color: #50475d; }
 .public-directory-intro > a { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; margin-top: 18px; color: #5b32b0; font-weight: 650; font-size: 14px; }
 .public-directory-list { padding-bottom: 70px; }
 .public-directory-list > h2 { margin-bottom: 24px; font-size: 25px; font-weight: 700; }
@@ -91,7 +103,7 @@
   .public-place-card h3 { font-size: 12px; }
   .public-footer { align-items: flex-start; flex-direction: column; }
   .public-directory-intro { padding-block: 15px 38px; }
-  .public-directory-intro > p:last-of-type { font-size: 14px; }
+  .public-directory-intro > p:not(.public-eyebrow) { font-size: 14px; }
   [data-slot="dialog-content"].public-place-modal { width: calc(100vw - 20px); max-height: 94dvh; padding: 0 20px; border-radius: 22px; }
   .public-place-modal .public-place-hero { gap: 22px; }
   .public-place-modal .public-place-info h1 { font-size: 29px; }

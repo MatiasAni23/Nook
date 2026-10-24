@@ -15,6 +15,7 @@ const response = (data, status = 200) =>
 
 before(async () => {
   server = await createServer({
+    cacheDir: 'node_modules/.vite-tests-admin',
     server: { middlewareMode: true, hmr: { port: 24684 } },
     define: {
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("http://127.0.0.1:9"),

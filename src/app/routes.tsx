@@ -13,7 +13,8 @@ import { DelegateLayout } from "./features/delegado/DelegateLayout";
 
 import { Layout } from "./features/shared/Layout";
 import { PublicSiteLayout } from "./features/public-places/PublicSiteLayout";
-import { PublicDirectory, PublicPlaceRoute } from "./features/public-places/PublicPlacePage";
+import { PublicCollectionRoute, PublicDirectory, PublicPlaceRoute } from "./features/public-places/PublicPlacePage";
+import { PUBLIC_PLACE_KINDS } from "./seo/publicPlaceDiscovery";
 import { authLink, destinationAfterLogin, safeAppDestination, verificationLink } from "./features/auth/authNavigation";
 import { getDemoSession, setDemoSession } from "./services/demoSessionService";
 import { isSupabaseConfigured } from "./lib/supabase";
@@ -361,6 +362,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: null },
       { path: "lugares", Component: PublicDirectory },
+      { path: "lugares/:locality", Component: PublicCollectionRoute },
+      ...Object.values(PUBLIC_PLACE_KINDS).map(kind => ({ path: kind.slug + "/:locality?", Component: PublicCollectionRoute })),
       { path: "lugar/:slug", Component: PublicPlaceRoute },
     ],
   },
