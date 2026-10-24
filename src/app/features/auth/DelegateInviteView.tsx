@@ -1,4 +1,5 @@
 import { useEmailCooldown } from "./useEmailCooldown";
+import { getWebAppUrl } from "../../mobile/appUrls";
 import { getPasswordValidationMessage, getPasswordStrength } from "../../lib/passwordPolicy";
 import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
@@ -161,7 +162,7 @@ export function DelegateInviteView() {
         password,
         role: "student",
         captchaToken,
-        emailRedirectTo: `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
+        emailRedirectTo: getWebAppUrl(`/delegate-invite?token=${encodeURIComponent(token)}`),
       });
 
       if (session && user) {
@@ -220,7 +221,7 @@ export function DelegateInviteView() {
     try {
       await resendSignupVerificationCode(
         invitation.email,
-        `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`,
+        getWebAppUrl(`/delegate-invite?token=${encodeURIComponent(token)}`),
         captchaToken,
       );
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");

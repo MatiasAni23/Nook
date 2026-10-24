@@ -2,6 +2,7 @@ import { createAdminDataCache, clearAdminDataCaches } from "./adminDataCache";
 import type { AppPlace } from "./placeService";
 import { clearCurrentUserServiceCaches } from "./currentUserService";
 import { supabase } from "../lib/supabase";
+import { getWebAppUrl } from "../mobile/appUrls";
 
 export type ManagedUserRole = "student" | "worker";
 export type ManagedUserStatus =
@@ -392,7 +393,7 @@ export async function createDelegateInvitation(
   if (error) throw error;
 
   const invitation = toDelegateInvitation(data);
-  const inviteUrl = `${window.location.origin}/delegate-invite?token=${encodeURIComponent(token)}`;
+  const inviteUrl = getWebAppUrl(`/delegate-invite?token=${encodeURIComponent(token)}`);
   delegateInvitationCache.set(token, { timestamp: Date.now(), invitation });
 
   let emailSent = false;

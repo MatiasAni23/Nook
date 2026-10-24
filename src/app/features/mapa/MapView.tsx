@@ -22,6 +22,7 @@ import { getDetailNavigationState } from "./navigationState";
 import { getPlacePinAsset } from "./placePinAssets";
 import { cleanMapStyles } from "./mapStyles";
 import { sortPlacesByDistance } from "./proximity";
+import { useDeviceLocation } from "../shared/useDeviceLocation";
 import "./map.css";
 
 // Configuracion base del mapa y del rol activo.
@@ -30,10 +31,8 @@ const getUserRole = (): 'student' | 'worker' | 'admin' => {
 };
 
 const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-const googleGeolocationUrl = "https://www.googleapis.com/geolocation/v1/geolocate";
 const defaultMapCenter = { lat: -33.4569, lng: -70.6483 };
 
-type UserLocationSource = "browser" | "google";
 type Coordinates = typeof defaultMapCenter;
 type SavedMapCamera = {
   center: Coordinates;
@@ -104,11 +103,7 @@ export function MapView() {
   const [placesError, setPlacesError] = useState("");
 
   // Ubicacion del usuario y control de recentrado del mapa.
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [hasResolvedUserLocation, setHasResolvedUserLocation] = useState(false);
-  const [userLocationSource, setUserLocationSource] = useState<UserLocationSource | null>(null);
-  const [isLocatingUser, setIsLocatingUser] = useState(false);
-  const [locationError, setLocationError] = useState("");
+  const { coordinates: userLocation, error: locationError, isLocating: isLocatingUser, requestLocation } = useDeviceLocation();
   const [userRecenterRequest, setUserRecenterRequest] = useState<RecenterRequest | null>(null);
   const [fallbackMapCenter, setFallbackMapCenter] = useState<Coordinates>(
     savedMapCamera?.center ?? defaultMapCenter,
@@ -117,145 +112,16 @@ export function MapView() {
   // Estado tactil del bottom sheet.
   const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(true);
   const [startY, setStartY] = useState(0);
-  const hasRequestedGoogleFallbackRef = useRef(false);
   const isDraggingSheetRef = useRef(false);
   const trackedHomeImpressionsRef = useRef(new Set<string>());
 
-  // Normaliza ubicaciones obtenidas por navegador o por Google Geolocation.
-  const applyUserCoordinates = (coords: Coordinates, source: UserLocationSource, shouldCenterMap = false) => {
-    setUserLocation(coords);
-    setUserLocationSource(source);
-    setHasResolvedUserLocation(true);
-    setLocationError("");
-    setIsLocatingUser(false);
-
-    if (shouldCenterMap) {
-      savedMapCamera = {
-        center: coords,
-        zoom: savedMapCamera?.zoom ?? 15,
-      };
-      setFallbackMapCenter(coords);
-      setUserRecenterRequest({ center: coords, id: Date.now() });
-    }
+  const requestUserLocation = async () => {
+    const coords = await requestLocation();
+    if (!coords) return;
+    savedMapCamera = { center: coords, zoom: savedMapCamera?.zoom ?? 15 };
+    setFallbackMapCenter(coords);
+    setUserRecenterRequest({ center: coords, id: Date.now() });
   };
-
-  const applyUserPosition = (position: GeolocationPosition, shouldCenterMap = false) => {
-    hasRequestedGoogleFallbackRef.current = false;
-    applyUserCoordinates(
-      {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      },
-      "browser",
-      shouldCenterMap,
-    );
-  };
-
-  // Fallback aproximado cuando el navegador no entrega ubicacion precisa.
-  const requestGoogleApproximateLocation = async (shouldCenterMap = false) => {
-    if (!googleMapsApiKey) {
-      setLocationError("No se pudo obtener tu ubicacion.");
-      setIsLocatingUser(false);
-      return;
-    }
-
-    try {
-      const response = await fetch(`${googleGeolocationUrl}?key=${googleMapsApiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ considerIp: true }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Google Geolocation no disponible.");
-      }
-
-      const data = await response.json();
-      const lat = data?.location?.lat;
-      const lng = data?.location?.lng;
-
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        throw new Error("Google Geolocation no devolvio coordenadas.");
-      }
-
-      applyUserCoordinates({ lat, lng }, "google", shouldCenterMap);
-    } catch {
-      setHasResolvedUserLocation(false);
-      setUserLocationSource(null);
-      setIsLocatingUser(false);
-      setLocationError("No se pudo obtener tu ubicacion. Activa permisos del navegador o Geolocation API en GCP.");
-    }
-  };
-
-  const handleLocationError = (
-    error?: GeolocationPositionError,
-    allowGoogleFallback = true,
-    shouldCenterFallback = false,
-  ) => {
-    if (allowGoogleFallback && !hasRequestedGoogleFallbackRef.current) {
-      hasRequestedGoogleFallbackRef.current = true;
-      requestGoogleApproximateLocation(shouldCenterFallback);
-      return;
-    }
-
-    setUserLocationSource(null);
-    setHasResolvedUserLocation(false);
-    setIsLocatingUser(false);
-
-    if (error?.code === 1) {
-      setLocationError("Permiso de ubicacion bloqueado en el navegador.");
-      return;
-    }
-
-    setLocationError("No se pudo obtener tu ubicacion.");
-  };
-
-  // Solicitud manual desde el boton de localizar.
-  const requestUserLocation = () => {
-    hasRequestedGoogleFallbackRef.current = false;
-
-    if (!navigator.geolocation) {
-      setIsLocatingUser(true);
-      requestGoogleApproximateLocation(true);
-      return;
-    }
-
-    setIsLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => applyUserPosition(position, true),
-      (error) => handleLocationError(error, true, true),
-      {
-        enableHighAccuracy: true,
-        maximumAge: 30_000,
-        timeout: 12_000,
-      },
-    );
-  };
-
-  // Mantiene actualizada la ubicacion mientras la vista esta montada.
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setIsLocatingUser(true);
-      requestGoogleApproximateLocation();
-      return;
-    }
-
-    setIsLocatingUser(true);
-
-    const watchId = navigator.geolocation.watchPosition(
-      applyUserPosition,
-      (error) => handleLocationError(error),
-      {
-        enableHighAccuracy: true,
-        maximumAge: 60_000,
-        timeout: 10_000,
-      },
-    );
-
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, []);
 
   // Carga lugares reales desde Supabase; si no esta configurado, se usan mocks.
   useEffect(() => {
@@ -535,10 +401,10 @@ export function MapView() {
             <LocateFixed className={"size-5" + (isLocatingUser ? " animate-pulse" : "")} aria-hidden="true" />
           </button>
           {locationError && <p className="map-location-error" role="status">{locationError}</p>}
-          {hasResolvedUserLocation && !locationError && (
+          {userLocation && !locationError && (
             <span className="map-location-status">
               <span aria-hidden="true" />
-              {userLocationSource === "google" ? "Ubicación aproximada" : "Ubicación activa"}
+              Ubicación activa
             </span>
           )}
         </div>

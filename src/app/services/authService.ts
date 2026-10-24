@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { getPasswordValidationMessage } from "../lib/passwordPolicy";
 import { normalizeAuthCode, normalizeAuthEmail, requireCaptcha } from "../lib/authSecurity";
 import { withEmailCooldown } from "./authAttemptService";
+import { getWebAppUrl } from "../mobile/appUrls";
 
 export type UserRole = "student" | "worker" | "admin" | "delegate";
 
@@ -94,7 +95,7 @@ export async function sendPasswordRecoveryCode(email: string, captchaToken?: str
   const normalizedEmail = normalizeAuthEmail(email);
   requireCaptcha(captchaToken);
   const { error } = await withEmailCooldown(normalizedEmail, () => client.auth.resetPasswordForEmail(normalizedEmail, {
-    redirectTo: `${window.location.origin}/recover-password`,
+    redirectTo: getWebAppUrl('/recover-password'),
     captchaToken,
   }));
 
@@ -111,7 +112,7 @@ export async function resendSignupVerificationCode(email: string, emailRedirectT
     type: "signup",
     email: normalizedEmail,
     options: {
-      emailRedirectTo: emailRedirectTo ?? `${window.location.origin}/verify-account`,
+      emailRedirectTo: emailRedirectTo ?? getWebAppUrl('/verify-account'),
       captchaToken,
     },
   }));

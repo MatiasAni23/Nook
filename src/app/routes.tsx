@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation, useSearchParams } from "react-router";
+import { getWebAppUrl } from "./mobile/appUrls";
 import { AdminHome } from "./features/admin/AdminHome";
 import { AdminLayout } from "./features/admin/AdminLayout";
 import { AdminManagement } from "./features/admin/AdminManagement";
@@ -265,7 +266,7 @@ function AuthWrapper() {
       return { email, needsEmailVerification: false };
     }
 
-    const { user, session } = await signUpWithEmail({ name, email, phone, password, captchaToken, emailRedirectTo: window.location.origin + verificationLink(params.get("continuar")) });
+    const { user, session } = await signUpWithEmail({ name, email, phone, password, captchaToken, emailRedirectTo: getWebAppUrl(verificationLink(params.get("continuar"))) });
 
     if (!user) {
       throw new Error("No se pudo crear la cuenta.");

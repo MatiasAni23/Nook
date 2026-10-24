@@ -10,9 +10,27 @@
     "typecheck": "tsc --noEmit",
     "emails:generate": "node scripts/generate-email-templates.mjs",
     "seo:check": "node scripts/check-seo-build.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "dev:phone": "vite --host 0.0.0.0",
+    "build:mobile": "vite build --mode mobile",
+    "mobile:icons": "node scripts/generate-mobile-icons.mjs",
+    "mobile:sync": "npm run build:mobile && cap sync",
+    "android:sync": "npm run build:mobile && cap sync android",
+    "android:open": "cap open android",
+    "android:apk": "npm run android:sync && node scripts/android-apk.mjs",
+    "android:run": "npm run android:sync && cap run android",
+    "ios:sync": "npm run build:mobile && cap sync ios",
+    "ios:open": "cap open ios",
+    "ios:run": "npm run ios:sync && cap run ios",
+    "preview:phone": "vite preview --host 0.0.0.0 --port 4173"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/geolocation": "^8.2.4",
+    "@capacitor/ios": "^8.5.3",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",
@@ -74,7 +92,9 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@electric-sql/pglite": "^0.5.8",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "4.1.12",
     "@types/node": "^26.6.4",
     "@types/react": "18.3.18",

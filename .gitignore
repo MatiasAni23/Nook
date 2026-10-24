@@ -6,6 +6,7 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-mobile/
 web-build/
 expo-env.d.ts
 
@@ -13,6 +14,7 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
@@ -49,6 +51,18 @@ supabase/schema/private/
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# Native projects are source; build products, machine paths and signing stay local.
+android/.gradle/
+android/.idea/
+android/local.properties
+android/**/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/Pods/
+ios/App/DerivedData/
+ios/**/xcuserdata/
+ios/capacitor-cordova-ios-plugins/

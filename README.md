@@ -47,6 +47,26 @@ Compilar para revisar que el proyecto no tenga errores de build:
 npm run build
 ```
 
+## Android e iPhone
+
+Capacitor 8 comparte la interfaz y Supabase con la web. Los proyectos nativos están en `android/` e `ios/`; el paquete móvil usa `dist-mobile/`. La compilación web y su SEO conservan `npm run build`.
+
+Para Android, instala Android Studio 2025.2.1 o posterior, SDK 36 y un JDK 21 compatible. Configura `ANDROID_HOME` y `JAVA_HOME` si las herramientas no los detectan. En esta copia hay un JDK portátil local que el script del APK detecta sin modificar Java del sistema.
+
+```bash
+npm ci
+npm run android:apk
+npm run android:open
+```
+
+`android:apk` compila y deja `docs-local/mobile/apk/Pinwi-0.1.0-debug.apk`, listo para enviar a un teléfono Android. Es una versión de prueba firmada con la clave debug local. Para ejecutar por USB, activa depuración USB y usa Android Studio o `npm run android:run`. Tras cambiar el frontend, vuelve a ejecutar `npm run android:sync` antes de compilar desde Android Studio. No regeneres las carpetas nativas con `cap add`: ya contienen permisos, iconos y ajustes de Pinwi.
+
+Para iOS, copia/clona el proyecto en un Mac con Xcode 26+, ejecuta `npm ci`, `npm run ios:sync` y `npm run ios:open`. Selecciona tu equipo de firma y el iPhone en Xcode y pulsa Run. El proyecto usa Swift Package Manager. El USB sirve para instalar/depurar desde Xcode; Windows no compila iOS. Un servicio remoto con macOS puede compilar una versión firmada para TestFlight, pero no transforma Windows en Xcode ni se configuró una cuenta de distribución.
+
+También puedes probar la web desde Safari: `npm run build` y `npm run preview:phone`, abrir la dirección de red del equipo en el iPhone conectado a la misma Wi-Fi. Para añadirla como aplicación de pantalla de inicio usa un sitio HTTPS y Safari → Compartir → Añadir a pantalla de inicio → Abrir como app web. El manifiesto y los iconos están preparados; requiere conexión, sin almacenamiento offline de datos privados.
+
+La web solicita ubicación al abrir Mapa o Descubrir después de iniciar sesión; la portada no la pide. Los permisos nativos se solicitan desde los botones de ubicación. Ambas vistas muestran errores y permiten reintentar, sin inferir la ubicación por IP. En Safari, revisa el permiso del sitio y Localización de iOS si no aparece el aviso: una página no puede forzarlo cuando está denegado. El login mantiene contraseña y códigos OTP por correo. Los enlaces de correo/invitación apuntan a `https://www.pinwi.cl`, y los enlaces externos abren el navegador del sistema. Comprueba Maps y Turnstile con las restricciones de origen de sus claves en el teléfono antes de distribuir. El APK inicial no incluye push cuando la app está cerrada.
+
 ## Supabase
 
 El frontend usa `@supabase/supabase-js`.

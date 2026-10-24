@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowUpRight, Bell, Building2, Map, MapPin, Plug, Search, Star, Wifi } from "lucide-react";
 import { BrandLogo } from "../../components/BrandLogo";
 import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
@@ -52,13 +52,14 @@ interface DiscoverDesktopProps {
   recommendedPlaces: AppPlace[];
   userLocation: Coordinates | null;
   placesError: string;
+  locationNotice?: ReactNode;
   onOpenPlace: (place: AppPlace) => void;
   onOpenProfile: () => void;
   onOpenMap: () => void;
   onOpenNotifications: () => void;
 }
 
-export function DiscoverDesktop({ name, profileImageUrl, isWorker, unreadCount, searchTerm, onSearchChange, places, recommendedPlaces, userLocation, placesError, onOpenPlace, onOpenProfile, onOpenMap, onOpenNotifications }: DiscoverDesktopProps) {
+export function DiscoverDesktop({ name, profileImageUrl, isWorker, unreadCount, searchTerm, onSearchChange, places, recommendedPlaces, userLocation, placesError, locationNotice, onOpenPlace, onOpenProfile, onOpenMap, onOpenNotifications }: DiscoverDesktopProps) {
   const [category, setCategory] = useState("all");
   const results = places.filter(place => placeMatchesTab(place, category));
   const isFiltered = Boolean(searchTerm.trim()) || category !== "all";
@@ -95,6 +96,7 @@ export function DiscoverDesktop({ name, profileImageUrl, isWorker, unreadCount, 
       </section>
 
       {placesError && <p className="discover-desktop-error" role="alert">{placesError}</p>}
+      {locationNotice}
 
       {!isFiltered && recommendedPlaces.length > 0 && (
         <section className="discover-desktop-recommendations" aria-labelledby="discover-recommended-heading">

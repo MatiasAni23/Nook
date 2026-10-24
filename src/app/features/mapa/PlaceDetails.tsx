@@ -1,4 +1,5 @@
 import { getSafeWebsiteUrl } from "../../lib/externalUrl";
+import { openExternalUrl } from "../../mobile/externalNavigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import {
@@ -427,7 +428,7 @@ export function PlaceDetails() {
         ? `${place.lat},${place.lng}`
         : address ?? "";
     const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
-    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+    void openExternalUrl(mapsUrl).catch(() => window.alert('No se pudo abrir el mapa. Intenta nuevamente.'));
   };
 
   const renderRatingDots = (value?: number | null) => {

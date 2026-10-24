@@ -1,4 +1,5 @@
 import { useEmailCooldown } from "./useEmailCooldown";
+import { getWebAppUrl } from "../../mobile/appUrls";
 import { AuthCaptcha, isAuthCaptchaEnabled } from "./AuthCaptcha";
 import { BrandLogo } from "../../components/BrandLogo";
 import { AuthBackground } from "./AuthBackground";
@@ -76,7 +77,7 @@ export function VerifyAccountView() {
     setSuccessMessage("");
 
     try {
-      await resendSignupVerificationCode(email.trim(), window.location.origin + verificationLink(searchParams.get("continuar")), captchaToken);
+      await resendSignupVerificationCode(email.trim(), getWebAppUrl(verificationLink(searchParams.get("continuar"))), captchaToken);
       setSuccessMessage("Te enviamos un nuevo codigo de verificacion.");
     } catch (error) {
       setErrorMessage(getVerificationErrorMessage(error));

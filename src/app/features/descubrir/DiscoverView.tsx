@@ -24,8 +24,10 @@ import { getDetailNavigationState } from "../mapa/navigationState";
 import { DiscoverSkeleton } from "./DiscoverSkeleton";
 import { DiscoverBackground } from "./DiscoverBackground";
 import { DiscoverDesktop, DiscoverDesktopSkeleton } from "./DiscoverDesktop";
-import { getDistanceInKm, sortPlacesByDistance, type Coordinates } from "../mapa/proximity";
+import { getDistanceInKm, sortPlacesByDistance } from "../mapa/proximity";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "../../components/ui/carousel";
+import { useDeviceLocation } from "../shared/useDeviceLocation";
+import { DiscoverLocationNotice } from "./DiscoverLocationNotice";
 
 // Helpers de presentacion para normalizar datos antes de mostrarlos.
 function getAmenityLabel(key?: string, name?: string) {
@@ -50,7 +52,7 @@ export function DiscoverView() {
   const [dbPlaces, setDbPlaces] = useState<AppPlace[]>(() => isSupabaseConfigured ? getCachedPlaces() ?? [] : []);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(() => isSupabaseConfigured && !getCachedPlaces());
   const [placesError, setPlacesError] = useState("");
-  const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
+  const { coordinates: userLocation, error: locationError, isLocating, requestLocation } = useDeviceLocation();
   const [recommendedCarouselApi, setRecommendedCarouselApi] = useState<CarouselApi | null>(null);
   const [unreadCount, setUnreadCount] = useState(
     isSupabaseConfigured ? 0 : mockNotifications.filter((notification) => !notification.read).length,
@@ -97,24 +99,6 @@ export function DiscoverView() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  // Descubrir usa la ubicación del dispositivo para ordenar "Cerca de ti".
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      () => undefined,
-      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 10_000 },
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   // Mantiene actualizado el contador del boton de notificaciones.
@@ -234,6 +218,7 @@ export function DiscoverView() {
             recommendedPlaces={recommendedPlaces}
             userLocation={userLocation}
             placesError={placesError}
+            locationNotice={<DiscoverLocationNotice hasLocation={Boolean(userLocation)} isLocating={isLocating} error={locationError} onRequest={() => { void requestLocation(); }} />}
             onOpenPlace={place => navigate(place.category === "work" ? `/app/workplace/${place.id}` : `/app/place/${place.id}`, { state: getDetailNavigationState("/app/discover") })}
             onOpenProfile={() => navigate("/app/profile")}
             onOpenMap={() => navigate("/app")}
@@ -300,6 +285,8 @@ export function DiscoverView() {
             </div>
           )}
         </div>
+
+        <div className="px-4"><DiscoverLocationNotice hasLocation={Boolean(userLocation)} isLocating={isLocating} error={locationError} onRequest={() => { void requestLocation(); }} /></div>
 
         {/* Banner editorial destacado de la pantalla Descubrir. */}
         {/* Selección temporal de espacios recomendados. */}

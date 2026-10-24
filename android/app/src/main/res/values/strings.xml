@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pinwi</string>
+    <string name="title_activity_main">Pinwi</string>
+    <string name="package_name">cl.pinwi.app</string>
+    <string name="custom_url_scheme">cl.pinwi.app</string>
+</resources>

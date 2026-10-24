@@ -23,6 +23,7 @@ function figmaAssetResolver(): Plugin {
 
 export default defineConfig(({ mode }) => {
   assertPublicEnvironment(loadEnv(mode, projectDirectory, 'VITE_'))
+  const mobile = mode === 'mobile'
   return {
   plugins: [
     figmaAssetResolver(),
@@ -30,8 +31,12 @@ export default defineConfig(({ mode }) => {
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
-    seoPlugin(),
+    // Native bundles start locally and must not prerender/download the public catalog.
+    ...(mobile ? [{ name: 'mobile-document', transformIndexHtml: (html: string) =>
+      html.replace('<!-- pinwi:seo -->', '<title>Pinwi</title><meta name="robots" content="noindex, nofollow" />'),
+    }] : [seoPlugin()]),
   ],
+  build: { outDir: mobile ? 'dist-mobile' : 'dist' },
   resolve: {
     alias: {
       // Alias @ to the src directory
