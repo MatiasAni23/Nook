@@ -12,10 +12,41 @@ const seo = module.exports;
 test('the sitemap contains only reviewed indexable public canonicals, with no invented dates', () => {
   const xml = seo.renderSitemap();
   const urls = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map(match => match[1]);
-  assert.deepEqual(urls, ['https://www.pinwi.cl/']);
+  assert.deepEqual(urls, ['https://www.pinwi.cl/', 'https://www.pinwi.cl/lugares']);
   assert.equal(new Set(urls).size, urls.length);
   assert.ok(!xml.includes('<lastmod>'));
   assert.ok(!xml.includes('/app') && !xml.includes('/admin') && !xml.includes('/delegate'));
+});
+
+test('public place URLs and metadata are distinct, minimal and truthful', () => {
+  const places = [
+    { id: 'public-a', name: 'Biblioteca de Ñuñoa', address: 'Irarrázaval 123, Ñuñoa', imageUrl: 'https://example.test/main.png' },
+    { id: 'public-b', name: 'Biblioteca de Ñuñoa', address: null, imageUrl: null },
+  ];
+  const paths = places.map(seo.getPublicPlacePath);
+  assert.notEqual(paths[0], paths[1]);
+  assert.match(paths[0], /^\/lugar\/biblioteca-de-nunoa-public-a$/);
+  assert.equal([...seo.renderSitemap(places).matchAll(/<loc>/g)].length, 4);
+  for (const [index, place] of places.entries()) {
+    const page = seo.getPageSeo(paths[index], places);
+    assert.equal(page.indexable, true);
+    assert.equal(page.canonical, seo.SITE_ORIGIN + paths[index]);
+    assert.ok(page.title.includes(place.name));
+    const graph = page.schema['@graph'];
+    const entity = graph.find(entity => entity['@type'] === 'Place');
+    assert.equal(entity.name, place.name);
+    assert.equal(entity.address, place.address ?? undefined);
+    assert.equal(entity.image, place.imageUrl ?? undefined);
+    assert.equal(graph.find(entity => entity['@type'] === 'BreadcrumbList').itemListElement.length, 3);
+    for (const field of ['geo', 'openingHours', 'priceRange', 'aggregateRating', 'telephone', 'amenityFeature']) assert.ok(!(field in entity));
+    assert.ok(seo.renderSeoHead(page).includes(place.imageUrl ?? seo.SOCIAL_IMAGE));
+  }
+  assert.equal(seo.getPageSeo('/lugar/no-publicado', places).indexable, false);
+  assert.equal(seo.getPageSeo(paths[0], []).canonical, undefined);
+  const hostile = { id: 'public-x', name: '</script><script>bad()</script>', address: '" onload="bad', imageUrl: null };
+  const head = seo.renderSeoHead(seo.getPublicPlaceSeo(hostile));
+  assert.ok(!head.includes('<script>bad()'));
+  assert.ok(head.includes('\\u003c/script>'));
 });
 
 test('auth, private records, legal drafts and unknown paths never inherit indexable homepage metadata', () => {

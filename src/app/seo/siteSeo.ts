@@ -1,3 +1,5 @@
+import type { PublicPlaceCard } from "../services/publicPlaceCatalog";
+
 export const SITE_ORIGIN = "https://www.pinwi.cl";
 export const SITE_NAME = "Pinwi";
 export const SOCIAL_IMAGE = SITE_ORIGIN + "/social/pinwi-preview-v1.jpg";
@@ -11,14 +13,22 @@ export interface PageSeo {
   canonical?: string;
   structuredData?: boolean;
   lastModified?: string;
+  image?: string;
+  imageAlt?: string;
+  schema?: Record<string, unknown>;
 }
 
 // Only reviewed public pages belong here. Legal documents remain accessible, but unindexed.
 export const PUBLIC_PAGES: readonly PageSeo[] = [
   {
     path: "/", title: "Pinwi | Espacios para estudiar y trabajar en Chile",
-    description: "Encuentra tu espacio para estudiar y trabajar en Chile. Descubre fotos de bibliotecas, cafés y coworking, y crea tu cuenta para conocer sus detalles.",
+    description: "Descubre bibliotecas, cafés para estudiar y coworking en Chile. Consulta fotos y direcciones, y entra a Pinwi para explorar horarios y servicios.",
     indexable: true, canonical: SITE_ORIGIN + "/", structuredData: true,
+  },
+  {
+    path: "/lugares", title: "Bibliotecas, cafés para estudiar y coworking en Chile | Pinwi",
+    description: "Explora lugares para estudiar y trabajar en Chile. Conoce el nombre, la foto y la dirección de cada espacio; consulta sus demás detalles con tu cuenta.",
+    indexable: true, canonical: SITE_ORIGIN + "/lugares", structuredData: true,
   },
   {
     path: "/terminos", title: "Términos y condiciones | Pinwi",
@@ -39,10 +49,47 @@ const authTitles: Record<string, string> = {
   "/delegate-invite": "Invitación de delegado | Pinwi",
 };
 
-export function getPageSeo(pathname: string): PageSeo {
+/** The immutable ID prevents collisions between venues with the same name. */
+export function getPublicPlacePath(place: PublicPlaceCard): string {
+  const slug = place.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").slice(0, 90).replace(/^-|-$/g, "") || "espacio";
+  return "/lugar/" + slug + "-" + place.id;
+}
+
+export function getPublicPages(places: readonly PublicPlaceCard[] = []): PageSeo[] {
+  return [...PUBLIC_PAGES, ...places.map(getPublicPlaceSeo)];
+}
+
+export function getPublicPlaceSeo(place: PublicPlaceCard): PageSeo {
+  const path = getPublicPlacePath(place), canonical = SITE_ORIGIN + path;
+  const description = `${place.name}${place.address ? ": " + place.address : " en Pinwi"}. Consulta su foto y dirección. Inicia sesión para conocer horarios, servicios y más detalles.`;
+  return {
+    path, canonical, title: place.name + ": dirección y foto | Pinwi", description, indexable: true, structuredData: true,
+    ...(place.imageUrl ? { image: place.imageUrl, imageAlt: "Foto principal de " + place.name } : {}),
+    schema: {
+      "@context": "https://schema.org", "@graph": [
+        ...getStructuredData()["@graph"],
+        { "@type": "WebPage", "@id": canonical, url: canonical, name: place.name, description, inLanguage: "es-CL", isPartOf: { "@id": SITE_ORIGIN + "/#website" }, mainEntity: { "@id": canonical + "#place" }, breadcrumb: { "@id": canonical + "#breadcrumbs" } },
+        { "@type": "Place", "@id": canonical + "#place", name: place.name, url: canonical,
+          ...(place.address ? { address: place.address } : {}), ...(place.imageUrl ? { image: place.imageUrl } : {}) },
+        { "@type": "BreadcrumbList", "@id": canonical + "#breadcrumbs", itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_ORIGIN + "/" },
+          { "@type": "ListItem", position: 2, name: "Lugares", item: SITE_ORIGIN + "/lugares" },
+          { "@type": "ListItem", position: 3, name: place.name, item: canonical },
+        ] },
+      ],
+    },
+  };
+}
+
+export function getPageSeo(pathname: string, places: readonly PublicPlaceCard[] = []): PageSeo {
   const path = pathname.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
   const publicPage = PUBLIC_PAGES.find(page => page.path === path);
   if (publicPage) return publicPage;
+  if (path.startsWith("/lugar/")) {
+    const place = places.find(place => getPublicPlacePath(place) === path);
+    if (place) return getPublicPlaceSeo(place);
+  }
   const prefix = path.split("/")[1];
   const title = authTitles[path] ?? (prefix === "admin" ? "Administración | Pinwi"
     : prefix === "delegate" ? "Panel de delegado | Pinwi"
@@ -72,6 +119,7 @@ export const SEO_START = "<!-- pinwi:seo:start -->";
 export const SEO_END = "<!-- pinwi:seo:end -->";
 export function renderSeoHead(page: PageSeo): string {
   const meta = (name: string, content: string, property = false) => `<meta ${property ? "property" : "name"}="${name}" content="${escapeHtml(content)}">`;
+  const image = page.image ?? SOCIAL_IMAGE, imageAlt = page.imageAlt ?? SOCIAL_IMAGE_ALT;
   return [
     SEO_START,
     `<title>${escapeHtml(page.title)}</title>`,
@@ -80,10 +128,10 @@ export function renderSeoHead(page: PageSeo): string {
     meta("og:type", "website", true), meta("og:site_name", SITE_NAME, true), meta("og:locale", "es_CL", true),
     ...(page.canonical ? [meta("og:url", page.canonical, true)] : []),
     meta("og:title", page.title, true), meta("og:description", page.description, true),
-    meta("og:image", SOCIAL_IMAGE, true), meta("og:image:secure_url", SOCIAL_IMAGE, true),
-    meta("og:image:type", "image/jpeg", true), meta("og:image:width", "1200", true), meta("og:image:height", "630", true), meta("og:image:alt", SOCIAL_IMAGE_ALT, true),
-    meta("twitter:card", "summary_large_image"), meta("twitter:title", page.title), meta("twitter:description", page.description), meta("twitter:image", SOCIAL_IMAGE), meta("twitter:image:alt", SOCIAL_IMAGE_ALT),
-    ...(page.structuredData ? [`<script id="pinwi-structured-data" type="application/ld+json">${JSON.stringify(getStructuredData()).replace(/</g, "\\u003c")}</script>`] : []),
+    meta("og:image", image, true), meta("og:image:secure_url", image, true),
+    ...(!page.image ? [meta("og:image:type", "image/jpeg", true), meta("og:image:width", "1200", true), meta("og:image:height", "630", true)] : []), meta("og:image:alt", imageAlt, true),
+    meta("twitter:card", "summary_large_image"), meta("twitter:title", page.title), meta("twitter:description", page.description), meta("twitter:image", image), meta("twitter:image:alt", imageAlt),
+    ...(page.structuredData ? [`<script id="pinwi-structured-data" type="application/ld+json">${JSON.stringify(page.schema ?? getStructuredData()).replace(/</g, "\\u003c")}</script>`] : []),
     SEO_END,
   ].join("\n");
 }
@@ -94,8 +142,8 @@ export function replaceSeoHead(html: string, page: PageSeo): string {
   return html.slice(0, start) + renderSeoHead(page) + html.slice(end + SEO_END.length);
 }
 
-export function renderSitemap(): string {
-  const entries = PUBLIC_PAGES.filter(page => page.indexable).map(page => {
+export function renderSitemap(places: readonly PublicPlaceCard[] = []): string {
+  const entries = getPublicPages(places).filter(page => page.indexable).map(page => {
     if (!page.canonical || !page.canonical.startsWith(SITE_ORIGIN + "/")) throw new Error("Invalid sitemap canonical");
     return `  <url><loc>${escapeHtml(page.canonical)}</loc>${page.lastModified ? `<lastmod>${escapeHtml(page.lastModified)}</lastmod>` : ""}</url>`;
   });

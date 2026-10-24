@@ -9,6 +9,7 @@ const config: CapacitorConfig = {
   android: { allowMixedContent: false },
   ios: { contentInset: 'automatic', preferredContentMode: 'mobile' },
   plugins: {
+    SplashScreen: { launchAutoHide: false, launchFadeOutDuration: 160, backgroundColor: '#21183f', androidScaleType: 'CENTER_INSIDE', showSpinner: false },
     SystemBars: { insetsHandling: 'native', initialViewportFitValueHint: 'contain', style: 'LIGHT' },
   },
 };

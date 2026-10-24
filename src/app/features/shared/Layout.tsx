@@ -24,6 +24,8 @@ export function Layout() {
     matchPath("/app/place/:placeId", location.pathname) ||
     matchPath("/app/workplace/:placeId", location.pathname),
   );
+  const isChatThread = Boolean(matchPath('/app/chat/:userId', location.pathname));
+  const hideNavigation = isPlaceDetail || isChatThread;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 900px)");
@@ -60,14 +62,14 @@ export function Layout() {
   const accountName = currentUser?.name || "Mi cuenta";
 
   return (
-    <div className={"user-layout" + (isPlaceDetail ? " is-detail" : "")}>
+    <div className={"user-layout" + (hideNavigation ? " is-detail" : "")}>
       <a href="#user-content" className="user-skip-link">Ir al contenido</a>
       <main id="user-content" tabIndex={-1} className="user-layout-content">
         <Outlet />
       </main>
       <MessageNotificationBanner />
 
-      {!isPlaceDetail && (isDesktop ? (
+      {!hideNavigation && (isDesktop ? (
         <aside className="user-sidebar">
           <NavLink to="/app/discover" className="user-sidebar-brand" aria-label="Pinwi, ir a Descubrir">
             <BrandLogo className="[&_img:first-child]:h-10 [&_img:last-child]:h-7" />

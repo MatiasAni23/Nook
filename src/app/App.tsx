@@ -4,6 +4,7 @@ import { router } from './routes';
 import { useEffect } from 'react';
 import { applyRouteMetadata } from './seo/routeMetadata';
 import { startNativeRuntime } from './mobile/nativeRuntime';
+import { NativeLaunch } from './mobile/NativeLaunch';
 
 export default function App() {
   useEffect(() => startNativeRuntime({
@@ -18,6 +19,7 @@ export default function App() {
   }, []);
   return (
     <CurrentUserProvider>
+      <NativeLaunch />
       <RouterProvider router={router} />
     </CurrentUserProvider>
   );

@@ -48,6 +48,8 @@ interface ChatMessageRow {
 const CHAT_MESSAGES_CACHE_TTL_MS = 2 * 60 * 1000;
 const chatMessagesCache = new Map<string, { timestamp: number; messages: ChatMessage[] }>();
 const chatMessagesRequests = new Map<string, Promise<ChatMessage[]>>();
+const chatMessageRevisions = new Map<string, number>();
+const chatFeeds = new Map<string, { channel: ReturnType<NonNullable<typeof supabase>['channel']>; listeners: Set<(message: ChatMessage) => void> }>();
 let chatSubscriptionId = 0;
 let chatCacheGeneration = 0;
 
@@ -55,6 +57,9 @@ export function clearChatServiceCaches() {
   chatCacheGeneration += 1;
   chatMessagesCache.clear();
   chatMessagesRequests.clear();
+  chatMessageRevisions.clear();
+  for (const feed of chatFeeds.values()) { feed.listeners.clear(); void supabase?.removeChannel(feed.channel); }
+  chatFeeds.clear();
 }
 
 function mapChatMessage(row: ChatMessageRow): ChatMessage {
@@ -73,11 +78,11 @@ export async function getChatUsersByIds(ids: string[]): Promise<ChatUser[]> {
   return getSharedProfiles({ ids });
 }
 
-export async function getChatMessagesForUser(userId: string): Promise<ChatMessage[]> {
+export async function getChatMessagesForUser(userId: string, options?: { forceRefresh?: boolean }): Promise<ChatMessage[]> {
   if (!isSupabaseConfigured || !supabase) return [];
 
   const cachedMessages = chatMessagesCache.get(userId);
-  if (cachedMessages && Date.now() - cachedMessages.timestamp < CHAT_MESSAGES_CACHE_TTL_MS) {
+  if (!options?.forceRefresh && cachedMessages && Date.now() - cachedMessages.timestamp < CHAT_MESSAGES_CACHE_TTL_MS) {
     return cachedMessages.messages;
   }
 
@@ -85,6 +90,7 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
   if (existingRequest) return existingRequest;
 
   const generation = chatCacheGeneration;
+  const revision = chatMessageRevisions.get(userId) ?? 0;
   const request = Promise.resolve(supabase
     .from("messages")
     .select("id, sender_id, receiver_id, message, created_at, read, read_at")
@@ -94,7 +100,17 @@ export async function getChatMessagesForUser(userId: string): Promise<ChatMessag
       if (error) throw error;
 
       if (generation !== chatCacheGeneration) return [];
-      const messages = (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+      let messages = (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
+      // A slower snapshot must not erase messages/read receipts received live.
+      if ((chatMessageRevisions.get(userId) ?? 0) !== revision) {
+        const merged = new Map(messages.map(message => [message.id, message]));
+        for (const message of chatMessagesCache.get(userId)?.messages ?? []) {
+          const snapshot = merged.get(message.id);
+          // Read acknowledgements only move forward, including another device's.
+          if (!snapshot?.read || message.read) merged.set(message.id, message);
+        }
+        messages = [...merged.values()].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      }
       chatMessagesCache.set(userId, { timestamp: Date.now(), messages });
       return messages;
     })
@@ -176,7 +192,7 @@ export async function markChatMessagesAsRead(input: {
 
   if (generation !== chatCacheGeneration) return [];
   const messages = (data ?? []).map((row) => mapChatMessage(row as ChatMessageRow));
-  messages.forEach((message) => upsertCachedChatMessage(input.currentUserId, message));
+  if (messages.length) upsertCachedChatMessages(input.currentUserId, messages);
   return messages;
 }
 
@@ -186,10 +202,15 @@ export function getCachedChatMessagesForUser(userId?: string) {
 }
 
 export function upsertCachedChatMessage(userId: string, message: ChatMessage) {
+  upsertCachedChatMessages(userId, [message]);
+}
+
+function upsertCachedChatMessages(userId: string, messages: ChatMessage[]) {
+  chatMessageRevisions.set(userId, (chatMessageRevisions.get(userId) ?? 0) + 1);
   const cachedMessages = chatMessagesCache.get(userId)?.messages ?? [];
-  const nextMessages = cachedMessages.some((item) => item.id === message.id)
-    ? cachedMessages.map((item) => (item.id === message.id ? message : item))
-    : [...cachedMessages, message];
+  const merged = new Map(cachedMessages.map(message => [message.id, message]));
+  for (const message of messages) merged.set(message.id, message);
+  const nextMessages = [...merged.values()];
 
   nextMessages.sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
   chatMessagesCache.set(userId, { timestamp: Date.now(), messages: nextMessages });
@@ -201,10 +222,18 @@ export function subscribeToChatMessages(
 ) {
   if (!isSupabaseConfigured || !supabase) return () => undefined;
 
+  const existingFeed = chatFeeds.get(userId);
+  if (existingFeed) {
+    existingFeed.listeners.add(onMessage);
+    return () => releaseChatFeed(userId, existingFeed, onMessage);
+  }
+
   chatSubscriptionId += 1;
   const client = supabase;
   const generation = chatCacheGeneration;
   const channel = client.channel(`messages-${userId}-${chatSubscriptionId}`);
+  const feed = { channel, listeners: new Set([onMessage]) };
+  chatFeeds.set(userId, feed);
 
   channel.on(
     "postgres_changes",
@@ -214,7 +243,7 @@ export function subscribeToChatMessages(
       const message = mapChatMessage(payload.new as ChatMessageRow);
       if (message.senderId !== userId && message.receiverId !== userId) return;
       upsertCachedChatMessage(userId, message);
-      onMessage(message);
+      for (const listener of feed.listeners) listener(message);
     },
   );
 
@@ -226,15 +255,27 @@ export function subscribeToChatMessages(
       const message = mapChatMessage(payload.new as ChatMessageRow);
       if (message.senderId !== userId && message.receiverId !== userId) return;
       upsertCachedChatMessage(userId, message);
-      onMessage(message);
+      for (const listener of feed.listeners) listener(message);
     },
   );
 
   channel.subscribe();
 
   return () => {
-    client.removeChannel(channel);
+    releaseChatFeed(userId, feed, onMessage);
   };
+}
+
+function releaseChatFeed(userId: string, feed: NonNullable<ReturnType<typeof chatFeeds.get>>, listener: (message: ChatMessage) => void) {
+  feed.listeners.delete(listener);
+  if (feed.listeners.size === 0 && chatFeeds.get(userId) === feed) {
+    chatFeeds.delete(userId);
+    void supabase?.removeChannel(feed.channel);
+  }
+}
+
+export function removeTypingChannel(channel: ReturnType<typeof createTypingChannel>) {
+  if (channel) void supabase?.removeChannel(channel);
 }
 
 export function getConversationId(userId: string, otherUserId: string) {

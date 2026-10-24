@@ -13,16 +13,28 @@ test('public prerender renders minimal place cards and never requests account or
   });
   try {
     const { renderPublicPage } = await server.ssrLoadModule('/src/app/seo/prerender.tsx');
+    const { getPublicPlacePath } = await server.ssrLoadModule('/src/app/seo/siteSeo.ts');
     const places = Array.from({ length: 205 }, (_, index) => ({ id: `public-${index}`, name: `Biblioteca ${index}`, address: `Dirección pública ${index}`, imageUrl: 'https://example.test/cover.jpg' }));
     const landing = renderPublicPage('/', places);
     assert.equal([...landing.matchAll(/<h1\b/g)].length, 1);
     assert.ok(landing.includes('Encuentra tu espacio para') && landing.includes('Un espacio para cada idea.'));
     assert.equal([...landing.matchAll(/class="landing-place-card"/g)].length, 205);
     assert.ok(landing.includes('Biblioteca 204') && landing.includes('https://example.test/cover.jpg'));
-    assert.ok(landing.includes('continuar=%2Fapp%2Fplace%2Fpublic-204'));
+    assert.ok(landing.includes('href="' + getPublicPlacePath(places[204]) + '"'));
     assert.ok(!landing.includes('Mapa público de espacios'));
     assert.doesNotMatch(landing, /lugares por descubrir|Mostrando \d|Página \d+ de \d+/);
     assert.ok(landing.includes('Estudiantes') || landing.includes('estudiantes y trabajadores'));
+    const directory = renderPublicPage('/lugares', places);
+    assert.equal([...directory.matchAll(/<h1\b/g)].length, 1);
+    assert.equal([...directory.matchAll(/class="public-place-card"/g)].length, 205);
+    for (const place of places) assert.ok(directory.includes('href="' + getPublicPlacePath(place) + '"'));
+    const detail = renderPublicPage(getPublicPlacePath(places[204]), places);
+    assert.equal([...detail.matchAll(/<h1\b/g)].length, 1);
+    assert.ok(detail.includes('Biblioteca 204') && detail.includes('Dirección pública 204'));
+    assert.ok(detail.includes('continuar=%2Fapp%2Fplace%2Fpublic-204'));
+    assert.ok(detail.includes('registro=1') && detail.includes('href="/lugares"'));
+    assert.ok(!detail.includes('role="dialog"'), 'Direct requests have complete HTML');
+    assert.throws(() => renderPublicPage('/lugar/no-publicado', places), /Only reviewed public/);
     for (const pathname of ['/terminos', '/privacidad']) {
       const legal = renderPublicPage(pathname);
       assert.equal([...legal.matchAll(/<h1\b/g)].length, 1);

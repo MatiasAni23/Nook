@@ -1,35 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createBrowserRouter, Navigate, useLocation, useSearchParams } from "react-router";
 import { getWebAppUrl } from "./mobile/appUrls";
-import { AdminHome } from "./features/admin/AdminHome";
+
 import { AdminLayout } from "./features/admin/AdminLayout";
-import { AdminManagement } from "./features/admin/AdminManagement";
-import { AdminManagePlaces } from "./features/admin/AdminManagePlaces";
-import { AdminStats } from "./features/admin/AdminStats";
-import { DelegateInviteView } from "./features/auth/DelegateInviteView";
+
 import { LoginView } from "./features/auth/LoginView";
 import { ProfileSetupView } from "./features/auth/ProfileSetupView";
-import { RecoverPasswordView } from "./features/auth/RecoverPasswordView";
-import { VerifyAccountView } from "./features/auth/VerifyAccountView";
-import { ChatView } from "./features/chat/ChatView";
+
 import { useCurrentUser } from "./context/CurrentUserContext";
-import { DelegateHome } from "./features/delegado/DelegateHome";
+
 import { DelegateLayout } from "./features/delegado/DelegateLayout";
-import { DelegateMyPlaces } from "./features/delegado/DelegateMyPlaces";
-import { DelegateReservations } from "./features/delegado/DelegateReservations";
-import { DelegateReports } from "./features/delegado/DelegateReports";
-import { DelegateSettings } from "./features/delegado/DelegateSettings";
-import { DelegateStats } from "./features/delegado/DelegateStats";
-import { DiscoverWrapper } from "./features/descubrir/DiscoverWrapper";
-import { StudentsView } from "./features/encontrar-estudiantes/StudentsView";
-import { CheckoutView } from "./features/mapa/CheckoutView";
-import { MapView } from "./features/mapa/MapView";
-import { PlaceDetails } from "./features/mapa/PlaceDetails";
-import { EditProfileView } from "./features/perfil/EditProfileView";
-import { ProfileWrapper } from "./features/perfil/ProfileWrapper";
-import { MyReservations } from "./features/reservas/MyReservations";
+
 import { Layout } from "./features/shared/Layout";
-import { LandingPage } from "./features/landing/LandingPage";
+import { PublicSiteLayout } from "./features/public-places/PublicSiteLayout";
+import { PublicDirectory, PublicPlaceRoute } from "./features/public-places/PublicPlacePage";
 import { authLink, destinationAfterLogin, safeAppDestination, verificationLink } from "./features/auth/authNavigation";
 import { getDemoSession, setDemoSession } from "./services/demoSessionService";
 import { isSupabaseConfigured } from "./lib/supabase";
@@ -46,6 +30,31 @@ import {
   signOut,
   signUpWithEmail,
 } from "./services/authService";
+
+import { deferPage } from "./features/shared/DeferredPage";
+
+const AdminHome = deferPage(() => import("./features/admin/AdminHome").then(module => ({ default: module.AdminHome })));
+const AdminManagement = deferPage(() => import("./features/admin/AdminManagement").then(module => ({ default: module.AdminManagement })));
+const AdminManagePlaces = deferPage(() => import("./features/admin/AdminManagePlaces").then(module => ({ default: module.AdminManagePlaces })));
+const AdminStats = deferPage(() => import("./features/admin/AdminStats").then(module => ({ default: module.AdminStats })));
+const DelegateInviteView = deferPage(() => import("./features/auth/DelegateInviteView").then(module => ({ default: module.DelegateInviteView })));
+const RecoverPasswordView = deferPage(() => import("./features/auth/RecoverPasswordView").then(module => ({ default: module.RecoverPasswordView })));
+const VerifyAccountView = deferPage(() => import("./features/auth/VerifyAccountView").then(module => ({ default: module.VerifyAccountView })));
+const ChatView = deferPage(() => import("./features/chat/ChatView").then(module => ({ default: module.ChatView })));
+const DelegateHome = deferPage(() => import("./features/delegado/DelegateHome").then(module => ({ default: module.DelegateHome })));
+const DelegateMyPlaces = deferPage(() => import("./features/delegado/DelegateMyPlaces").then(module => ({ default: module.DelegateMyPlaces })));
+const DelegateReservations = deferPage(() => import("./features/delegado/DelegateReservations").then(module => ({ default: module.DelegateReservations })));
+const DelegateReports = deferPage(() => import("./features/delegado/DelegateReports").then(module => ({ default: module.DelegateReports })));
+const DelegateSettings = deferPage(() => import("./features/delegado/DelegateSettings").then(module => ({ default: module.DelegateSettings })));
+const DelegateStats = deferPage(() => import("./features/delegado/DelegateStats").then(module => ({ default: module.DelegateStats })));
+const DiscoverWrapper = deferPage(() => import("./features/descubrir/DiscoverWrapper").then(module => ({ default: module.DiscoverWrapper })));
+const StudentsView = deferPage(() => import("./features/encontrar-estudiantes/StudentsView").then(module => ({ default: module.StudentsView })));
+const CheckoutView = deferPage(() => import("./features/mapa/CheckoutView").then(module => ({ default: module.CheckoutView })));
+const MapView = deferPage(() => import("./features/mapa/MapView").then(module => ({ default: module.MapView })));
+const PlaceDetails = deferPage(() => import("./features/mapa/PlaceDetails").then(module => ({ default: module.PlaceDetails })));
+const EditProfileView = deferPage(() => import("./features/perfil/EditProfileView").then(module => ({ default: module.EditProfileView })));
+const ProfileWrapper = deferPage(() => import("./features/perfil/ProfileWrapper").then(module => ({ default: module.ProfileWrapper })));
+const MyReservations = deferPage(() => import("./features/reservas/MyReservations").then(module => ({ default: module.MyReservations })));
 
 type UserRole = "student" | "worker" | "admin" | "delegate";
 
@@ -348,7 +357,12 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
-    Component: LandingPage,
+    Component: PublicSiteLayout,
+    children: [
+      { index: true, element: null },
+      { path: "lugares", Component: PublicDirectory },
+      { path: "lugar/:slug", Component: PublicPlaceRoute },
+    ],
   },
   {
     path: "/iniciar-sesion",

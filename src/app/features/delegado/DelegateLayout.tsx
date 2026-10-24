@@ -19,6 +19,7 @@ const primaryPaths = ["/delegate","/delegate/places","/delegate/reservations","/
 export function DelegateLayout({ onLogout }: { onLogout: () => void }) {
   const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
+  if (/^\/delegate\/chat\/[^/]+\/?$/.test(location.pathname)) return <main className="size-full overflow-hidden"><Outlet /></main>;
   const chat = location.pathname.startsWith("/delegate/chat");
   const active = (path: string) => location.pathname === path || (path !== "/delegate" && location.pathname.startsWith(path));
   const current = navItems.find((item) => active(item.path)) ?? navItems[0];

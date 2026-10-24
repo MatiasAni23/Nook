@@ -1,0 +1,11 @@
+.native-launch { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #483073 0%, #2f2051 38%, #21183f 76%); color: #fff; opacity: 1; transition: opacity 180ms ease-out; }
+.native-launch.is-leaving { opacity: 0; pointer-events: none; }
+.native-launch-content { display: flex; align-items: center; flex-direction: column; transform: translateY(-16px); }
+.native-launch-character { position: relative; width: clamp(220px, 52vw, 290px); height: clamp(220px, 52vw, 290px); }
+.native-launch-character img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; animation: native-launch-float 2.8s ease-in-out infinite; }
+.native-launch-character span { position: absolute; bottom: 12%; left: 25%; width: 50%; height: 10px; border-radius: 50%; background: #100a24; filter: blur(6px); opacity: .5; animation: native-launch-shadow 2.8s ease-in-out infinite; }
+.native-launch-wordmark { width: 144px; height: auto; margin-top: -12px; filter: brightness(0) invert(1); }
+.native-launch-content p { margin-top: 18px; color: #d1c1e4; font: 500 12px/1.6 system-ui, sans-serif; letter-spacing: .3px; }
+@keyframes native-launch-float { 50% { transform: translateY(-10px) rotate(-2deg); } }
+@keyframes native-launch-shadow { 50% { transform: scaleX(.83); opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .native-launch, .native-launch * { animation: none !important; transition: none !important; } }

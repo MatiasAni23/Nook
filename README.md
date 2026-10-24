@@ -59,7 +59,9 @@ npm run android:apk
 npm run android:open
 ```
 
-`android:apk` compila y deja `docs-local/mobile/apk/Pinwi-0.1.0-debug.apk`, listo para enviar a un teléfono Android. Es una versión de prueba firmada con la clave debug local. Para ejecutar por USB, activa depuración USB y usa Android Studio o `npm run android:run`. Tras cambiar el frontend, vuelve a ejecutar `npm run android:sync` antes de compilar desde Android Studio. No regeneres las carpetas nativas con `cap add`: ya contienen permisos, iconos y ajustes de Pinwi.
+`android:apk` compila y deja el APK en `docs-local/mobile/apk/`, con la versión leída de Android (`Pinwi-0.2.0-debug.apk` actualmente), listo para enviar a un teléfono. Es una versión de prueba firmada con la clave debug local. Para ejecutar por USB, activa depuración USB y usa Android Studio o `npm run android:run`. Tras cambiar el frontend, vuelve a ejecutar `npm run android:sync` antes de compilar desde Android Studio. No regeneres las carpetas nativas con `cap add`: ya contienen permisos, iconos y ajustes de Pinwi.
+
+El arranque nativo usa el pinwino de la landing, el wordmark y un fondo exclusivo para el splash. Las pantallas pesadas se cargan por separado y las fotos usan la carga nativa del navegador. Las conversaciones ocultan la navegación principal y comparten el feed de mensajes con el banner de avisos. Las comprobaciones simuladas de red y navegador no sustituyen la prueba del APK en el teléfono real.
 
 Para iOS, copia/clona el proyecto en un Mac con Xcode 26+, ejecuta `npm ci`, `npm run ios:sync` y `npm run ios:open`. Selecciona tu equipo de firma y el iPhone en Xcode y pulsa Run. El proyecto usa Swift Package Manager. El USB sirve para instalar/depurar desde Xcode; Windows no compila iOS. Un servicio remoto con macOS puede compilar una versión firmada para TestFlight, pero no transforma Windows en Xcode ni se configuró una cuenta de distribución.
 

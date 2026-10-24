@@ -22,6 +22,7 @@ const navigation = [
 export function AdminLayout({ onLogout }: { onLogout: () => void }) {
   const { currentUser } = useCurrentUser();
   const { pathname } = useLocation();
+  if (/^\/admin\/chat\/[^/]+\/?$/.test(pathname)) return <main className="size-full overflow-hidden"><Outlet /></main>;
   const active =
     navigation.find(
       (item) => item.path !== "/admin" && pathname.startsWith(item.path),

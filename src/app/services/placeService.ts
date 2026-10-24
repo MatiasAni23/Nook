@@ -260,15 +260,14 @@ function toAppPlace(row: PlaceRow): AppPlace {
 
 async function fetchPlaces(): Promise<AppPlace[]> {
   const client = requireSupabase();
-  const promotedResult = await client.rpc("list_public_places");
+  const [promotedResult, spacesResult] = await Promise.all([
+    client.rpc("list_public_places"),
+    client.from("place_spaces").select("id, place_id, name, capacity, price_per_hour, billing_unit, image_url"),
+  ]);
 
   if (!promotedResult.error && promotedResult.data) {
     const rows = (promotedResult.data ?? []) as PlaceRow[];
-    const { data: spaces, error: spacesError } = await client
-      .from("place_spaces")
-      .select(
-        "id, place_id, name, capacity, price_per_hour, billing_unit, image_url",
-      );
+    const { data: spaces, error: spacesError } = spacesResult;
 
     // An incomplete record must not become an edit form that erases its spaces.
     if (spacesError) throw spacesError;

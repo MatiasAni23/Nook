@@ -1,9 +1,9 @@
 import { createServer, type Plugin, type ResolvedConfig } from "vite";
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { getPageSeo, PUBLIC_PAGES, renderSeoHead, replaceSeoHead, renderRobots, renderSitemap } from "../src/app/seo/siteSeo";
+import { getPageSeo, getPublicPages, renderSeoHead, replaceSeoHead, renderRobots, renderSitemap } from "../src/app/seo/siteSeo";
 import { loadPublicPlaceCatalog } from "./publicPlaceCatalog";
 import { PUBLIC_PLACE_SNAPSHOT_ID, serializePublicPlaceCards, type PublicPlaceCard } from "../src/app/services/publicPlaceCatalog";
 
@@ -42,7 +42,7 @@ export function seoPlugin(): Plugin {
       const server = await createServer({ root: config.root, mode: config.mode, server: { middlewareMode: true, watch: null, hmr: false }, appType: "custom" });
       try {
         const entry = await server.ssrLoadModule("/src/app/seo/prerender.tsx") as { renderPublicPage: (pathname: string, places: PublicPlaceCard[]) => string };
-        for (const page of PUBLIC_PAGES) {
+        for (const page of getPublicPages(places)) {
           let content = entry.renderPublicPage(page.path, places);
           content = content.replace(/file:\/\/\/[^"\s<>]+/g, reference => {
             const sourcePath = fileURLToPath(reference);
@@ -57,15 +57,16 @@ export function seoPlugin(): Plugin {
             }
             throw new Error("Missing built public asset: " + filename);
           });
-          const snapshot = page.path === "/" ? `<script id="${PUBLIC_PLACE_SNAPSHOT_ID}" type="application/json">${serializePublicPlaceCards(places)}</script>` : "";
+          const snapshot = page.path === "/" || page.path === "/lugares" || page.path.startsWith("/lugar/") ? `<script id="${PUBLIC_PLACE_SNAPSHOT_ID}" type="application/json">${serializePublicPlaceCards(places)}</script>` : "";
           const html = replaceSeoHead(template, page).replace('<div id="root"></div>', () => `<div id="root">${content}</div>${snapshot}`);
           const filename = page.path === "/" ? "index.html" : page.path.slice(1) + ".html";
+          await mkdir(path.dirname(path.join(directory, filename)), { recursive: true });
           await writeFile(path.join(directory, filename), html);
         }
         await writeFile(path.join(directory, "app-shell.html"), replaceSeoHead(template, getPageSeo("/app")));
         await writeFile(path.join(directory, "robots.txt"), renderRobots());
-        await writeFile(path.join(directory, "sitemap.xml"), renderSitemap());
-        config.logger.info(`SEO: catálogo de ${places.length} lugares prerenderizado; documentos públicos, sitemap, robots y shell privado generados.`);
+        await writeFile(path.join(directory, "sitemap.xml"), renderSitemap(places));
+        config.logger.info(`SEO: ${places.length} fichas públicas y directorio prerenderizados; catálogo, documentos públicos, sitemap, robots y shell privado generados.`);
       } finally { await server.close(); }
     },
   };

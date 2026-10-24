@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import { ArrowRight, LockKeyhole, Pause, Play, RefreshCw } from "lucide-react";
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "../../components/ui/carousel";
-import { useCurrentUser } from "../../context/CurrentUserContext";
 import { isSupabaseConfigured } from "../../lib/supabase";
-import { getDemoSession } from "../../services/demoSessionService";
-import { getCachedPublicPlaces, listPublicPlaces, type PublicPlaceCard } from "../../services/publicPlaceService";
-import { readPublicPlaceSnapshot } from "../../services/publicPlaceCatalog";
-import { authLink } from "../auth/authNavigation";
+import { getPublicPlacePath } from "../../seo/siteSeo";
+import { usePublicCatalog } from "./PublicCatalogContext";
 import { LandingGuide } from "./LandingGuide";
 import { PlacePhoto } from "./PlacePhoto";
 
@@ -15,18 +12,14 @@ const carouselOptions = { align: "start" as const, loop: true, breakpoints: { "(
 const AUTOPLAY_DELAY_MS = 6000;
 
 interface Props {
-  initialPlaces?: PublicPlaceCard[];
   accessOpen: boolean;
-  onPreview: (place: PublicPlaceCard, opener: HTMLAnchorElement) => void;
+  onPlaceOpen: (opener: HTMLAnchorElement) => void;
+  initialPage?: number;
+  onReady?: () => void;
 }
 
-export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
-  const { currentUser } = useCurrentUser();
-  const hasAccount = Boolean(currentUser) || (!isSupabaseConfigured && Boolean(getDemoSession()));
-  const [places, setPlaces] = useState<PublicPlaceCard[] | null>(() => initialPlaces ?? getCachedPublicPlaces() ?? readPublicPlaceSnapshot());
-  const [loading, setLoading] = useState(places === null);
-  const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
+export function PublicPlaces({ accessOpen, onPlaceOpen, initialPage = 0, onReady }: Props) {
+  const { places, loading, error, retry } = usePublicCatalog();
   const [pageSize, setPageSize] = useState(12);
   const [carousel, setCarousel] = useState<CarouselApi>();
   const [currentPage, setCurrentPage] = useState(0);
@@ -37,12 +30,16 @@ export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
   const [dragging, setDragging] = useState(false);
   const [inView, setInView] = useState(false);
   const [tabVisible, setTabVisible] = useState(true);
+  const [viewportReady, setViewportReady] = useState(false);
+  const restorePage = useRef<number | null>(initialPage);
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   useEffect(() => {
     const mobile = window.matchMedia("(max-width: 639px)");
     const tablet = window.matchMedia("(max-width: 900px)");
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => { setPageSize(mobile.matches ? 6 : tablet.matches ? 9 : 12); setReducedMotion(motion.matches); };
+    const update = () => { setPageSize(mobile.matches ? 6 : tablet.matches ? 9 : 12); setReducedMotion(motion.matches); setViewportReady(true); };
     update();
     mobile.addEventListener("change", update);
     tablet.addEventListener("change", update);
@@ -81,22 +78,17 @@ export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
     return () => observer.disconnect();
   }, [carousel]);
 
-  useEffect(() => {
-    let mounted = true;
-    setError("");
-    listPublicPlaces().then(value => { if (mounted) setPlaces(value); })
-      .catch(() => { if (mounted) setError("No pudimos actualizar los lugares. Intenta nuevamente."); })
-      .finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; };
-  }, [attempt]);
-
   const pages = useMemo(() => Array.from({ length: Math.ceil((places?.length ?? 0) / pageSize) }, (_, index) =>
     (places ?? []).slice(index * pageSize, (index + 1) * pageSize)), [places, pageSize]);
   const activePage = Math.min(currentPage, Math.max(0, pages.length - 1));
 
   useEffect(() => {
-    carousel?.reInit({ startIndex: 0 });
-  }, [carousel, places, pageSize]);
+    if (!carousel || !viewportReady || !places) return;
+    const page = restorePage.current ?? carousel.selectedScrollSnap();
+    carousel.reInit({ startIndex: Math.min(page, Math.max(0, Math.ceil(places.length / pageSize) - 1)) });
+    restorePage.current = null;
+    onReadyRef.current?.();
+  }, [carousel, places, pageSize, viewportReady]);
 
   useEffect(() => {
     if (!carousel || pages.length < 2 || paused || reducedMotion || hovered || focused || dragging || !inView || !tabVisible || accessOpen) return;
@@ -115,7 +107,7 @@ export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
         {!reducedMotion && pages.length > 1 && <button type="button" className="landing-autoplay-toggle" disabled={!carousel} onClick={() => setPaused(value => !value)} aria-label={paused ? "Reanudar carrusel automático" : "Pausar carrusel automático"} title={paused ? "Reanudar carrusel" : "Pausar carrusel"}>{paused ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>}
       </div>
       {!isSupabaseConfigured && <p className="landing-demo-note">Vista de ejemplo. Los lugares conectados se mostrarán al configurar el servicio.</p>}
-      {error && <div className="landing-catalog-status is-error" role="alert"><p>{error}</p><button type="button" onClick={() => { setLoading(places === null); setAttempt(value => value + 1); }}><RefreshCw size={16} aria-hidden="true" />Reintentar</button></div>}
+      {error && <div className="landing-catalog-status is-error" role="alert"><p>{error}</p><button type="button" onClick={retry}><RefreshCw size={16} aria-hidden="true" />Reintentar</button></div>}
       {loading && !places ? <div className="landing-place-grid" aria-busy="true">{Array.from({ length: pageSize }, (_, index) => <div key={index} className="landing-card-skeleton" aria-hidden="true"><span /><span /></div>)}</div> : pages.length > 0 && (
         <Carousel className={`landing-place-carousel${carousel ? " is-ready" : ""}`} opts={carouselOptions} setApi={setCarousel} aria-label="Lugares disponibles" aria-roledescription="carrusel" aria-busy={loading}
           onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
@@ -124,10 +116,10 @@ export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
             {pages.map((page, pageIndex) => <CarouselItem key={pageIndex} className="landing-carousel-page" aria-roledescription="página" aria-label={`${pageIndex + 1} de ${pages.length}`} aria-hidden={carousel ? pageIndex !== activePage : undefined}>
               <div className="landing-place-grid">{page.map(place => (
                 <article className="landing-place-card" key={place.id}>
-                  <Link to={hasAccount ? "/app/place/" + place.id : authLink("/app/place/" + place.id)} aria-label={"Conocer " + place.name} tabIndex={carousel && pageIndex !== activePage ? -1 : undefined}
+                  <Link to={getPublicPlacePath(place)} state={{ publicPlaceModal: true }} aria-label={"Conocer " + place.name} tabIndex={carousel && pageIndex !== activePage ? -1 : undefined}
                     onClick={event => {
-                      if (hasAccount || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
-                      event.preventDefault(); onPreview(place, event.currentTarget);
+                      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                      onPlaceOpen(event.currentTarget);
                     }}>
                     <div className="landing-card-photo"><PlacePhoto place={place} /><span className="landing-card-arrow" aria-hidden="true"><ArrowRight size={20} /></span></div>
                     <h3 title={place.name}>{place.name}</h3>
@@ -141,6 +133,7 @@ export function PublicPlaces({ initialPlaces, accessOpen, onPreview }: Props) {
       )}
       {!loading && !error && !places?.length && <div className="landing-catalog-status"><p>Pronto encontrarás nuevos espacios aquí.</p></div>}
       <p className="landing-catalog-note"><LockKeyhole size={15} aria-hidden="true" />Abre un lugar para ver su dirección. Entra a tu cuenta para conocer más.</p>
+      <Link className="landing-inline-link" to="/lugares">Explorar el directorio de lugares<ArrowRight size={17} aria-hidden="true" /></Link>
     </section>
   );
 }
